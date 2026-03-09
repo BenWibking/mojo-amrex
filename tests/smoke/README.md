@@ -6,9 +6,10 @@ The intended smoke sequence is:
 1. build the C ABI library
 2. package the Mojo bindings
 3. initialize the runtime
-4. construct `BoxArray`, `DistributionMapping`, and `MultiFab`
-5. iterate tiles from Mojo and fill through the exported `Array4` view
-6. shut down cleanly
+4. construct `BoxArray`, `DistributionMapping`, `Geometry`, `MultiFab`, and `ParmParse`
+5. iterate tiles from Mojo through `MultiFab.for_each_tile`
+6. write a single-level plotfile from Mojo
+7. shut down cleanly
 
 Useful commands:
 

@@ -43,6 +43,13 @@ struct RealVect3D(Copyable):
 
 
 @fieldwise_init
+struct ParmParseIntQueryResult(Copyable):
+    var status: Int
+    var found: Bool
+    var value: Int
+
+
+@fieldwise_init
 struct Array4F64View(Copyable):
     var data: RealPtr
     var lo_x: c_int
@@ -422,4 +429,70 @@ fn multifab_copy(
             c_int(ncomp),
             ngrow,
         )
+    )
+
+
+fn multifab_write_single_level_plotfile(
+    ref lib: OwnedDLHandle,
+    multifab: MultiFabHandle,
+    geometry: GeometryHandle,
+    plotfile: StringLiteral,
+    time: Float64,
+    level_step: Int,
+) -> Int:
+    return Int(
+        lib.call["amrex_mojo_write_single_level_plotfile", c_int](
+            multifab,
+            geometry,
+            plotfile.as_c_string_slice().unsafe_ptr(),
+            c_double(time),
+            c_int(level_step),
+        )
+    )
+
+
+fn parmparse_create(
+    ref lib: OwnedDLHandle, runtime: RuntimeHandle, prefix: StringLiteral
+) -> ParmParseHandle:
+    return lib.call["amrex_mojo_parmparse_create", ParmParseHandle](
+        runtime, prefix.as_c_string_slice().unsafe_ptr()
+    )
+
+
+fn parmparse_destroy(ref lib: OwnedDLHandle, parmparse: ParmParseHandle):
+    lib.call["amrex_mojo_parmparse_destroy"](parmparse)
+
+
+fn parmparse_add_int(
+    ref lib: OwnedDLHandle,
+    parmparse: ParmParseHandle,
+    name: StringLiteral,
+    value: Int,
+) -> Int:
+    return Int(
+        lib.call["amrex_mojo_parmparse_add_int", c_int](
+            parmparse,
+            name.as_c_string_slice().unsafe_ptr(),
+            c_int(value),
+        )
+    )
+
+
+fn parmparse_query_int(
+    ref lib: OwnedDLHandle, parmparse: ParmParseHandle, name: StringLiteral
+) -> ParmParseIntQueryResult:
+    var out_value = List[c_int](length=1, fill=0)
+    var out_found = List[c_int](length=1, fill=0)
+    var status = Int(
+        lib.call["amrex_mojo_parmparse_query_int", c_int](
+            parmparse,
+            name.as_c_string_slice().unsafe_ptr(),
+            out_value.unsafe_ptr(),
+            out_found.unsafe_ptr(),
+        )
+    )
+    return ParmParseIntQueryResult(
+        status=status,
+        found=out_found[0] != 0,
+        value=Int(out_value[0]),
     )

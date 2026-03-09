@@ -20,12 +20,14 @@ from amrex.ffi import (
     multifab_set_val,
     multifab_sum,
     multifab_tile_count,
+    multifab_write_single_level_plotfile,
     tile_view,
     zero_intvect3d,
 )
 from amrex.loader import load_library
 from amrex.runtime import AmrexRuntime
 from amrex.space3d.boxarray import BoxArray, DistributionMapping
+from amrex.space3d.geometry import Geometry
 from std.ffi import OwnedDLHandle
 
 
@@ -85,6 +87,12 @@ struct MultiFab(Movable):
     fn tile(ref self, tile_index: Int) raises -> TileF64View:
         self._require_tile_index(tile_index)
         return tile_view(self.lib, self.handle, tile_index)
+
+    fn for_each_tile[
+        tile_func: fn(TileF64View) raises -> None
+    ](ref self) raises:
+        for tile_index in range(self.tile_count()):
+            tile_func(self.tile(tile_index))
 
     fn min(ref self, comp: Int) -> Float64:
         return multifab_min(self.lib, self.handle, comp)
@@ -151,6 +159,26 @@ struct MultiFab(Movable):
                 dst_comp,
                 ncomp,
                 ngrow,
+            )
+            != 0
+        ):
+            raise Error(last_error_message(self.lib))
+
+    fn write_single_level_plotfile(
+        ref self,
+        plotfile: StringLiteral,
+        ref geometry: Geometry,
+        time: Float64 = 0.0,
+        level_step: Int = 0,
+    ) raises:
+        if (
+            multifab_write_single_level_plotfile(
+                self.lib,
+                self.handle,
+                geometry._handle(),
+                plotfile,
+                time,
+                level_step,
             )
             != 0
         ):
