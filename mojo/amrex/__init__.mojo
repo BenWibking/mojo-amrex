@@ -2,6 +2,7 @@
 
 from amrex.loader import (
     default_library_path,
+    installed_library_path,
     load_default_library,
     load_library,
 )

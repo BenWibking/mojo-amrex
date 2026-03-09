@@ -13,8 +13,10 @@ The intended smoke sequence is:
 Useful commands:
 
 ```bash
+pixi run configure
 pixi run build-capi
-pixi run package-mojo
+pixi run install-amrex
 pixi run build-vertical-slice
 pixi run run-vertical-slice
+pixi run run-vertical-slice-script
 ```

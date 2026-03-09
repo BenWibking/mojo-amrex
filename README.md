@@ -7,6 +7,7 @@ The current repo contains:
 - a design note in `docs/mojo-amrex-bindings-plan.md`
 - a real AMReX-backed C ABI under `src/capi`
 - a Mojo package under `mojo/amrex`
+- an install path that exposes `amrex` as a top-level Mojo package in the active environment
 - a working vertical-slice example in `examples/vertical_slice.mojo`
 
 The current MVP covers:
@@ -43,9 +44,11 @@ With `pixi`:
 ```bash
 pixi run configure
 pixi run build-capi
+pixi run install-amrex
 pixi run package-mojo
 pixi run build-vertical-slice
 pixi run run-vertical-slice
+pixi run run-vertical-slice-script
 pixi run format-mojo
 ```
 
@@ -53,6 +56,10 @@ Notes:
 
 - By default the CMake build pulls AMReX from `../amrex` and configures a 3D,
   CPU-only, double-precision build suitable for the MVP bindings.
+- `pixi run install-amrex` installs the C API library into the active env's
+  `lib/` directory and installs `amrex.mojopkg` into the env's `lib/mojo/`
+  directory, so bare commands like `mojo examples/vertical_slice.mojo` work
+  from the repo root without `-I mojo`.
 - The public Mojo surface now uses move-only wrapper objects such as
   `AmrexRuntime`, `BoxArray`, `Geometry`, and `MultiFab`. The raw handle-level
   bindings remain available under `amrex.ffi`.
