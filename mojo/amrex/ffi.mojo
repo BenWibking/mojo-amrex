@@ -2,13 +2,13 @@ from std.collections import List
 from std.ffi import OwnedDLHandle, c_char, c_double, c_int
 
 
-comptime RuntimeHandle = UnsafePointer[NoneType, MutAnyOrigin]
-comptime BoxArrayHandle = UnsafePointer[NoneType, MutAnyOrigin]
-comptime DistributionMappingHandle = UnsafePointer[NoneType, MutAnyOrigin]
-comptime GeometryHandle = UnsafePointer[NoneType, MutAnyOrigin]
-comptime MultiFabHandle = UnsafePointer[NoneType, MutAnyOrigin]
-comptime ParmParseHandle = UnsafePointer[NoneType, MutAnyOrigin]
-comptime RealPtr = UnsafePointer[c_double, MutAnyOrigin]
+comptime RuntimeHandle = UnsafePointer[NoneType, MutExternalOrigin]
+comptime BoxArrayHandle = UnsafePointer[NoneType, MutExternalOrigin]
+comptime DistributionMappingHandle = UnsafePointer[NoneType, MutExternalOrigin]
+comptime GeometryHandle = UnsafePointer[NoneType, MutExternalOrigin]
+comptime MultiFabHandle = UnsafePointer[NoneType, MutExternalOrigin]
+comptime MFIterHandle = UnsafePointer[NoneType, MutExternalOrigin]
+comptime ParmParseHandle = UnsafePointer[NoneType, MutExternalOrigin]
 
 
 @fieldwise_init
@@ -74,8 +74,8 @@ struct IntVect3DResult(Copyable):
 
 
 @fieldwise_init
-struct Array4F64View(Copyable):
-    var data: RealPtr
+struct Array4F64View[origin: Origin[mut=True]](Copyable):
+    var data: UnsafePointer[c_double, Self.origin]
     var lo_x: c_int
     var lo_y: c_int
     var lo_z: c_int
@@ -110,12 +110,12 @@ struct Array4F64View(Copyable):
 
 
 @fieldwise_init
-struct TileF64View(Copyable):
+struct TileF64View[origin: Origin[mut=True]](Copyable):
     var tile_box: Box3D
     var valid_box: Box3D
-    var array_view: Array4F64View
+    var array_view: Array4F64View[Self.origin]
 
-    fn array(self) -> Array4F64View:
+    fn array(self) -> Array4F64View[Self.origin]:
         return self.array_view.copy()
 
     fn fill(self, value: Float64, comp: Int = 0):
@@ -145,7 +145,7 @@ fn box3d(
 fn last_error_message(ref lib: OwnedDLHandle) -> String:
     var message = lib.call[
         "amrex_mojo_last_error_message",
-        UnsafePointer[c_char, MutAnyOrigin],
+        UnsafePointer[c_char, ImmutExternalOrigin],
     ]()
     if not message:
         return String("AMReX call failed.")
@@ -299,6 +299,118 @@ fn multifab_tile_count(ref lib: OwnedDLHandle, multifab: MultiFabHandle) -> Int:
     return Int(lib.call["amrex_mojo_multifab_tile_count", c_int](multifab))
 
 
+fn mfiter_create(ref lib: OwnedDLHandle, multifab: MultiFabHandle) -> MFIterHandle:
+    var out_handle = List[MFIterHandle](length=1, fill=MFIterHandle())
+    _ = lib.call["amrex_mojo_mfiter_create", c_int](
+        multifab,
+        out_handle.unsafe_ptr(),
+    )
+    return out_handle[0]
+
+
+fn mfiter_destroy(ref lib: OwnedDLHandle, mfiter: MFIterHandle):
+    lib.call["amrex_mojo_mfiter_destroy"](mfiter)
+
+
+fn mfiter_is_valid(ref lib: OwnedDLHandle, mfiter: MFIterHandle) -> Bool:
+    return lib.call["amrex_mojo_mfiter_is_valid", c_int](mfiter) != 0
+
+
+fn mfiter_next(ref lib: OwnedDLHandle, mfiter: MFIterHandle) -> Int:
+    return Int(lib.call["amrex_mojo_mfiter_next", c_int](mfiter))
+
+
+fn mfiter_index(ref lib: OwnedDLHandle, mfiter: MFIterHandle) -> Int:
+    return Int(lib.call["amrex_mojo_mfiter_index", c_int](mfiter))
+
+
+fn mfiter_local_tile_index(
+    ref lib: OwnedDLHandle, mfiter: MFIterHandle
+) -> Int:
+    return Int(lib.call["amrex_mojo_mfiter_local_tile_index", c_int](mfiter))
+
+
+fn mfiter_tile_box(
+    ref lib: OwnedDLHandle, mfiter: MFIterHandle
+) -> Box3DResult:
+    var small_end = List[c_int](length=3, fill=0)
+    var big_end = List[c_int](length=3, fill=0)
+    var nodal = List[c_int](length=3, fill=0)
+    var status = Int(
+        lib.call["amrex_mojo_mfiter_tile_box_metadata", c_int](
+            mfiter,
+            small_end.unsafe_ptr(),
+            big_end.unsafe_ptr(),
+            nodal.unsafe_ptr(),
+        )
+    )
+    return Box3DResult(
+        status=status,
+        value=box_from_parts(small_end, big_end, nodal),
+    )
+
+
+fn mfiter_valid_box(
+    ref lib: OwnedDLHandle, mfiter: MFIterHandle
+) -> Box3DResult:
+    var small_end = List[c_int](length=3, fill=0)
+    var big_end = List[c_int](length=3, fill=0)
+    var nodal = List[c_int](length=3, fill=0)
+    var status = Int(
+        lib.call["amrex_mojo_mfiter_valid_box_metadata", c_int](
+            mfiter,
+            small_end.unsafe_ptr(),
+            big_end.unsafe_ptr(),
+            nodal.unsafe_ptr(),
+        )
+    )
+    return Box3DResult(
+        status=status,
+        value=box_from_parts(small_end, big_end, nodal),
+    )
+
+
+fn mfiter_fab_box(
+    ref lib: OwnedDLHandle, mfiter: MFIterHandle
+) -> Box3DResult:
+    var small_end = List[c_int](length=3, fill=0)
+    var big_end = List[c_int](length=3, fill=0)
+    var nodal = List[c_int](length=3, fill=0)
+    var status = Int(
+        lib.call["amrex_mojo_mfiter_fab_box_metadata", c_int](
+            mfiter,
+            small_end.unsafe_ptr(),
+            big_end.unsafe_ptr(),
+            nodal.unsafe_ptr(),
+        )
+    )
+    return Box3DResult(
+        status=status,
+        value=box_from_parts(small_end, big_end, nodal),
+    )
+
+
+fn mfiter_growntile_box(
+    ref lib: OwnedDLHandle, mfiter: MFIterHandle, ngrow: IntVect3D
+) -> Box3DResult:
+    var small_end = List[c_int](length=3, fill=0)
+    var big_end = List[c_int](length=3, fill=0)
+    var nodal = List[c_int](length=3, fill=0)
+    var status = Int(
+        lib.call["amrex_mojo_mfiter_growntile_box_metadata", c_int](
+            mfiter,
+            ngrow,
+            small_end.unsafe_ptr(),
+            big_end.unsafe_ptr(),
+            nodal.unsafe_ptr(),
+        )
+    )
+    return Box3DResult(
+        status=status,
+        value=box_from_parts(small_end, big_end, nodal),
+    )
+
+
 fn box_from_bounds(lo_raw: List[c_int], hi_raw: List[c_int]) -> Box3D:
     return box3d(
         small_end=intvect3d(Int(lo_raw[0]), Int(lo_raw[1]), Int(lo_raw[2])),
@@ -318,9 +430,9 @@ fn box_from_parts(
     )
 
 
-fn tile_view(
+fn tile_view[owner_origin: Origin[mut=True]](
     ref lib: OwnedDLHandle, multifab: MultiFabHandle, tile_index: Int
-) -> TileF64View:
+) -> TileF64View[owner_origin]:
     var tile_lo = List[c_int](length=3, fill=0)
     var tile_hi = List[c_int](length=3, fill=0)
     var valid_lo = List[c_int](length=3, fill=0)
@@ -343,8 +455,11 @@ fn tile_view(
         ncomp_raw.unsafe_ptr(),
     )
 
-    var array_view = Array4F64View(
-        data=lib.call["amrex_mojo_multifab_data_ptr", RealPtr](
+    var array_view = Array4F64View[owner_origin](
+        data=lib.call[
+            "amrex_mojo_multifab_data_ptr",
+            UnsafePointer[c_double, owner_origin],
+        ](
             multifab, c_int(tile_index)
         ),
         lo_x=data_lo[0],
@@ -360,10 +475,48 @@ fn tile_view(
         ncomp=ncomp_raw[0],
     )
 
-    return TileF64View(
+    return TileF64View[owner_origin](
         tile_box=box_from_bounds(tile_lo, tile_hi),
         valid_box=box_from_bounds(valid_lo, valid_hi),
         array_view=array_view.copy(),
+    )
+
+
+fn array4_view_from_mfiter[owner_origin: Origin[mut=True]](
+    ref lib: OwnedDLHandle,
+    multifab: MultiFabHandle,
+    mfiter: MFIterHandle,
+) -> Array4F64View[owner_origin]:
+    var data_lo = List[c_int](length=3, fill=0)
+    var data_hi = List[c_int](length=3, fill=0)
+    var stride = List[Int64](length=4, fill=0)
+    var ncomp_raw = List[c_int](length=1, fill=0)
+
+    _ = lib.call["amrex_mojo_multifab_array4_metadata_for_mfiter", c_int](
+        multifab,
+        mfiter,
+        data_lo.unsafe_ptr(),
+        data_hi.unsafe_ptr(),
+        stride.unsafe_ptr(),
+        ncomp_raw.unsafe_ptr(),
+    )
+
+    return Array4F64View[owner_origin](
+        data=lib.call[
+            "amrex_mojo_multifab_data_ptr_for_mfiter",
+            UnsafePointer[c_double, owner_origin],
+        ](multifab, mfiter),
+        lo_x=data_lo[0],
+        lo_y=data_lo[1],
+        lo_z=data_lo[2],
+        hi_x=data_hi[0],
+        hi_y=data_hi[1],
+        hi_z=data_hi[2],
+        stride_i=stride[0],
+        stride_j=stride[1],
+        stride_k=stride[2],
+        stride_n=stride[3],
+        ncomp=ncomp_raw[0],
     )
 
 
@@ -578,6 +731,26 @@ fn multifab_write_single_level_plotfile(
     ref lib: OwnedDLHandle,
     multifab: MultiFabHandle,
     geometry: GeometryHandle,
+    plotfile: String,
+    time: Float64,
+    level_step: Int,
+) -> Int:
+    var plotfile_owned = plotfile
+    return Int(
+        lib.call["amrex_mojo_write_single_level_plotfile", c_int](
+            multifab,
+            geometry,
+            plotfile_owned.as_c_string_slice().unsafe_ptr(),
+            c_double(time),
+            c_int(level_step),
+        )
+    )
+
+
+fn multifab_write_single_level_plotfile(
+    ref lib: OwnedDLHandle,
+    multifab: MultiFabHandle,
+    geometry: GeometryHandle,
     plotfile: StringLiteral,
     time: Float64,
     level_step: Int,
@@ -590,6 +763,15 @@ fn multifab_write_single_level_plotfile(
             c_double(time),
             c_int(level_step),
         )
+    )
+
+
+fn parmparse_create(
+    ref lib: OwnedDLHandle, runtime: RuntimeHandle, prefix: String
+) -> ParmParseHandle:
+    var prefix_owned = prefix
+    return lib.call["amrex_mojo_parmparse_create", ParmParseHandle](
+        runtime, prefix_owned.as_c_string_slice().unsafe_ptr()
     )
 
 
@@ -608,6 +790,22 @@ fn parmparse_destroy(ref lib: OwnedDLHandle, parmparse: ParmParseHandle):
 fn parmparse_add_int(
     ref lib: OwnedDLHandle,
     parmparse: ParmParseHandle,
+    name: String,
+    value: Int,
+) -> Int:
+    var name_owned = name
+    return Int(
+        lib.call["amrex_mojo_parmparse_add_int", c_int](
+            parmparse,
+            name_owned.as_c_string_slice().unsafe_ptr(),
+            c_int(value),
+        )
+    )
+
+
+fn parmparse_add_int(
+    ref lib: OwnedDLHandle,
+    parmparse: ParmParseHandle,
     name: StringLiteral,
     value: Int,
 ) -> Int:
@@ -617,6 +815,27 @@ fn parmparse_add_int(
             name.as_c_string_slice().unsafe_ptr(),
             c_int(value),
         )
+    )
+
+
+fn parmparse_query_int(
+    ref lib: OwnedDLHandle, parmparse: ParmParseHandle, name: String
+) -> ParmParseIntQueryResult:
+    var name_owned = name
+    var out_value = List[c_int](length=1, fill=0)
+    var out_found = List[c_int](length=1, fill=0)
+    var status = Int(
+        lib.call["amrex_mojo_parmparse_query_int", c_int](
+            parmparse,
+            name_owned.as_c_string_slice().unsafe_ptr(),
+            out_value.unsafe_ptr(),
+            out_found.unsafe_ptr(),
+        )
+    )
+    return ParmParseIntQueryResult(
+        status=status,
+        found=out_found[0] != 0,
+        value=Int(out_value[0]),
     )
 
 

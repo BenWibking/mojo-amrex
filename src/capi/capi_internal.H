@@ -32,6 +32,9 @@ namespace amrex_mojo::detail
     {
         amrex::Box tile_box;
         amrex::Box valid_box;
+        amrex::Box fab_box;
+        int32_t box_index = 0;
+        int32_t local_tile_index = 0;
         amrex::FArrayBox* fab = nullptr;
     };
 
@@ -137,6 +140,14 @@ struct amrex_mojo_multifab
     amrex_mojo::detail::runtime_state* state = nullptr;
     std::unique_ptr<amrex::MultiFab> value;
     std::vector<amrex_mojo::detail::tile_descriptor> tiles;
+};
+
+struct amrex_mojo_mfiter
+{
+    amrex_mojo::detail::runtime_state* state = nullptr;
+    amrex_mojo_intvect_3d ngrow{};
+    std::vector<amrex_mojo::detail::tile_descriptor> tiles;
+    int32_t current_tile = 0;
 };
 
 struct amrex_mojo_parmparse

@@ -118,7 +118,7 @@ field operations:
 - `Array4<Real>` tile views
 - callback-based tile iteration
 - minimal `ParmParse`
-- plotfile write/read smoke path
+- plotfile write smoke path
 
 This is enough to support a real AMReX workflow in Mojo:
 
@@ -379,6 +379,36 @@ The first version should not try to reproduce:
 - CUDA `__cuda_array_interface__`
 - DLPack
 
+### GPU ownership and async execution
+
+GPU support should preserve AMReX's native ownership model instead of replacing
+it with Mojo-native buffer ownership.
+
+Design guidance:
+
+- keep `MultiFab` storage owned by AMReX, not by Mojo `DeviceBuffer`
+- if a GPU-capable `MultiFab` constructor is added, it should allocate through
+  `MFInfo().SetArena(The_Async_Arena())`
+- AMReX can expose and switch its active stream through existing `Gpu` APIs
+- borrowed `Array4` tile views may be passed directly to kernels if the kernel
+  launch happens while the borrow is live
+- exact C++-style "destroy at scope end" semantics are not available in Mojo;
+  the binding should target the practical guarantee that the underlying AMReX
+  storage remains valid for the launched work
+- Mojo `DeviceBuffer` may still be useful for Mojo-native buffers or staging
+  data, but it should not become the backing store for `MultiFab`
+- Mojo can select among AsyncRT-managed streams, but the public API does not
+  currently appear to support adopting an external AMReX `cudaStream_t` /
+  `hipStream_t` as a `DeviceStream`
+
+This shifts the GPU design problem away from "who owns the memory" and toward
+"which stream owns the work." `The_Async_Arena()` solves async-safe allocation
+and free for AMReX-managed data on the relevant AMReX stream, but stream
+interoperability between Mojo GPU launches and AMReX still needs to be defined
+before GPU support is considered complete. If no raw-stream interop is exposed
+on the Mojo side, the first GPU boundary may need explicit synchronization
+instead of true same-stream asynchronous composition.
+
 Those are follow-on interop features, not prerequisites for a functional Mojo
 binding.
 
@@ -502,14 +532,14 @@ Exit criteria:
 
 Deliverables:
 
-- `MFIter`, only if still needed after the callback API is in place
+- `MFIter`
 - minimal `ParmParse`
 - plotfile write smoke path
 
 Exit criteria:
 
-- if `MFIter` is exposed, its borrowing relationship to `MultiFab` is encoded
-  in the wrapper type
+- `MFIter` supports `MultiFab.array(mfi)` across compatible `MultiFab`
+  layouts without exposing raw C++ iterator lifetime hazards
 - configure simple values through `ParmParse`
 - write a plotfile from Mojo
 
@@ -534,7 +564,8 @@ Potential additions:
 - 1D and 2D builds
 - MPI support
 - OpenMP support
-- GPU builds
+- GPU builds using AMReX-owned `MultiFab` storage allocated from
+  `The_Async_Arena()`
 - DLPack or other array interop
 - particles
 - EB
@@ -586,7 +617,12 @@ owners under `AmrexRuntime` and make finalization happen from its destructor.
 ### 4. Premature GPU interop
 
 GPU support is important long-term, but it is not the right first target for a
-new FFI stack. CPU correctness should come first.
+new FFI stack. CPU correctness should come first. When GPU support is added,
+prefer AMReX-managed allocation via `The_Async_Arena()` over redesigning
+`MultiFab` ownership around Mojo `DeviceBuffer`, and treat stream coordination
+as the main integration risk. The current public Mojo GPU API appears to manage
+its own streams rather than adopt external AMReX stream handles, so boundary
+synchronization may be required unless lower-level interop becomes available.
 
 ### 5. Depending too heavily on AMReX's Fortran interface build path
 

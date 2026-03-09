@@ -14,48 +14,47 @@ from amrex.ffi import (
     geometry_prob_domain,
     last_error_message,
 )
-from amrex.loader import load_library
-from amrex.runtime import AmrexRuntime
-from std.ffi import OwnedDLHandle
+from amrex.runtime import AmrexRuntime, RuntimeLease
 
 
 struct Geometry(Movable):
-    var lib: OwnedDLHandle
+    var runtime: RuntimeLease
     var handle: GeometryHandle
 
     fn __init__(out self, ref runtime: AmrexRuntime, domain: Box3D) raises:
-        var path = runtime.library_path()
-        self.lib = load_library(path)
-        self.handle = geometry_create(self.lib, runtime._handle(), domain)
+        self.runtime = runtime._lease()
+        self.handle = geometry_create(
+            self.runtime[].lib, self.runtime[].handle, domain
+        )
         if not self.handle:
-            raise Error(last_error_message(self.lib))
+            raise Error(last_error_message(self.runtime[].lib))
 
     fn __del__(deinit self):
         if self.handle:
-            geometry_destroy(self.lib, self.handle)
+            geometry_destroy(self.runtime[].lib, self.handle)
 
     fn domain(ref self) raises -> Box3D:
-        var result = geometry_domain(self.lib, self.handle)
+        var result = geometry_domain(self.runtime[].lib, self.handle)
         if result.status != 0:
-            raise Error(last_error_message(self.lib))
+            raise Error(last_error_message(self.runtime[].lib))
         return result.value.copy()
 
     fn prob_domain(ref self) raises -> RealBox3D:
-        var result = geometry_prob_domain(self.lib, self.handle)
+        var result = geometry_prob_domain(self.runtime[].lib, self.handle)
         if result.status != 0:
-            raise Error(last_error_message(self.lib))
+            raise Error(last_error_message(self.runtime[].lib))
         return result.value.copy()
 
     fn cell_size(ref self) raises -> RealVect3D:
-        var result = geometry_cell_size(self.lib, self.handle)
+        var result = geometry_cell_size(self.runtime[].lib, self.handle)
         if result.status != 0:
-            raise Error(last_error_message(self.lib))
+            raise Error(last_error_message(self.runtime[].lib))
         return result.value.copy()
 
     fn periodicity(ref self) raises -> IntVect3D:
-        var result = geometry_periodicity(self.lib, self.handle)
+        var result = geometry_periodicity(self.runtime[].lib, self.handle)
         if result.status != 0:
-            raise Error(last_error_message(self.lib))
+            raise Error(last_error_message(self.runtime[].lib))
         return result.value.copy()
 
     fn _handle(ref self) -> GeometryHandle:

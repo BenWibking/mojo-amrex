@@ -8,49 +8,69 @@ from amrex.ffi import (
     parmparse_destroy,
     parmparse_query_int,
 )
-from amrex.loader import load_library
-from amrex.runtime import AmrexRuntime
-from std.ffi import OwnedDLHandle
+from amrex.runtime import AmrexRuntime, RuntimeLease
 
 
 struct ParmParse(Movable):
-    var lib: OwnedDLHandle
+    var runtime: RuntimeLease
     var handle: ParmParseHandle
 
     fn __init__(
         out self, ref runtime: AmrexRuntime, prefix: StringLiteral = ""
     ) raises:
-        var path = runtime.library_path()
-        self.lib = load_library(path)
-        self.handle = parmparse_create(self.lib, runtime._handle(), prefix)
+        self.runtime = runtime._lease()
+        self.handle = parmparse_create(
+            self.runtime[].lib, self.runtime[].handle, prefix
+        )
         if not self.handle:
-            raise Error(last_error_message(self.lib))
+            raise Error(last_error_message(self.runtime[].lib))
+
+    fn __init__(
+        out self, ref runtime: AmrexRuntime, prefix: String
+    ) raises:
+        self.runtime = runtime._lease()
+        self.handle = parmparse_create(
+            self.runtime[].lib, self.runtime[].handle, prefix
+        )
+        if not self.handle:
+            raise Error(last_error_message(self.runtime[].lib))
 
     fn __del__(deinit self):
         if self.handle:
-            parmparse_destroy(self.lib, self.handle)
+            parmparse_destroy(self.runtime[].lib, self.handle)
+
+    fn add_int(mut self, name: String, value: Int) raises:
+        if parmparse_add_int(self.runtime[].lib, self.handle, name, value) != 0:
+            raise Error(last_error_message(self.runtime[].lib))
 
     fn add_int(mut self, name: StringLiteral, value: Int) raises:
-        if parmparse_add_int(self.lib, self.handle, name, value) != 0:
-            raise Error(last_error_message(self.lib))
+        self.add_int(String(name), value)
 
-    fn query_int(ref self, name: StringLiteral) raises -> Int:
-        var result = parmparse_query_int(self.lib, self.handle, name)
+    fn query_int(ref self, name: String) raises -> Int:
+        var result = parmparse_query_int(self.runtime[].lib, self.handle, name)
         if result.status != 0:
-            raise Error(last_error_message(self.lib))
+            raise Error(last_error_message(self.runtime[].lib))
         if not result.found:
             raise Error("ParmParse integer value was not found.")
+        return result.value
+
+    fn query_int(ref self, name: StringLiteral) raises -> Int:
+        return self.query_int(String(name))
+
+    fn query_int_or(
+        ref self, name: String, default_value: Int
+    ) raises -> Int:
+        var result = parmparse_query_int(self.runtime[].lib, self.handle, name)
+        if result.status != 0:
+            raise Error(last_error_message(self.runtime[].lib))
+        if not result.found:
+            return default_value
         return result.value
 
     fn query_int_or(
         ref self, name: StringLiteral, default_value: Int
     ) raises -> Int:
-        var result = parmparse_query_int(self.lib, self.handle, name)
-        if result.status != 0:
-            raise Error(last_error_message(self.lib))
-        if not result.found:
-            return default_value
-        return result.value
+        return self.query_int_or(String(name), default_value)
 
     fn _handle(ref self) -> ParmParseHandle:
         return self.handle

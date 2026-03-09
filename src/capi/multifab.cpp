@@ -44,6 +44,69 @@ namespace
         return &multifab->tiles[static_cast<std::size_t>(tile_index)];
     }
 
+    auto require_current_mfiter_tile(const amrex_mojo_mfiter_t* mfiter)
+        -> const amrex_mojo::detail::tile_descriptor*
+    {
+        if (mfiter == nullptr) {
+            amrex_mojo::detail::set_last_error(
+                AMREX_MOJO_STATUS_INVALID_ARGUMENT,
+                "mfiter access requires a non-null iterator."
+            );
+            return nullptr;
+        }
+
+        if (mfiter->current_tile < 0 ||
+            mfiter->current_tile >= static_cast<int32_t>(mfiter->tiles.size())) {
+            amrex_mojo::detail::set_last_error(
+                AMREX_MOJO_STATUS_INVALID_ARGUMENT,
+                "mfiter is not positioned on a valid tile."
+            );
+            return nullptr;
+        }
+
+        return &mfiter->tiles[static_cast<std::size_t>(mfiter->current_tile)];
+    }
+
+    auto require_multifab_tile_for_mfiter(
+        const amrex_mojo_multifab_t* multifab,
+        const amrex_mojo_mfiter_t* mfiter
+    ) -> const amrex_mojo::detail::tile_descriptor*
+    {
+        const auto* iter_tile = require_current_mfiter_tile(mfiter);
+        if (iter_tile == nullptr) {
+            return nullptr;
+        }
+
+        if (multifab == nullptr || multifab->value == nullptr) {
+            amrex_mojo::detail::set_last_error(
+                AMREX_MOJO_STATUS_INVALID_ARGUMENT,
+                "multifab access by MFIter requires a non-null multifab."
+            );
+            return nullptr;
+        }
+
+        if (mfiter->current_tile >= static_cast<int32_t>(multifab->tiles.size())) {
+            amrex_mojo::detail::set_last_error(
+                AMREX_MOJO_STATUS_INVALID_ARGUMENT,
+                "multifab is not compatible with the iterator tile ordering."
+            );
+            return nullptr;
+        }
+
+        const auto& multifab_tile =
+            multifab->tiles[static_cast<std::size_t>(mfiter->current_tile)];
+        if (multifab_tile.tile_box != iter_tile->tile_box ||
+            multifab_tile.valid_box != iter_tile->valid_box) {
+            amrex_mojo::detail::set_last_error(
+                AMREX_MOJO_STATUS_INVALID_ARGUMENT,
+                "multifab tile layout is not compatible with the iterator."
+            );
+            return nullptr;
+        }
+
+        return &multifab_tile;
+    }
+
     auto validate_component_range(const amrex::MultiFab& multifab, int32_t start_comp, int32_t ncomp)
         -> amrex_mojo_status_code_t
     {
@@ -102,6 +165,9 @@ amrex_mojo_multifab_create(
             multifab->tiles.push_back(amrex_mojo::detail::tile_descriptor{
                 mfi.tilebox(),
                 mfi.validbox(),
+                (*multifab->value)[mfi].box(),
+                mfi.index(),
+                mfi.LocalTileIndex(),
                 &((*multifab->value)[mfi])
             });
         }
@@ -333,6 +399,60 @@ amrex_mojo_multifab_tile_metadata(
 
     amrex_mojo::detail::clear_last_error();
     return AMREX_MOJO_STATUS_OK;
+}
+
+extern "C" amrex_mojo_status_code_t
+amrex_mojo_multifab_array4_metadata_for_mfiter(
+    const amrex_mojo_multifab_t* multifab,
+    const amrex_mojo_mfiter_t* mfiter,
+    int32_t* data_lo,
+    int32_t* data_hi,
+    int64_t* stride,
+    int32_t* out_ncomp
+)
+{
+    if (data_lo == nullptr || data_hi == nullptr || stride == nullptr || out_ncomp == nullptr) {
+        return amrex_mojo::detail::set_last_error(
+            AMREX_MOJO_STATUS_INVALID_ARGUMENT,
+            "multifab_array4_metadata_for_mfiter requires non-null output pointers."
+        );
+    }
+
+    const auto* tile = require_multifab_tile_for_mfiter(multifab, mfiter);
+    if (tile == nullptr) {
+        return AMREX_MOJO_STATUS_INVALID_ARGUMENT;
+    }
+
+    const auto array = tile->fab->array();
+    data_lo[0] = array.begin[0];
+    data_lo[1] = array.begin[1];
+    data_lo[2] = array.begin[2];
+    data_hi[0] = array.end[0] - 1;
+    data_hi[1] = array.end[1] - 1;
+    data_hi[2] = array.end[2] - 1;
+    stride[0] = 1;
+    stride[1] = array.get_stride<1>();
+    stride[2] = array.get_stride<2>();
+    stride[3] = array.get_stride<3>();
+    *out_ncomp = array.nComp();
+
+    amrex_mojo::detail::clear_last_error();
+    return AMREX_MOJO_STATUS_OK;
+}
+
+extern "C" double*
+amrex_mojo_multifab_data_ptr_for_mfiter(
+    const amrex_mojo_multifab_t* multifab,
+    const amrex_mojo_mfiter_t* mfiter
+)
+{
+    const auto* tile = require_multifab_tile_for_mfiter(multifab, mfiter);
+    if (tile == nullptr) {
+        return nullptr;
+    }
+
+    amrex_mojo::detail::clear_last_error();
+    return tile->fab->dataPtr();
 }
 
 extern "C" double amrex_mojo_multifab_min(const amrex_mojo_multifab_t* multifab, int32_t comp)

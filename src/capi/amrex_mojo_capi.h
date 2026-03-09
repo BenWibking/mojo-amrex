@@ -13,6 +13,7 @@ typedef struct amrex_mojo_boxarray amrex_mojo_boxarray_t;
 typedef struct amrex_mojo_distmap amrex_mojo_distmap_t;
 typedef struct amrex_mojo_geometry amrex_mojo_geometry_t;
 typedef struct amrex_mojo_multifab amrex_mojo_multifab_t;
+typedef struct amrex_mojo_mfiter amrex_mojo_mfiter_t;
 typedef struct amrex_mojo_parmparse amrex_mojo_parmparse_t;
 
 typedef enum amrex_mojo_status_code
@@ -222,6 +223,18 @@ amrex_mojo_status_code_t amrex_mojo_multifab_tile_metadata(
     int64_t* stride,
     int32_t* out_ncomp
 );
+amrex_mojo_status_code_t amrex_mojo_multifab_array4_metadata_for_mfiter(
+    const amrex_mojo_multifab_t* multifab,
+    const amrex_mojo_mfiter_t* mfiter,
+    int32_t* data_lo,
+    int32_t* data_hi,
+    int64_t* stride,
+    int32_t* out_ncomp
+);
+double* amrex_mojo_multifab_data_ptr_for_mfiter(
+    const amrex_mojo_multifab_t* multifab,
+    const amrex_mojo_mfiter_t* mfiter
+);
 double amrex_mojo_multifab_min(const amrex_mojo_multifab_t* multifab, int32_t comp);
 double amrex_mojo_multifab_max(const amrex_mojo_multifab_t* multifab, int32_t comp);
 double amrex_mojo_multifab_sum(const amrex_mojo_multifab_t* multifab, int32_t comp);
@@ -256,6 +269,39 @@ amrex_mojo_status_code_t amrex_mojo_write_single_level_plotfile(
     const char* plotfile,
     double time,
     int32_t level_step
+);
+
+amrex_mojo_status_code_t
+amrex_mojo_mfiter_create(amrex_mojo_multifab_t* multifab, amrex_mojo_mfiter_t** out_mfiter);
+void amrex_mojo_mfiter_destroy(amrex_mojo_mfiter_t* mfiter);
+int32_t amrex_mojo_mfiter_is_valid(const amrex_mojo_mfiter_t* mfiter);
+amrex_mojo_status_code_t amrex_mojo_mfiter_next(amrex_mojo_mfiter_t* mfiter);
+int32_t amrex_mojo_mfiter_index(const amrex_mojo_mfiter_t* mfiter);
+int32_t amrex_mojo_mfiter_local_tile_index(const amrex_mojo_mfiter_t* mfiter);
+amrex_mojo_status_code_t amrex_mojo_mfiter_tile_box_metadata(
+    const amrex_mojo_mfiter_t* mfiter,
+    int32_t* out_small_end,
+    int32_t* out_big_end,
+    int32_t* out_nodal
+);
+amrex_mojo_status_code_t amrex_mojo_mfiter_valid_box_metadata(
+    const amrex_mojo_mfiter_t* mfiter,
+    int32_t* out_small_end,
+    int32_t* out_big_end,
+    int32_t* out_nodal
+);
+amrex_mojo_status_code_t amrex_mojo_mfiter_fab_box_metadata(
+    const amrex_mojo_mfiter_t* mfiter,
+    int32_t* out_small_end,
+    int32_t* out_big_end,
+    int32_t* out_nodal
+);
+amrex_mojo_status_code_t amrex_mojo_mfiter_growntile_box_metadata(
+    const amrex_mojo_mfiter_t* mfiter,
+    amrex_mojo_intvect_3d ngrow,
+    int32_t* out_small_end,
+    int32_t* out_big_end,
+    int32_t* out_nodal
 );
 
 amrex_mojo_parmparse_t* amrex_mojo_parmparse_create(

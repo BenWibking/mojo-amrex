@@ -5,6 +5,7 @@ set(
     boxarray.cpp
     distmap.cpp
     geometry.cpp
+    mfiter.cpp
     multifab.cpp
     parmparse.cpp
 )
