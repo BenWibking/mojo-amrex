@@ -18,13 +18,24 @@ The recommended architecture is:
 
 1. `AMReX C++`
 2. `extern "C"` shim library with a narrow, explicit ABI
-3. Mojo wrappers built on Mojo FFI
+3. Mojo wrappers built on Mojo FFI and Mojo's value lifecycle model
 
 This is the right boundary because `pyamrex` is a pybind11 layer over C++, but
 Mojo's FFI is designed around C ABI calls. Direct C++ binding from Mojo would
 be brittle and difficult to maintain. A C shim gives us stable symbol names,
 explicit ownership, and a place to flatten AMReX types into FFI-safe handles
 and structs.
+
+The wrapper layer must also respect Mojo's value destruction rules. In
+particular:
+
+- destruction can happen as soon as a value is no longer used, not only at the
+  lexical end of scope
+- owner and borrower relationships must be represented in Mojo types, not only
+  documented in comments
+- opaque-handle wrappers should be move-only by default unless the C ABI
+  provides an explicit clone operation
+- destructors must be infallible and safe to call on moved-from or null handles
 
 ## Key Findings
 
@@ -95,29 +106,28 @@ Mojo-focused C shim library in this repository.
 Implement a usable 3D, CPU-only, double-precision binding set for core mesh and
 field operations:
 
-- `initialize`
-- `finalize`
-- `initialized`
+- `AmrexRuntime`
+- runtime state query
 - `ParallelDescriptor` basics
 - `IntVect`
 - `Box`
 - `BoxArray`
 - `DistributionMapping`
 - `Geometry`
-- `MFIter`
 - `MultiFab`
 - `Array4<Real>` tile views
+- callback-based tile iteration
 - minimal `ParmParse`
 - plotfile write/read smoke path
 
 This is enough to support a real AMReX workflow in Mojo:
 
-- initialize runtime
+- create runtime root owner
 - define domain and geometry
 - create a `BoxArray`
 - create a `DistributionMapping`
 - allocate a `MultiFab`
-- iterate tiles with `MFIter`
+- iterate tiles through a borrowing-safe API
 - access tile data through `Array4`
 - do reductions or write a plotfile
 
@@ -185,6 +195,8 @@ Recommended starting approach:
 - use `OwnedDLHandle` to load the library at runtime
 - resolve symbols from a predictable build/install location
 - keep the raw C signatures in one low-level Mojo module
+- keep the loaded library alive for at least as long as any wrapper that may
+  call into it
 
 Why start with runtime loading:
 
@@ -199,21 +211,33 @@ can move to compile-time `external_call`.
 
 Build user-facing Mojo types on top of the raw FFI layer:
 
+- `AmrexRuntime`
 - `IntVect3D`
 - `Box3D`
 - `BoxArray`
 - `DistributionMapping`
 - `Geometry`
-- `MFIter`
 - `MultiFab`
 - `Array4F64View`
+- `TileF64View`
 - `ParmParse`
 
 Wrapper rules:
 
+- `AmrexRuntime` is the root owner for AMReX process state and the FFI library
+  handle
+- every owning AMReX wrapper retains a dependency on `AmrexRuntime` so the
+  runtime cannot be destroyed while AMReX objects still exist
 - owning Mojo types destroy the C++ object in `__del__`
+- owning wrappers are move-only unless the C ABI provides an explicit clone
+  operation
+- moved-from owning wrappers must become null and safe to destroy
 - non-owning views never free memory
-- iterators keep their source objects alive
+- borrowed values encode their dependency on owners in the Mojo type system,
+  either through origin-based borrowing or by retaining the required owner
+  internally
+- tile iteration APIs should prefer non-escaping callback-style borrows in the
+  first milestone
 - bounds and null checks happen in the Mojo layer where practical
 - compile-time AMReX configuration is surfaced explicitly
 
@@ -245,24 +269,22 @@ Things not worth copying directly:
 from amrex.space3d import *
 
 fn main() raises:
-    initialize()
+    var rt = AmrexRuntime()
 
     let small = IntVect3D(0, 0, 0)
     let big = IntVect3D(63, 63, 63)
     let domain = Box3D(small, big)
 
-    var ba = BoxArray(domain)
+    var ba = BoxArray(rt, domain)
     ba.max_size(32)
 
-    let dm = DistributionMapping(ba)
-    let geom = Geometry(domain)
-    var mf = MultiFab(ba, dm, n_comp=1, n_grow=1)
+    let dm = DistributionMapping(rt, ba)
+    let geom = Geometry(rt, domain)
+    var mf = MultiFab(rt, ba, dm, n_comp=1, n_grow=1)
 
-    for mfi in MFIter(mf):
-        var arr = mf.array(mfi)
-        arr.fill(42.0)
-
-    finalize()
+    mf.for_each_tile(fn (tile):
+        tile.array().fill(42.0)
+    )
 ```
 
 This should be the user experience target for the first milestone.
@@ -271,11 +293,24 @@ This should be the user experience target for the first milestone.
 
 ### Initialization
 
-Expose simple initialization entry points:
+Do not model AMReX runtime state as a pair of free-standing public functions in
+the Mojo layer. Mojo can destroy values as soon as they are no longer used, so
+an explicit `finalize()` call can race with later wrapper destruction.
 
-- `amrex_mojo_initialize(argc, argv, use_parmparse)`
-- `amrex_mojo_finalize()`
-- `amrex_mojo_initialized()`
+Instead, expose a root runtime object:
+
+- C ABI:
+  - `amrex_mojo_runtime_create(argc, argv, use_parmparse, out_runtime)`
+  - `amrex_mojo_runtime_destroy(runtime)`
+  - `amrex_mojo_runtime_initialized(runtime)`
+- Mojo API:
+  - `AmrexRuntime()`
+  - `AmrexRuntime.initialized()`
+
+All owning AMReX wrappers are created from an `AmrexRuntime` and retain a
+runtime dependency in their Mojo representation. That makes the runtime a true
+root owner rather than a convention. `AmrexRuntime.__del__()` performs
+finalization only when no wrappers that depend on it remain alive.
 
 Avoid passing raw AMReX callback hooks in the first version unless there is a
 clear need.
@@ -298,14 +333,33 @@ Every owning constructor needs a matching destroy function:
 - `*_clone` if needed
 - `*_destroy`
 
-Non-owning return values must be documented clearly. For example:
+Ownership and borrowing must be represented in the Mojo API, not merely
+documented. The lifecycle rules for the binding layer should be:
 
-- `MultiFab.box_array()` returns a borrowed handle or a copied object
-- `MultiFab.array(mfi)` returns a borrowed `Array4` view valid only while the
-  parent objects remain alive
+- small value types such as `IntVect3D` and `Box3D` are copied by value
+- opaque AMReX owners such as `BoxArray`, `DistributionMapping`, `Geometry`,
+  `MultiFab`, and `ParmParse` are move-only Mojo wrappers by default
+- copied wrappers are only allowed when the C ABI provides a true deep-copy
+  operation
+- destructors must be infallible and null-safe because they run from `__del__`
+- borrowed views must encode the owner relationship in Mojo types so they
+  cannot outlive the data they refer to
+- non-owning views should return copied metadata plus a borrowed data pointer,
+  not a second borrowed opaque handle, wherever feasible
+
+Concrete API guidance:
+
+- `Geometry.domain()` should return a copied `Box3D`
+- `MultiFab.box_array()` should return copied metadata or a copied `BoxArray`,
+  not a borrowed `BoxArray` handle
+- `MultiFab.array(...)` should return an `Array4F64View` whose lifetime is tied
+  to the owning `MultiFab` and, if necessary, any iterator state used to compute
+  the tile
+- first-milestone tile access should prefer a callback-style API such as
+  `for_each_tile` so the tile borrow cannot escape its valid scope
 
 It is better to copy small objects than to export tricky borrowed references
-without clear lifetime guarantees.
+without type-enforced lifetime guarantees.
 
 ### Array view semantics
 
@@ -314,9 +368,10 @@ without clear lifetime guarantees.
 The first version should support:
 
 - mutable host pointer access on CPU
-- explicit shape metadata
-- explicit stride metadata
+- explicit shape metadata copied into the view
+- explicit stride metadata copied into the view
 - helper methods in Mojo for indexing and fill operations
+- a view type whose borrow is tied to the `MultiFab` tile lifetime
 
 The first version should not try to reproduce:
 
@@ -373,6 +428,7 @@ mojo/
     __init__.mojo
     loader.mojo
     ffi.mojo
+    runtime.mojo
     space3d/
       __init__.mojo
       types.mojo
@@ -381,6 +437,7 @@ mojo/
       geometry.mojo
       multifab.mojo
       mfiter.mojo
+      tile.mojo
 tests/
   smoke/
 ```
@@ -398,17 +455,20 @@ Deliverables:
 - CMake build for shared library
 - minimal Mojo package layout
 - library loading via `OwnedDLHandle`
+- `AmrexRuntime`
 - one working smoke test
 
 Exit criteria:
 
 - Mojo code can load the shared library
-- `initialize()` and `finalize()` succeed
+- `AmrexRuntime` creation and destruction succeed
+- the loaded shared library stays alive for the duration of runtime-owned values
 
 ### Phase 1: value types and runtime basics
 
 Deliverables:
 
+- move-only owner wrapper pattern
 - `IntVect3D`
 - `Box3D`
 - `BoxArray`
@@ -426,27 +486,30 @@ Exit criteria:
 Deliverables:
 
 - `MultiFab`
-- `MFIter`
 - `Array4F64View`
+- callback-based tile iteration
 - core reductions: `min`, `max`, `sum`, `norm0`, `norm1`, `norm2`
 - basic arithmetic: `set_val`, `plus`, `mult`, `copy`
 
 Exit criteria:
 
 - allocate a `MultiFab`
-- iterate over tiles
+- iterate over tiles through a borrowing-safe API
 - fill and modify data
 - validate results against expected reductions
 
-### Phase 3: utility and I/O
+### Phase 3: explicit iterator API, utility, and I/O
 
 Deliverables:
 
+- `MFIter`, only if still needed after the callback API is in place
 - minimal `ParmParse`
 - plotfile write smoke path
 
 Exit criteria:
 
+- if `MFIter` is exposed, its borrowing relationship to `MultiFab` is encoded
+  in the wrapper type
 - configure simple values through `ParmParse`
 - write a plotfile from Mojo
 
@@ -454,6 +517,7 @@ Exit criteria:
 
 Deliverables:
 
+- clone operations for selected owner types where warranted
 - safer wrapper APIs
 - better error messages
 - docs and examples
@@ -510,19 +574,26 @@ start. The initial slice should be small and useful.
 ### 2. Borrowed lifetimes that are not explicit
 
 `MultiFab`, `MFIter`, and `Array4` relationships are easy to get wrong. The
-wrapper layer must make ownership and borrowing obvious.
+wrapper layer must make ownership and borrowing obvious in the type system, not
+just in documentation.
 
-### 3. Premature GPU interop
+### 3. Runtime shutdown ordering
+
+If AMReX finalization happens before all owner wrappers are destroyed, later
+destructors may call into a shut-down runtime. The binding layer must root all
+owners under `AmrexRuntime` and make finalization happen from its destructor.
+
+### 4. Premature GPU interop
 
 GPU support is important long-term, but it is not the right first target for a
 new FFI stack. CPU correctness should come first.
 
-### 4. Depending too heavily on AMReX's Fortran interface build path
+### 5. Depending too heavily on AMReX's Fortran interface build path
 
 That path is useful as a reference and may provide reusable code, but it is not
 the right architectural center for a Mojo project.
 
-### 5. Leaking C++ exceptions across the ABI
+### 6. Leaking C++ exceptions across the ABI
 
 The shim must translate errors to C-compatible results. This should be enforced
 from the beginning.
@@ -546,19 +617,23 @@ first C ABI header, then wire one complete vertical slice:
 
 1. build shared library
 2. load it from Mojo
-3. call `initialize()`
+3. create `AmrexRuntime`
 4. construct `BoxArray`
 5. construct `DistributionMapping`
 6. construct `MultiFab`
-7. iterate with `MFIter`
+7. iterate tiles with a callback-style API
 8. fill a tile through `Array4`
-9. call `finalize()`
+9. let `AmrexRuntime` and owners clean up through destruction
 
 That slice will validate the overall architecture before expanding the API.
 
 ## References
 
 - Mojo FFI documentation: <https://docs.modular.com/mojo/std/ffi/>
+- Mojo value creation: <https://docs.modular.com/mojo/manual/lifecycle/life/>
+- Mojo value destruction: <https://docs.modular.com/mojo/manual/lifecycle/death/>
+- Mojo lifetimes and origins:
+  <https://docs.modular.com/mojo/manual/values/lifetimes/>
 - `pyamrex` entry point: `../pyamrex/src/pyAMReX.cpp`
 - `pyamrex` public API guide: `../pyamrex/docs/source/usage/api.rst`
 - AMReX Fortran-interface C++ wrappers:
