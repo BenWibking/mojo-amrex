@@ -134,3 +134,92 @@ extern "C" amrex_mojo_intvect_3d amrex_mojo_geometry_periodicity(const amrex_moj
         geometry->value.isPeriodic(2)
     };
 }
+
+extern "C" amrex_mojo_status_code_t amrex_mojo_geometry_domain_metadata(
+    const amrex_mojo_geometry_t* geometry,
+    int32_t* out_small_end,
+    int32_t* out_big_end,
+    int32_t* out_nodal
+)
+{
+    if (geometry == nullptr || out_small_end == nullptr || out_big_end == nullptr || out_nodal == nullptr) {
+        return amrex_mojo::detail::set_last_error(
+            AMREX_MOJO_STATUS_INVALID_ARGUMENT,
+            "geometry_domain_metadata requires non-null pointers."
+        );
+    }
+
+    const auto domain = geometry->value.Domain();
+    const auto small_end = domain.smallEnd();
+    const auto big_end = domain.bigEnd();
+    const auto nodal = domain.type();
+    out_small_end[0] = small_end[0];
+    out_small_end[1] = small_end[1];
+    out_small_end[2] = small_end[2];
+    out_big_end[0] = big_end[0];
+    out_big_end[1] = big_end[1];
+    out_big_end[2] = big_end[2];
+    out_nodal[0] = nodal[0];
+    out_nodal[1] = nodal[1];
+    out_nodal[2] = nodal[2];
+    amrex_mojo::detail::clear_last_error();
+    return AMREX_MOJO_STATUS_OK;
+}
+
+extern "C" amrex_mojo_status_code_t amrex_mojo_geometry_prob_domain_metadata(
+    const amrex_mojo_geometry_t* geometry,
+    double* out_lo,
+    double* out_hi
+)
+{
+    if (geometry == nullptr || out_lo == nullptr || out_hi == nullptr) {
+        return amrex_mojo::detail::set_last_error(
+            AMREX_MOJO_STATUS_INVALID_ARGUMENT,
+            "geometry_prob_domain_metadata requires non-null pointers."
+        );
+    }
+
+    const auto prob_domain = geometry->value.ProbDomain();
+    out_lo[0] = prob_domain.lo(0);
+    out_lo[1] = prob_domain.lo(1);
+    out_lo[2] = prob_domain.lo(2);
+    out_hi[0] = prob_domain.hi(0);
+    out_hi[1] = prob_domain.hi(1);
+    out_hi[2] = prob_domain.hi(2);
+    amrex_mojo::detail::clear_last_error();
+    return AMREX_MOJO_STATUS_OK;
+}
+
+extern "C" amrex_mojo_status_code_t
+amrex_mojo_geometry_cell_size_data(const amrex_mojo_geometry_t* geometry, double* out_cell_size)
+{
+    if (geometry == nullptr || out_cell_size == nullptr) {
+        return amrex_mojo::detail::set_last_error(
+            AMREX_MOJO_STATUS_INVALID_ARGUMENT,
+            "geometry_cell_size_data requires non-null pointers."
+        );
+    }
+
+    out_cell_size[0] = geometry->value.CellSize(0);
+    out_cell_size[1] = geometry->value.CellSize(1);
+    out_cell_size[2] = geometry->value.CellSize(2);
+    amrex_mojo::detail::clear_last_error();
+    return AMREX_MOJO_STATUS_OK;
+}
+
+extern "C" amrex_mojo_status_code_t
+amrex_mojo_geometry_periodicity_data(const amrex_mojo_geometry_t* geometry, int32_t* out_periodicity)
+{
+    if (geometry == nullptr || out_periodicity == nullptr) {
+        return amrex_mojo::detail::set_last_error(
+            AMREX_MOJO_STATUS_INVALID_ARGUMENT,
+            "geometry_periodicity_data requires non-null pointers."
+        );
+    }
+
+    out_periodicity[0] = geometry->value.isPeriodic(0);
+    out_periodicity[1] = geometry->value.isPeriodic(1);
+    out_periodicity[2] = geometry->value.isPeriodic(2);
+    amrex_mojo::detail::clear_last_error();
+    return AMREX_MOJO_STATUS_OK;
+}

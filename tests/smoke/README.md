@@ -16,6 +16,8 @@ Useful commands:
 ```bash
 pixi run configure
 pixi run build-capi
+pixi run install-capi
+pixi run install-mojo-package
 pixi run install-amrex
 pixi run build-multifab-smoke
 pixi run run-multifab-smoke

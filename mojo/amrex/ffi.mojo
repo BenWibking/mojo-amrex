@@ -50,6 +50,30 @@ struct ParmParseIntQueryResult(Copyable):
 
 
 @fieldwise_init
+struct Box3DResult(Copyable):
+    var status: Int
+    var value: Box3D
+
+
+@fieldwise_init
+struct RealBox3DResult(Copyable):
+    var status: Int
+    var value: RealBox3D
+
+
+@fieldwise_init
+struct RealVect3DResult(Copyable):
+    var status: Int
+    var value: RealVect3D
+
+
+@fieldwise_init
+struct IntVect3DResult(Copyable):
+    var status: Int
+    var value: IntVect3D
+
+
+@fieldwise_init
 struct Array4F64View(Copyable):
     var data: RealPtr
     var lo_x: c_int
@@ -282,6 +306,18 @@ fn box_from_bounds(lo_raw: List[c_int], hi_raw: List[c_int]) -> Box3D:
     )
 
 
+fn box_from_parts(
+    lo_raw: List[c_int], hi_raw: List[c_int], nodal_raw: List[c_int]
+) -> Box3D:
+    return box3d(
+        small_end=intvect3d(Int(lo_raw[0]), Int(lo_raw[1]), Int(lo_raw[2])),
+        big_end=intvect3d(Int(hi_raw[0]), Int(hi_raw[1]), Int(hi_raw[2])),
+        nodal=intvect3d(
+            Int(nodal_raw[0]), Int(nodal_raw[1]), Int(nodal_raw[2])
+        ),
+    )
+
+
 fn tile_view(
     ref lib: OwnedDLHandle, multifab: MultiFabHandle, tile_index: Int
 ) -> TileF64View:
@@ -335,6 +371,112 @@ fn multifab_sum(
     ref lib: OwnedDLHandle, multifab: MultiFabHandle, comp: Int
 ) -> Float64:
     return lib.call["amrex_mojo_multifab_sum", c_double](multifab, c_int(comp))
+
+
+fn boxarray_box(
+    ref lib: OwnedDLHandle, boxarray: BoxArrayHandle, index: Int
+) -> Box3DResult:
+    var small_end = List[c_int](length=3, fill=0)
+    var big_end = List[c_int](length=3, fill=0)
+    var nodal = List[c_int](length=3, fill=0)
+    var status = Int(
+        lib.call["amrex_mojo_boxarray_box_metadata", c_int](
+            boxarray,
+            c_int(index),
+            small_end.unsafe_ptr(),
+            big_end.unsafe_ptr(),
+            nodal.unsafe_ptr(),
+        )
+    )
+    return Box3DResult(
+        status=status,
+        value=box_from_parts(small_end, big_end, nodal),
+    )
+
+
+fn geometry_domain(
+    ref lib: OwnedDLHandle, geometry: GeometryHandle
+) -> Box3DResult:
+    var small_end = List[c_int](length=3, fill=0)
+    var big_end = List[c_int](length=3, fill=0)
+    var nodal = List[c_int](length=3, fill=0)
+    var status = Int(
+        lib.call["amrex_mojo_geometry_domain_metadata", c_int](
+            geometry,
+            small_end.unsafe_ptr(),
+            big_end.unsafe_ptr(),
+            nodal.unsafe_ptr(),
+        )
+    )
+    return Box3DResult(
+        status=status,
+        value=box_from_parts(small_end, big_end, nodal),
+    )
+
+
+fn geometry_prob_domain(
+    ref lib: OwnedDLHandle, geometry: GeometryHandle
+) -> RealBox3DResult:
+    var lo = List[Float64](length=3, fill=0.0)
+    var hi = List[Float64](length=3, fill=0.0)
+    var status = Int(
+        lib.call["amrex_mojo_geometry_prob_domain_metadata", c_int](
+            geometry,
+            lo.unsafe_ptr(),
+            hi.unsafe_ptr(),
+        )
+    )
+    return RealBox3DResult(
+        status=status,
+        value=RealBox3D(
+            lo_x=lo[0],
+            lo_y=lo[1],
+            lo_z=lo[2],
+            hi_x=hi[0],
+            hi_y=hi[1],
+            hi_z=hi[2],
+        ),
+    )
+
+
+fn geometry_cell_size(
+    ref lib: OwnedDLHandle, geometry: GeometryHandle
+) -> RealVect3DResult:
+    var cell_size = List[Float64](length=3, fill=0.0)
+    var status = Int(
+        lib.call["amrex_mojo_geometry_cell_size_data", c_int](
+            geometry,
+            cell_size.unsafe_ptr(),
+        )
+    )
+    return RealVect3DResult(
+        status=status,
+        value=RealVect3D(
+            x=cell_size[0],
+            y=cell_size[1],
+            z=cell_size[2],
+        ),
+    )
+
+
+fn geometry_periodicity(
+    ref lib: OwnedDLHandle, geometry: GeometryHandle
+) -> IntVect3DResult:
+    var periodicity = List[c_int](length=3, fill=0)
+    var status = Int(
+        lib.call["amrex_mojo_geometry_periodicity_data", c_int](
+            geometry,
+            periodicity.unsafe_ptr(),
+        )
+    )
+    return IntVect3DResult(
+        status=status,
+        value=intvect3d(
+            Int(periodicity[0]),
+            Int(periodicity[1]),
+            Int(periodicity[2]),
+        ),
+    )
 
 
 fn multifab_min(

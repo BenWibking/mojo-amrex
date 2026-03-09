@@ -5,6 +5,7 @@ from amrex.ffi import (
     BoxArrayHandle,
     DistributionMappingHandle,
     IntVect3D,
+    boxarray_box,
     boxarray_create_from_box,
     boxarray_destroy,
     boxarray_max_size,
@@ -45,6 +46,12 @@ struct BoxArray(Movable):
 
     fn size(ref self) -> Int:
         return boxarray_size(self.lib, self.handle)
+
+    fn box(ref self, index: Int) raises -> Box3D:
+        var result = boxarray_box(self.lib, self.handle, index)
+        if result.status != 0:
+            raise Error(last_error_message(self.lib))
+        return result.value.copy()
 
     fn _handle(ref self) -> BoxArrayHandle:
         return self.handle

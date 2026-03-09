@@ -135,3 +135,42 @@ extern "C" amrex_mojo_box_3d amrex_mojo_boxarray_box(const amrex_mojo_boxarray_t
     amrex_mojo::detail::clear_last_error();
     return amrex_mojo::detail::from_box(boxarray->value[index]);
 }
+
+extern "C" amrex_mojo_status_code_t amrex_mojo_boxarray_box_metadata(
+    const amrex_mojo_boxarray_t* boxarray,
+    int32_t index,
+    int32_t* out_small_end,
+    int32_t* out_big_end,
+    int32_t* out_nodal
+)
+{
+    if (boxarray == nullptr || out_small_end == nullptr || out_big_end == nullptr || out_nodal == nullptr) {
+        return amrex_mojo::detail::set_last_error(
+            AMREX_MOJO_STATUS_INVALID_ARGUMENT,
+            "boxarray_box_metadata requires non-null pointers."
+        );
+    }
+
+    if (index < 0 || index >= boxarray->value.size()) {
+        return amrex_mojo::detail::set_last_error(
+            AMREX_MOJO_STATUS_INVALID_ARGUMENT,
+            "boxarray_box_metadata index is out of range."
+        );
+    }
+
+    const auto& box = boxarray->value[index];
+    const auto small_end = box.smallEnd();
+    const auto big_end = box.bigEnd();
+    const auto nodal = box.type();
+    out_small_end[0] = small_end[0];
+    out_small_end[1] = small_end[1];
+    out_small_end[2] = small_end[2];
+    out_big_end[0] = big_end[0];
+    out_big_end[1] = big_end[1];
+    out_big_end[2] = big_end[2];
+    out_nodal[0] = nodal[0];
+    out_nodal[1] = nodal[1];
+    out_nodal[2] = nodal[2];
+    amrex_mojo::detail::clear_last_error();
+    return AMREX_MOJO_STATUS_OK;
+}
