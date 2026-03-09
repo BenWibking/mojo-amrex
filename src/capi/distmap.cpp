@@ -1,28 +1,47 @@
 #include "capi_internal.H"
 
-extern "C" amrex_mojo_status_code_t
-amrex_mojo_distmap_create_from_boxarray(
-    const amrex_mojo_boxarray_t* boxarray,
-    amrex_mojo_distmap_t** out_distmap
-)
+extern "C" amrex_mojo_distmap_t*
+amrex_mojo_distmap_create_from_boxarray(amrex_mojo_runtime_t* runtime, const amrex_mojo_boxarray_t* boxarray)
 {
-    if (boxarray == nullptr || out_distmap == nullptr) {
-        return amrex_mojo::detail::set_last_error(
+    if (runtime == nullptr || runtime->state == nullptr || boxarray == nullptr) {
+        amrex_mojo::detail::set_last_error(
             AMREX_MOJO_STATUS_INVALID_ARGUMENT,
-            "distmap_create_from_boxarray requires non-null pointers."
+            "distmap_create_from_boxarray requires a live runtime and a non-null boxarray."
         );
+        return nullptr;
     }
 
-    *out_distmap = nullptr;
-    return amrex_mojo::detail::set_last_error(
-        AMREX_MOJO_STATUS_UNIMPLEMENTED,
-        "amrex_mojo_distmap_create_from_boxarray is not implemented yet."
-    );
+    auto* state = amrex_mojo::detail::retain_runtime(runtime->state);
+    try {
+        auto* distmap = new amrex_mojo_distmap{
+            state,
+            amrex::DistributionMapping(boxarray->value)
+        };
+        amrex_mojo::detail::clear_last_error();
+        return distmap;
+    } catch (const std::exception& ex) {
+        amrex_mojo::detail::release_runtime(state);
+        amrex_mojo::detail::set_last_error(AMREX_MOJO_STATUS_INTERNAL_ERROR, ex.what());
+        return nullptr;
+    } catch (...) {
+        amrex_mojo::detail::release_runtime(state);
+        amrex_mojo::detail::set_last_error(
+            AMREX_MOJO_STATUS_INTERNAL_ERROR,
+            "distmap_create_from_boxarray failed with an unknown exception."
+        );
+        return nullptr;
+    }
 }
 
-extern "C" amrex_mojo_status_code_t amrex_mojo_distmap_destroy(amrex_mojo_distmap_t* distmap)
+extern "C" void amrex_mojo_distmap_destroy(amrex_mojo_distmap_t* distmap)
 {
-    (void)distmap;
+    if (distmap == nullptr) {
+        amrex_mojo::detail::clear_last_error();
+        return;
+    }
+
+    auto* state = distmap->state;
+    delete distmap;
+    amrex_mojo::detail::release_runtime(state);
     amrex_mojo::detail::clear_last_error();
-    return AMREX_MOJO_STATUS_OK;
 }

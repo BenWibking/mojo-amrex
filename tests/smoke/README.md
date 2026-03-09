@@ -1,13 +1,20 @@
 # Smoke Tests
 
-This directory is reserved for the first executable smoke tests once the
-vertical slice is wired:
+The repository now has a working smoke path in `examples/vertical_slice.mojo`.
+The intended smoke sequence is:
 
 1. build the C ABI library
 2. package the Mojo bindings
 3. initialize the runtime
 4. construct `BoxArray`, `DistributionMapping`, and `MultiFab`
-5. iterate a tile with `MFIter`
+5. iterate tiles from Mojo and fill through the exported `Array4` view
 6. shut down cleanly
 
-For now, the repository only provides the scaffold and the stub C ABI.
+Useful commands:
+
+```bash
+pixi run build-capi
+pixi run package-mojo
+pixi run build-vertical-slice
+pixi run run-vertical-slice
+```

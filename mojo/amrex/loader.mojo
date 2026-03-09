@@ -1,5 +1,9 @@
-"""Runtime shared-library loading for the AMReX C API.
+from std.ffi import OwnedDLHandle
 
-This module will eventually centralize `OwnedDLHandle` usage and resolve the
-shared library built from `src/capi`.
-"""
+
+fn load_library(path: String) raises -> OwnedDLHandle:
+    return OwnedDLHandle(path)
+
+
+fn load_default_library() raises -> OwnedDLHandle:
+    return load_library(String("./build/src/capi/libamrex_mojo_capi_3d.dylib"))

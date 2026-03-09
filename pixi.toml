@@ -9,6 +9,8 @@ version = "0.1.0"
 configure = "cmake -S . -B build"
 build-capi = "cmake --build build --target amrex_mojo_capi_3d"
 package-mojo = "mojo package mojo/amrex -o amrex.mojopkg"
+build-vertical-slice = "mojo build examples/vertical_slice.mojo -I mojo -o build/vertical_slice"
+run-vertical-slice = "./build/vertical_slice"
 format-mojo = "mojo format mojo/amrex examples"
 
 [dependencies]
