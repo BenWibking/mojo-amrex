@@ -12,9 +12,9 @@ install-capi = "cmake --install build --prefix .pixi/envs/default"
 package-mojo = "mojo package mojo/amrex -o amrex.mojopkg"
 install-mojo-package = "mkdir -p .pixi/envs/default/lib/mojo && mojo package mojo/amrex -o .pixi/envs/default/lib/mojo/amrex.mojopkg"
 install-amrex = "cmake --install build --prefix .pixi/envs/default && mkdir -p .pixi/envs/default/lib/mojo && mojo package mojo/amrex -o .pixi/envs/default/lib/mojo/amrex.mojopkg"
-build-vertical-slice = "mojo build examples/vertical_slice.mojo -o build/vertical_slice"
-run-vertical-slice = "./build/vertical_slice"
-run-vertical-slice-script = "mojo examples/vertical_slice.mojo"
+build-multifab-smoke = "mojo build examples/multifab_smoke.mojo -o build/multifab_smoke"
+run-multifab-smoke = "./build/multifab_smoke"
+run-multifab-smoke-script = "mojo examples/multifab_smoke.mojo"
 format-mojo = "mojo format mojo/amrex examples"
 
 [dependencies]

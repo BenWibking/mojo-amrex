@@ -1,6 +1,6 @@
 # Smoke Tests
 
-The repository now has a working smoke path in `examples/vertical_slice.mojo`.
+The repository now has a working smoke path in `examples/multifab_smoke.mojo`.
 The intended smoke sequence is:
 
 1. build the C ABI library
@@ -16,7 +16,7 @@ Useful commands:
 pixi run configure
 pixi run build-capi
 pixi run install-amrex
-pixi run build-vertical-slice
-pixi run run-vertical-slice
-pixi run run-vertical-slice-script
+pixi run build-multifab-smoke
+pixi run run-multifab-smoke
+pixi run run-multifab-smoke-script
 ```

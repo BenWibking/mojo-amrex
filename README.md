@@ -8,7 +8,7 @@ The current repo contains:
 - a real AMReX-backed C ABI under `src/capi`
 - a Mojo package under `mojo/amrex`
 - an install path that exposes `amrex` as a top-level Mojo package in the active environment
-- a working vertical-slice example in `examples/vertical_slice.mojo`
+- a working MultiFab smoke example in `examples/multifab_smoke.mojo`
 
 The current MVP covers:
 
@@ -46,9 +46,9 @@ pixi run configure
 pixi run build-capi
 pixi run install-amrex
 pixi run package-mojo
-pixi run build-vertical-slice
-pixi run run-vertical-slice
-pixi run run-vertical-slice-script
+pixi run build-multifab-smoke
+pixi run run-multifab-smoke
+pixi run run-multifab-smoke-script
 pixi run format-mojo
 ```
 
@@ -58,7 +58,7 @@ Notes:
   CPU-only, double-precision build suitable for the MVP bindings.
 - `pixi run install-amrex` installs the C API library into the active env's
   `lib/` directory and installs `amrex.mojopkg` into the env's `lib/mojo/`
-  directory, so bare commands like `mojo examples/vertical_slice.mojo` work
+  directory, so bare commands like `mojo examples/multifab_smoke.mojo` work
   from the repo root without `-I mojo`.
 - The public Mojo surface now uses move-only wrapper objects such as
   `AmrexRuntime`, `BoxArray`, `Geometry`, and `MultiFab`. The raw handle-level
