@@ -1,6 +1,6 @@
 # mojo-amrex
 
-Mojo bindings to AMReX, implemented as a narrow C ABI plus a Mojo FFI layer.
+Mojo bindings to AMReX, implemented as a narrow C ABI plus RAII-style Mojo objects.
 
 The current repo contains:
 
@@ -53,6 +53,6 @@ Notes:
 
 - By default the CMake build pulls AMReX from `../amrex` and configures a 3D,
   CPU-only, double-precision build suitable for the MVP bindings.
-- The current Mojo surface is intentionally pragmatic: opaque handles plus
-  typed helper structs and tile views. It validates the binding architecture
-  without committing to the final ownership ergonomics yet.
+- The public Mojo surface now uses move-only wrapper objects such as
+  `AmrexRuntime`, `BoxArray`, `Geometry`, and `MultiFab`. The raw handle-level
+  bindings remain available under `amrex.ffi`.

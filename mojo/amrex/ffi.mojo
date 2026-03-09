@@ -1,5 +1,5 @@
 from std.collections import List
-from std.ffi import OwnedDLHandle, c_double, c_int
+from std.ffi import OwnedDLHandle, c_char, c_double, c_int
 
 
 comptime RuntimeHandle = UnsafePointer[NoneType, MutAnyOrigin]
@@ -23,6 +23,23 @@ struct Box3D(Copyable):
     var small_end: IntVect3D
     var big_end: IntVect3D
     var nodal: IntVect3D
+
+
+@fieldwise_init
+struct RealBox3D(Copyable):
+    var lo_x: Float64
+    var lo_y: Float64
+    var lo_z: Float64
+    var hi_x: Float64
+    var hi_y: Float64
+    var hi_z: Float64
+
+
+@fieldwise_init
+struct RealVect3D(Copyable):
+    var x: Float64
+    var y: Float64
+    var z: Float64
 
 
 @fieldwise_init
@@ -67,6 +84,9 @@ struct TileF64View(Copyable):
     var valid_box: Box3D
     var array_view: Array4F64View
 
+    fn array(self) -> Array4F64View:
+        return self.array_view.copy()
+
     fn fill(self, value: Float64, comp: Int = 0):
         self.array_view.fill(self.tile_box, value, comp)
 
@@ -79,12 +99,26 @@ fn zero_intvect3d() -> IntVect3D:
     return intvect3d(0, 0, 0)
 
 
-fn box3d(small_end: IntVect3D, big_end: IntVect3D, nodal: IntVect3D = zero_intvect3d()) -> Box3D:
+fn box3d(
+    small_end: IntVect3D,
+    big_end: IntVect3D,
+    nodal: IntVect3D = zero_intvect3d(),
+) -> Box3D:
     return Box3D(
         small_end=small_end.copy(),
         big_end=big_end.copy(),
         nodal=nodal.copy(),
     )
+
+
+fn last_error_message(ref lib: OwnedDLHandle) -> String:
+    var message = lib.call[
+        "amrex_mojo_last_error_message",
+        UnsafePointer[c_char, MutAnyOrigin],
+    ]()
+    if not message:
+        return String("AMReX call failed.")
+    return String(unsafe_from_utf8_ptr=message)
 
 
 fn abi_version(ref lib: OwnedDLHandle) -> Int:
@@ -111,7 +145,17 @@ fn parallel_myproc(ref lib: OwnedDLHandle) -> Int:
     return Int(lib.call["amrex_mojo_parallel_myproc", c_int]())
 
 
-fn boxarray_create_from_box(ref lib: OwnedDLHandle, runtime: RuntimeHandle, domain: Box3D) -> BoxArrayHandle:
+fn parallel_ioprocessor(ref lib: OwnedDLHandle) -> Bool:
+    return lib.call["amrex_mojo_parallel_ioprocessor", c_int]() != 0
+
+
+fn parallel_ioprocessor_number(ref lib: OwnedDLHandle) -> Int:
+    return Int(lib.call["amrex_mojo_parallel_ioprocessor_number", c_int]())
+
+
+fn boxarray_create_from_box(
+    ref lib: OwnedDLHandle, runtime: RuntimeHandle, domain: Box3D
+) -> BoxArrayHandle:
     return lib.call["amrex_mojo_boxarray_create_from_bounds", BoxArrayHandle](
         runtime,
         domain.small_end.x,
@@ -130,9 +174,13 @@ fn boxarray_destroy(ref lib: OwnedDLHandle, boxarray: BoxArrayHandle):
     lib.call["amrex_mojo_boxarray_destroy"](boxarray)
 
 
-fn boxarray_max_size(ref lib: OwnedDLHandle, boxarray: BoxArrayHandle, max_size: IntVect3D) -> Int:
+fn boxarray_max_size(
+    ref lib: OwnedDLHandle, boxarray: BoxArrayHandle, max_size: IntVect3D
+) -> Int:
     return Int(
-        lib.call["amrex_mojo_boxarray_max_size_xyz", c_int](boxarray, max_size.x, max_size.y, max_size.z)
+        lib.call["amrex_mojo_boxarray_max_size_xyz", c_int](
+            boxarray, max_size.x, max_size.y, max_size.z
+        )
     )
 
 
@@ -145,14 +193,18 @@ fn distmap_create_from_boxarray(
     runtime: RuntimeHandle,
     boxarray: BoxArrayHandle,
 ) -> DistributionMappingHandle:
-    return lib.call["amrex_mojo_distmap_create_from_boxarray", DistributionMappingHandle](runtime, boxarray)
+    return lib.call[
+        "amrex_mojo_distmap_create_from_boxarray", DistributionMappingHandle
+    ](runtime, boxarray)
 
 
 fn distmap_destroy(ref lib: OwnedDLHandle, distmap: DistributionMappingHandle):
     lib.call["amrex_mojo_distmap_destroy"](distmap)
 
 
-fn geometry_create(ref lib: OwnedDLHandle, runtime: RuntimeHandle, domain: Box3D) -> GeometryHandle:
+fn geometry_create(
+    ref lib: OwnedDLHandle, runtime: RuntimeHandle, domain: Box3D
+) -> GeometryHandle:
     return lib.call["amrex_mojo_geometry_create_from_bounds", GeometryHandle](
         runtime,
         domain.small_end.x,
@@ -198,8 +250,18 @@ fn multifab_ncomp(ref lib: OwnedDLHandle, multifab: MultiFabHandle) -> Int:
     return Int(lib.call["amrex_mojo_multifab_ncomp", c_int](multifab))
 
 
-fn multifab_set_val(ref lib: OwnedDLHandle, multifab: MultiFabHandle, value: Float64, start_comp: Int, ncomp: Int) -> Int:
-    return Int(lib.call["amrex_mojo_multifab_set_val", c_int](multifab, c_double(value), c_int(start_comp), c_int(ncomp)))
+fn multifab_set_val(
+    ref lib: OwnedDLHandle,
+    multifab: MultiFabHandle,
+    value: Float64,
+    start_comp: Int,
+    ncomp: Int,
+) -> Int:
+    return Int(
+        lib.call["amrex_mojo_multifab_set_val", c_int](
+            multifab, c_double(value), c_int(start_comp), c_int(ncomp)
+        )
+    )
 
 
 fn multifab_tile_count(ref lib: OwnedDLHandle, multifab: MultiFabHandle) -> Int:
@@ -213,7 +275,9 @@ fn box_from_bounds(lo_raw: List[c_int], hi_raw: List[c_int]) -> Box3D:
     )
 
 
-fn tile_view(ref lib: OwnedDLHandle, multifab: MultiFabHandle, tile_index: Int) -> TileF64View:
+fn tile_view(
+    ref lib: OwnedDLHandle, multifab: MultiFabHandle, tile_index: Int
+) -> TileF64View:
     var tile_lo = List[c_int](length=3, fill=0)
     var tile_hi = List[c_int](length=3, fill=0)
     var valid_lo = List[c_int](length=3, fill=0)
@@ -237,7 +301,9 @@ fn tile_view(ref lib: OwnedDLHandle, multifab: MultiFabHandle, tile_index: Int) 
     )
 
     var array_view = Array4F64View(
-        data=lib.call["amrex_mojo_multifab_data_ptr", RealPtr](multifab, c_int(tile_index)),
+        data=lib.call["amrex_mojo_multifab_data_ptr", RealPtr](
+            multifab, c_int(tile_index)
+        ),
         lo_x=data_lo[0],
         lo_y=data_lo[1],
         lo_z=data_lo[2],
@@ -258,13 +324,102 @@ fn tile_view(ref lib: OwnedDLHandle, multifab: MultiFabHandle, tile_index: Int) 
     )
 
 
-fn multifab_sum(ref lib: OwnedDLHandle, multifab: MultiFabHandle, comp: Int) -> Float64:
+fn multifab_sum(
+    ref lib: OwnedDLHandle, multifab: MultiFabHandle, comp: Int
+) -> Float64:
     return lib.call["amrex_mojo_multifab_sum", c_double](multifab, c_int(comp))
 
 
-fn multifab_min(ref lib: OwnedDLHandle, multifab: MultiFabHandle, comp: Int) -> Float64:
+fn multifab_min(
+    ref lib: OwnedDLHandle, multifab: MultiFabHandle, comp: Int
+) -> Float64:
     return lib.call["amrex_mojo_multifab_min", c_double](multifab, c_int(comp))
 
 
-fn multifab_max(ref lib: OwnedDLHandle, multifab: MultiFabHandle, comp: Int) -> Float64:
+fn multifab_max(
+    ref lib: OwnedDLHandle, multifab: MultiFabHandle, comp: Int
+) -> Float64:
     return lib.call["amrex_mojo_multifab_max", c_double](multifab, c_int(comp))
+
+
+fn multifab_norm0(
+    ref lib: OwnedDLHandle, multifab: MultiFabHandle, comp: Int
+) -> Float64:
+    return lib.call["amrex_mojo_multifab_norm0", c_double](
+        multifab, c_int(comp)
+    )
+
+
+fn multifab_norm1(
+    ref lib: OwnedDLHandle, multifab: MultiFabHandle, comp: Int
+) -> Float64:
+    return lib.call["amrex_mojo_multifab_norm1", c_double](
+        multifab, c_int(comp)
+    )
+
+
+fn multifab_norm2(
+    ref lib: OwnedDLHandle, multifab: MultiFabHandle, comp: Int
+) -> Float64:
+    return lib.call["amrex_mojo_multifab_norm2", c_double](
+        multifab, c_int(comp)
+    )
+
+
+fn multifab_plus(
+    ref lib: OwnedDLHandle,
+    multifab: MultiFabHandle,
+    value: Float64,
+    start_comp: Int,
+    ncomp: Int,
+    ngrow: IntVect3D,
+) -> Int:
+    return Int(
+        lib.call["amrex_mojo_multifab_plus", c_int](
+            multifab,
+            c_double(value),
+            c_int(start_comp),
+            c_int(ncomp),
+            ngrow,
+        )
+    )
+
+
+fn multifab_mult(
+    ref lib: OwnedDLHandle,
+    multifab: MultiFabHandle,
+    value: Float64,
+    start_comp: Int,
+    ncomp: Int,
+    ngrow: IntVect3D,
+) -> Int:
+    return Int(
+        lib.call["amrex_mojo_multifab_mult", c_int](
+            multifab,
+            c_double(value),
+            c_int(start_comp),
+            c_int(ncomp),
+            ngrow,
+        )
+    )
+
+
+fn multifab_copy(
+    ref lib: OwnedDLHandle,
+    dst_multifab: MultiFabHandle,
+    src_multifab: MultiFabHandle,
+    src_comp: Int,
+    dst_comp: Int,
+    ncomp: Int,
+    ngrow: IntVect3D,
+) -> Int:
+    return Int(
+        lib.call["amrex_mojo_multifab_copy", c_int](
+            dst_multifab,
+            src_multifab,
+            c_int(src_comp),
+            c_int(dst_comp),
+            c_int(ncomp),
+            ngrow,
+        )
+    )
