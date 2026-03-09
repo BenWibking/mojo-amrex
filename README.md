@@ -63,3 +63,8 @@ Notes:
 - The public Mojo surface now uses move-only wrapper objects such as
   `AmrexRuntime`, `BoxArray`, `Geometry`, and `MultiFab`. The raw handle-level
   bindings remain available under `amrex.ffi`.
+
+## License
+
+This repository is licensed under the BSD 3-Clause License. See `LICENSE`
+for the full text.
