@@ -1,0 +1,15 @@
+[workspace]
+authors = ["Ben Wibking <ben@wibking.com>"]
+channels = ["https://conda.modular.com/max-nightly", "conda-forge"]
+name = "mojo-amrex"
+platforms = ["osx-arm64"]
+version = "0.1.0"
+
+[tasks]
+configure = "cmake -S . -B build"
+build-capi = "cmake --build build --target amrex_mojo_capi_3d"
+package-mojo = "mojo package mojo/amrex -o amrex.mojopkg"
+format-mojo = "mojo format mojo/amrex examples"
+
+[dependencies]
+mojo = ">=0.26.2.0.dev2026030905,<0.27"

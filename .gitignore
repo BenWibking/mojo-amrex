@@ -1,0 +1,11 @@
+pixi.lock
+build/
+dist/
+*.mojopkg
+*.o
+*.so
+*.dylib
+*.dll
+*.a
+*.swp
+*.DS_Store
