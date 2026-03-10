@@ -35,7 +35,9 @@ If you just installed `pixi`, restart your shell first so `pixi` is on `PATH`.
 `bootstrap` configures the build, compiles the AMReX C ABI, and installs both
 the shared library and `amrex.mojopkg` into the default pixi environment. A
 fresh checkout does not need a preexisting AMReX clone; CMake fetches AMReX
-from GitHub during the initial configure step.
+from GitHub during the initial configure step. The default pixi build now
+enables MPI, so both examples under `examples/` can use the installed library
+without a separate MPI-only build tree.
 
 ## Layout
 
@@ -93,24 +95,28 @@ Notes:
 - By default the CMake build fetches AMReX from
   `https://github.com/AMReX-Codes/amrex/releases/download/26.03/amrex-26.03.tar.gz`
   and verifies the pinned SHA-256 before configuring a 3D, CPU-only,
-  double-precision build suitable for the MVP bindings.
-- `pixi run configure-mpi` creates a separate `build-mpi/` tree with
-  `AMREX_MOJO_ENABLE_MPI=ON` and uses the pixi-provided OpenMPI wrapper
-  compilers.
+  double-precision MPI-enabled build suitable for the MVP bindings.
+- `pixi run configure` now uses the pixi-provided OpenMPI wrapper compilers so
+  the default `build/` tree and installed C ABI are MPI-capable.
+- `pixi run configure-mpi`, `build-capi-mpi`, and `build-tests-mpi` remain as
+  explicit MPI task aliases, but they target the same default `build/` tree.
 - To build against a local AMReX checkout instead, configure with
   `-DAMREX_MOJO_AMREX_SOURCE_DIR=/path/to/amrex`.
 - `pixi run install-amrex` installs the C API library into the active env's
   `lib/` directory and installs `amrex.mojopkg` into the env's `lib/mojo/`
   directory, so bare commands like `mojo examples/multifab_smoke.mojo` work
-  from the repo root inside `pixi shell` without `-I mojo`.
+  from the repo root inside `pixi shell` without `-I mojo`. After `bootstrap`,
+  `mpiexec -n 2 mojo examples/multifab_mpi_exchange.mojo` also uses that same
+  installed library by default.
 - `pixi run test` runs the C++ ABI test through `ctest` and the Mojo
   functional tests against the local build tree. The Mojo test tasks rebuild
   and install `amrex.mojopkg` into the active pixi env before running, then set
   `AMREX_MOJO_LIBRARY_PATH=./build/src/capi/libamrex_mojo_capi_3d.dylib`.
 - `pixi run run-multifab-mpi-exchange` packages the current Mojo bindings,
-  points them at `build-mpi/`, and runs the MPI example with `mpiexec -n 2`.
+  points them at the default `build/` tree, and runs the MPI example with
+  `mpiexec -n 2`.
 - `pixi run test-mpi` runs the two-rank MPI variants of the C++ and Mojo tests
-  from the separate `build-mpi/` tree.
+  from the default MPI-enabled `build/` tree.
 - The public Mojo surface now uses move-only wrapper objects such as
   `AmrexRuntime`, `BoxArray`, `Geometry`, and `MultiFab`. The raw handle-level
   bindings remain available under `amrex.ffi`.

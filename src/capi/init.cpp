@@ -92,8 +92,8 @@ namespace
             message += std::to_string(hint.size);
         }
         message +=
-            ". Set AMREX_MOJO_LIBRARY_PATH=./build-mpi/src/capi/libamrex_mojo_capi_3d.dylib "
-            "or run `pixi run run-multifab-mpi-exchange`.";
+            ". Rebuild the default MPI-enabled library with `pixi run bootstrap`, "
+            "or set AMREX_MOJO_LIBRARY_PATH=./build/src/capi/libamrex_mojo_capi_3d.dylib.";
         return message;
     }
 }
