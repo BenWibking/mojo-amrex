@@ -668,6 +668,92 @@ amrex_mojo_multifab_copy(
 }
 
 extern "C" amrex_mojo_status_code_t
+amrex_mojo_multifab_parallel_copy(
+    amrex_mojo_multifab_t* dst_multifab,
+    const amrex_mojo_multifab_t* src_multifab,
+    const amrex_mojo_geometry_t* geometry,
+    int32_t src_comp,
+    int32_t dst_comp,
+    int32_t ncomp,
+    amrex_mojo_intvect_3d src_ngrow,
+    amrex_mojo_intvect_3d dst_ngrow
+)
+{
+    if (dst_multifab == nullptr || dst_multifab->value == nullptr || src_multifab == nullptr ||
+        src_multifab->value == nullptr || geometry == nullptr) {
+        return amrex_mojo::detail::set_last_error(
+            AMREX_MOJO_STATUS_INVALID_ARGUMENT,
+            "multifab_parallel_copy requires non-null source, destination, and geometry."
+        );
+    }
+
+    if (validate_component_range(*src_multifab->value, src_comp, ncomp) != AMREX_MOJO_STATUS_OK ||
+        validate_component_range(*dst_multifab->value, dst_comp, ncomp) != AMREX_MOJO_STATUS_OK) {
+        return AMREX_MOJO_STATUS_INVALID_ARGUMENT;
+    }
+
+    try {
+        dst_multifab->value->ParallelCopy(
+            *src_multifab->value,
+            src_comp,
+            dst_comp,
+            ncomp,
+            amrex_mojo::detail::to_intvect(src_ngrow),
+            amrex_mojo::detail::to_intvect(dst_ngrow),
+            geometry->value.periodicity()
+        );
+        amrex_mojo::detail::clear_last_error();
+        return AMREX_MOJO_STATUS_OK;
+    } catch (const std::exception& ex) {
+        return amrex_mojo::detail::set_last_error(AMREX_MOJO_STATUS_INTERNAL_ERROR, ex.what());
+    } catch (...) {
+        return amrex_mojo::detail::set_last_error(
+            AMREX_MOJO_STATUS_INTERNAL_ERROR,
+            "multifab_parallel_copy failed with an unknown exception."
+        );
+    }
+}
+
+extern "C" amrex_mojo_status_code_t
+amrex_mojo_multifab_fill_boundary(
+    amrex_mojo_multifab_t* multifab,
+    const amrex_mojo_geometry_t* geometry,
+    int32_t start_comp,
+    int32_t ncomp,
+    int32_t cross
+)
+{
+    if (multifab == nullptr || multifab->value == nullptr || geometry == nullptr) {
+        return amrex_mojo::detail::set_last_error(
+            AMREX_MOJO_STATUS_INVALID_ARGUMENT,
+            "multifab_fill_boundary requires a non-null multifab and geometry."
+        );
+    }
+
+    if (validate_component_range(*multifab->value, start_comp, ncomp) != AMREX_MOJO_STATUS_OK) {
+        return AMREX_MOJO_STATUS_INVALID_ARGUMENT;
+    }
+
+    try {
+        multifab->value->FillBoundary(
+            start_comp,
+            ncomp,
+            geometry->value.periodicity(),
+            cross != 0
+        );
+        amrex_mojo::detail::clear_last_error();
+        return AMREX_MOJO_STATUS_OK;
+    } catch (const std::exception& ex) {
+        return amrex_mojo::detail::set_last_error(AMREX_MOJO_STATUS_INTERNAL_ERROR, ex.what());
+    } catch (...) {
+        return amrex_mojo::detail::set_last_error(
+            AMREX_MOJO_STATUS_INTERNAL_ERROR,
+            "multifab_fill_boundary failed with an unknown exception."
+        );
+    }
+}
+
+extern "C" amrex_mojo_status_code_t
 amrex_mojo_write_single_level_plotfile(
     const amrex_mojo_multifab_t* multifab,
     const amrex_mojo_geometry_t* geometry,

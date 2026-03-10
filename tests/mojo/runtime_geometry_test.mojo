@@ -5,10 +5,12 @@ from amrex.space3d import (
     DistributionMapping,
     Geometry,
     IntVect3D,
+    ParmParse,
     box3d,
     intvect3d,
     zero_intvect3d,
 )
+from std.collections import List
 
 
 comptime DOMAIN_EXTENT = 64
@@ -72,7 +74,10 @@ def box_cells(box: Box3D) raises -> Int:
 
 
 def main() raises:
-    var runtime = AmrexRuntime()
+    var argv = List[String](length=2, fill=String(""))
+    argv[0] = String("runtime_geometry_test")
+    argv[1] = String("runtime_geometry_test.answer=17")
+    var runtime = AmrexRuntime(argv, use_parmparse=True)
     expect(runtime.abi_version() == 1, "unexpected ABI version")
     expect(runtime.initialized(), "runtime should be initialized")
     expect(runtime.nprocs() >= 1, "nprocs should be >= 1")
@@ -81,6 +86,9 @@ def main() raises:
         runtime.ioprocessor_number() >= 0,
         "ioprocessor_number should be >= 0",
     )
+
+    var params = ParmParse(runtime, "runtime_geometry_test")
+    expect(params.query_int("answer") == 17, "ParmParse query_int mismatch")
 
     var zero = zero_intvect3d()
     expect_intvect(zero, 0, 0, 0, "zero_intvect3d mismatch")

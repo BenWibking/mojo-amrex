@@ -11,6 +11,7 @@ from amrex.ffi import (
 )
 from amrex.loader import default_library_path, load_library
 from amrex.ownership import require_live_handle
+from std.collections import List
 from std.ffi import OwnedDLHandle
 from std.memory import ArcPointer
 
@@ -42,10 +43,32 @@ struct AmrexRuntime(Movable):
         self.state = RuntimeLease(_AmrexRuntimeState(lib^, handle, path^))
         self.handle = handle
 
+    def __init__(
+        out self, argv: List[String], use_parmparse: Bool = False
+    ) raises:
+        var path = default_library_path()
+        var lib = load_library(path)
+        var handle = runtime_create(lib, argv, use_parmparse)
+        if not handle:
+            raise Error(last_error_message(lib))
+        self.state = RuntimeLease(_AmrexRuntimeState(lib^, handle, path^))
+        self.handle = handle
+
     def __init__(out self, path: String) raises:
         var path_owned = path.copy()
         var lib = load_library(path_owned)
         var handle = runtime_create(lib)
+        if not handle:
+            raise Error(last_error_message(lib))
+        self.state = RuntimeLease(_AmrexRuntimeState(lib^, handle, path_owned^))
+        self.handle = handle
+
+    def __init__(
+        out self, path: String, argv: List[String], use_parmparse: Bool = False
+    ) raises:
+        var path_owned = path.copy()
+        var lib = load_library(path_owned)
+        var handle = runtime_create(lib, argv, use_parmparse)
         if not handle:
             raise Error(last_error_message(lib))
         self.state = RuntimeLease(_AmrexRuntimeState(lib^, handle, path_owned^))

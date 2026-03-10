@@ -54,8 +54,18 @@ plan:
 That means the first vertical slice is no longer the next task. The main work
 remaining is:
 
-- later Phase 5 expansion items such as MPI, OpenMP, GPU, particles, EB, and
-  broader dimensional coverage
+- deeper Phase 5 expansion items such as broader MPI coverage, GPU, particles,
+  and broader dimensional coverage
+
+An initial MPI slice is now implemented:
+
+- optional MPI-enabled build and test path through `AMREX_MOJO_ENABLE_MPI`
+- OpenMPI-backed pixi environment and MPI test tasks
+- runtime initialization through `argc`, `argv`, and `use_parmparse` in both
+  the C ABI and Mojo wrappers
+- `MultiFab.fill_boundary(...)` and `MultiFab.parallel_copy_from(...)`
+- two-rank C ABI and Mojo regression coverage
+- a runnable MPI ghost-exchange example under `examples/`
 
 ## Key Findings
 
@@ -63,8 +73,8 @@ remaining is:
 
 `../pyamrex` exposes a large API surface:
 
-- `pyAMReX.cpp` registers bindings across Base, AmrCore, EB, Particle, and
-  utility subsystems.
+- `pyAMReX.cpp` registers bindings across Base, AmrCore, Particle, and utility
+  subsystems.
 - `docs/source/usage/api.rst` shows broad coverage including `IntVect`, `Box`,
   `BoxArray`, `Geometry`, `DistributionMapping`, `MultiFab`, `Array4`,
   `ParmParse`, `ParallelDescriptor`, particles, and plotfile utilities.
@@ -158,7 +168,6 @@ This is enough to support a real AMReX workflow in Mojo:
 - GPU array interop
 - DLPack
 - particles
-- embedded boundary support
 - the full `ParmParse` surface
 - `AmrMesh` or custom `AmrCore` subclassing
 
@@ -324,11 +333,14 @@ an explicit `finalize()` call can race with later wrapper destruction.
 Instead, expose a root runtime object:
 
 - C ABI:
-  - `amrex_mojo_runtime_create(argc, argv, use_parmparse, out_runtime)`
+  - `amrex_mojo_runtime_create(argc, argv, use_parmparse)`
+  - `amrex_mojo_runtime_create_default()`
   - `amrex_mojo_runtime_destroy(runtime)`
   - `amrex_mojo_runtime_initialized(runtime)`
 - Mojo API:
   - `AmrexRuntime()`
+  - `AmrexRuntime(argv, use_parmparse=False)`
+  - `AmrexRuntime(path, argv, use_parmparse=False)`
   - `AmrexRuntime.initialized()`
 
 All owning AMReX wrappers are created from an `AmrexRuntime` and retain a
@@ -450,11 +462,10 @@ Recommended AMReX options for the first milestone:
 
 - `AMReX_SPACEDIM=3`
 - `AMReX_PRECISION=DOUBLE`
-- `AMReX_MPI=OFF` initially, then optionally `ON`
-- `AMReX_OMP=OFF` initially
+- `AMReX_MPI=OFF` by default, with an optional MPI build enabled through the
+  repository's `AMREX_MOJO_ENABLE_MPI` toggle
 - `AMReX_GPU_BACKEND=NONE`
 - `AMReX_PARTICLES=OFF` initially
-- `AMReX_EB=OFF` initially
 
 This keeps the ABI small and the bring-up path short.
 
@@ -581,19 +592,29 @@ Exit criteria:
 
 - enough stability to use bindings in a small AMReX-driven workflow
 
-### Phase 5: expansion (future)
+### Phase 5: expansion (in progress)
 
 Potential additions:
 
 - 1D and 2D builds
-- MPI support
-- OpenMP support
+- broader MPI support beyond the initial slice
+  - custom communicators instead of only `MPI_COMM_WORLD`
+  - more `ParallelDescriptor` collectives and synchronization utilities
+  - additional `MultiFab` communication helpers as real workflows require them
 - GPU builds using AMReX-owned `MultiFab` storage allocated from
   `The_Async_Arena()`
 - DLPack or other array interop
 - particles
-- EB
 - more `AmrCore` functionality
+
+Completed MPI slice:
+
+- optional MPI build/test path and OpenMPI pixi environment
+- runtime construction from `argv` with `use_parmparse`
+- `MultiFab.fill_boundary(...)`
+- `MultiFab.parallel_copy_from(...)`
+- two-rank C ABI and Mojo coverage
+- MPI example exercising ghost exchange and copy
 
 ## Testing Plan
 
@@ -616,6 +637,7 @@ Recommended test layers:
 - C++ C-ABI tests for the shim
 - Mojo smoke tests for library loading and ownership
 - Mojo functional tests for core AMReX workflows
+- MPI variants of the C++ and Mojo tests for communication-sensitive paths
 
 The test strategy should verify both behavior and lifetime correctness.
 
@@ -663,7 +685,7 @@ from the beginning.
 Rough estimates:
 
 - bootstrap + MVP core: 1 to 2 weeks
-- solid core binding set without particles, EB, or GPU: 3 to 6 weeks
+- solid core binding set without particles or GPU: 3 to 6 weeks
 - broad `pyamrex`-like coverage: significantly more, depending on how far MPI,
   particles, and GPU interop are taken
 
@@ -672,22 +694,21 @@ not literal code translation.
 
 ## Recommended Next Step
 
-Phase 4 is complete for the current 3D CPU binding layer. The next
-implementation step is to choose the first Phase 5 expansion target based on the
-next concrete workflow the bindings need to support.
+Phase 4 is complete for the current 3D CPU binding layer, and the first MPI
+slice of Phase 5 is now in place. The next implementation step is to choose
+whether the next workflow needs broader MPI coverage or whether the project
+should move to the next Phase 5 expansion target.
 
 Recommended expansion order:
 
-1. MPI support, because it unlocks real AMReX workflows without changing the
-   core ownership model
+1. Broader MPI coverage, if the next workflow needs custom communicators,
+   additional collectives, or more boundary synchronization helpers
 2. 1D and 2D builds, because dimensional coverage expands the same API design
    without introducing major new subsystems
-3. OpenMP support, because it broadens CPU execution without changing the C ABI
-   object model
 
-GPU, particles, EB, and broader `AmrCore` functionality should still follow
-after the CPU ownership and iteration model has been exercised through those
-smaller expansion steps.
+GPU, particles, and broader `AmrCore` functionality should still follow after
+the CPU ownership and iteration model has been exercised through those smaller
+expansion steps.
 
 ## References
 

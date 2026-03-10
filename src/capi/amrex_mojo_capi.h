@@ -263,6 +263,23 @@ amrex_mojo_status_code_t amrex_mojo_multifab_copy(
     int32_t ncomp,
     amrex_mojo_intvect_3d ngrow
 );
+amrex_mojo_status_code_t amrex_mojo_multifab_parallel_copy(
+    amrex_mojo_multifab_t* dst_multifab,
+    const amrex_mojo_multifab_t* src_multifab,
+    const amrex_mojo_geometry_t* geometry,
+    int32_t src_comp,
+    int32_t dst_comp,
+    int32_t ncomp,
+    amrex_mojo_intvect_3d src_ngrow,
+    amrex_mojo_intvect_3d dst_ngrow
+);
+amrex_mojo_status_code_t amrex_mojo_multifab_fill_boundary(
+    amrex_mojo_multifab_t* multifab,
+    const amrex_mojo_geometry_t* geometry,
+    int32_t start_comp,
+    int32_t ncomp,
+    int32_t cross
+);
 amrex_mojo_status_code_t amrex_mojo_write_single_level_plotfile(
     const amrex_mojo_multifab_t* multifab,
     const amrex_mojo_geometry_t* geometry,

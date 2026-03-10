@@ -9,6 +9,7 @@ from amrex.ffi import (
     last_error_message,
     multifab_copy,
     multifab_create,
+    multifab_fill_boundary,
     multifab_max,
     multifab_min,
     multifab_mult,
@@ -16,6 +17,7 @@ from amrex.ffi import (
     multifab_norm0,
     multifab_norm1,
     multifab_norm2,
+    multifab_parallel_copy,
     multifab_plus,
     multifab_set_val,
     multifab_sum,
@@ -232,6 +234,59 @@ struct MultiFab(Movable):
             != 0
         ):
             raise Error(last_error_message(self.runtime[].lib))
+
+    def parallel_copy_from(
+        mut self,
+        ref source: MultiFab,
+        ref geometry: Geometry,
+        src_comp: Int,
+        dst_comp: Int,
+        ncomp: Int,
+        src_ngrow: IntVect3D = IntVect3D(x=0, y=0, z=0),
+        dst_ngrow: IntVect3D = IntVect3D(x=0, y=0, z=0),
+    ) raises:
+        var handle = self._handle()
+        if (
+            multifab_parallel_copy(
+                self.runtime[].lib,
+                handle,
+                source._handle(),
+                geometry._handle(),
+                src_comp,
+                dst_comp,
+                ncomp,
+                src_ngrow,
+                dst_ngrow,
+            )
+            != 0
+        ):
+            raise Error(last_error_message(self.runtime[].lib))
+
+    def fill_boundary(
+        mut self,
+        ref geometry: Geometry,
+        start_comp: Int,
+        ncomp: Int,
+        cross: Bool = False,
+    ) raises:
+        var handle = self._handle()
+        if (
+            multifab_fill_boundary(
+                self.runtime[].lib,
+                handle,
+                geometry._handle(),
+                start_comp,
+                ncomp,
+                cross,
+            )
+            != 0
+        ):
+            raise Error(last_error_message(self.runtime[].lib))
+
+    def fill_boundary(
+        mut self, ref geometry: Geometry, cross: Bool = False
+    ) raises:
+        self.fill_boundary(geometry, 0, self.ncomp(), cross)
 
     def write_single_level_plotfile(
         ref self,

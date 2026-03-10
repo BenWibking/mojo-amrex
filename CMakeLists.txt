@@ -17,6 +17,12 @@ option(
     ON
 )
 
+option(
+    AMREX_MOJO_ENABLE_MPI
+    "Enable MPI support in AMReX and the Mojo bindings."
+    OFF
+)
+
 set(AMREX_MOJO_AMREX_SOURCE_DIR_DEFAULT "")
 set(
     AMREX_MOJO_AMREX_SOURCE_DIR
@@ -54,7 +60,7 @@ endif()
 if(NOT TARGET AMReX::amrex_3d AND NOT TARGET AMReX::amrex)
     set(AMReX_SPACEDIM 3 CACHE STRING "Dimension of AMReX build" FORCE)
     set(AMReX_PRECISION DOUBLE CACHE STRING "Precision of AMReX build" FORCE)
-    set(AMReX_MPI OFF CACHE BOOL "Enable MPI in AMReX" FORCE)
+    set(AMReX_MPI ${AMREX_MOJO_ENABLE_MPI} CACHE BOOL "Enable MPI in AMReX" FORCE)
     set(AMReX_OMP OFF CACHE BOOL "Enable OpenMP in AMReX" FORCE)
     set(AMReX_GPU_BACKEND NONE CACHE STRING "GPU backend for AMReX" FORCE)
     set(AMReX_PARTICLES OFF CACHE BOOL "Enable AMReX particle classes" FORCE)

@@ -1,6 +1,7 @@
 #include "amrex_mojo_capi.h"
 
 #include <cmath>
+#include <cstddef>
 #include <cstdlib>
 #include <filesystem>
 #include <iostream>
@@ -30,6 +31,73 @@ namespace
         if (!condition) {
             fail(message);
         }
+    }
+
+    auto box_cell_count(const amrex_mojo_box_3d& box) -> long long
+    {
+        const auto nx = static_cast<long long>(box.big_end.x - box.small_end.x + 1);
+        const auto ny = static_cast<long long>(box.big_end.y - box.small_end.y + 1);
+        const auto nz = static_cast<long long>(box.big_end.z - box.small_end.z + 1);
+        return nx * ny * nz;
+    }
+
+    auto array4_value(
+        const amrex_mojo_array4_view_f64& array4,
+        int i,
+        int j,
+        int k,
+        int comp = 0
+    ) -> double
+    {
+        const auto offset =
+            static_cast<std::ptrdiff_t>(i - array4.lo_x) * array4.stride_i +
+            static_cast<std::ptrdiff_t>(j - array4.lo_y) * array4.stride_j +
+            static_cast<std::ptrdiff_t>(k - array4.lo_z) * array4.stride_k +
+            static_cast<std::ptrdiff_t>(comp) * array4.stride_n;
+        return array4.data[offset];
+    }
+
+    void fill_valid_box(
+        const amrex_mojo_array4_view_f64& array4,
+        const amrex_mojo_box_3d& box,
+        double value
+    )
+    {
+        for (int k = box.small_end.z; k <= box.big_end.z; ++k) {
+            for (int j = box.small_end.y; j <= box.big_end.y; ++j) {
+                for (int i = box.small_end.x; i <= box.big_end.x; ++i) {
+                    const auto offset =
+                        static_cast<std::ptrdiff_t>(i - array4.lo_x) * array4.stride_i +
+                        static_cast<std::ptrdiff_t>(j - array4.lo_y) * array4.stride_j +
+                        static_cast<std::ptrdiff_t>(k - array4.lo_z) * array4.stride_k;
+                    array4.data[offset] = value;
+                }
+            }
+        }
+    }
+
+    auto has_nonzero_ghost_cells(const amrex_mojo_multifab_t* multifab) -> bool
+    {
+        const auto tile_count = amrex_mojo_multifab_tile_count(multifab);
+        for (int tile_index = 0; tile_index < tile_count; ++tile_index) {
+            const auto valid_box = amrex_mojo_multifab_valid_box(multifab, tile_index);
+            const auto array4 = amrex_mojo_multifab_array4(multifab, tile_index);
+            for (int k = array4.lo_z; k <= array4.hi_z; ++k) {
+                for (int j = array4.lo_y; j <= array4.hi_y; ++j) {
+                    for (int i = array4.lo_x; i <= array4.hi_x; ++i) {
+                        const bool in_valid =
+                            i >= valid_box.small_end.x && i <= valid_box.big_end.x &&
+                            j >= valid_box.small_end.y && j <= valid_box.big_end.y &&
+                            k >= valid_box.small_end.z && k <= valid_box.big_end.z;
+                        if (!in_valid && !close_enough(array4_value(array4, i, j, k), 0.0)) {
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+
+        return false;
     }
 }
 
@@ -70,8 +138,9 @@ auto main() -> int
         "mfiter_next should report a null-handle diagnostic."
     );
 
-    amrex_mojo_runtime_t* runtime = amrex_mojo_runtime_create_default();
-    expect(runtime != nullptr, "runtime_create_default returned null.");
+    const char* runtime_argv[] = {"amrex_mojo_capi_test"};
+    amrex_mojo_runtime_t* runtime = amrex_mojo_runtime_create(1, runtime_argv, 0);
+    expect(runtime != nullptr, "runtime_create returned null.");
     expect(amrex_mojo_runtime_initialized(runtime) == 1, "runtime should report initialized.");
     expect(amrex_mojo_parallel_nprocs() >= 1, "parallel_nprocs should be >= 1.");
     expect(amrex_mojo_parallel_myproc() >= 0, "parallel_myproc should be >= 0.");
@@ -103,7 +172,7 @@ auto main() -> int
         expect(nx > 0 && nx <= 32, "boxarray x-extent should be within the split size.");
         expect(ny > 0 && ny <= 32, "boxarray y-extent should be within the split size.");
         expect(nz > 0 && nz <= 32, "boxarray z-extent should be within the split size.");
-        total_cells += static_cast<long long>(nx) * ny * nz;
+        total_cells += box_cell_count(box);
     }
     expect(
         total_cells == static_cast<long long>(kDomainExtent) * kDomainExtent * kDomainExtent,
@@ -202,6 +271,63 @@ auto main() -> int
     expect(iterated_tiles == amrex_mojo_multifab_tile_count(multifab), "mfiter tile count mismatch.");
     amrex_mojo_mfiter_destroy(mfiter);
 
+    amrex_mojo_multifab_t* comm_source =
+        amrex_mojo_multifab_create_xyz(runtime, boxarray, distmap, 1, 1, 1, 1);
+    expect(comm_source != nullptr, "comm_source create failed.");
+    amrex_mojo_multifab_t* comm_destination =
+        amrex_mojo_multifab_create_xyz(runtime, boxarray, distmap, 1, 1, 1, 1);
+    expect(comm_destination != nullptr, "comm_destination create failed.");
+    expect(
+        amrex_mojo_multifab_set_val(comm_source, 0.0, 0, 1) == AMREX_MOJO_STATUS_OK,
+        "comm_source set_val failed."
+    );
+    expect(
+        amrex_mojo_multifab_set_val(comm_destination, 0.0, 0, 1) == AMREX_MOJO_STATUS_OK,
+        "comm_destination set_val failed."
+    );
+
+    for (int tile_index = 0; tile_index < amrex_mojo_multifab_tile_count(comm_source); ++tile_index) {
+        const auto tile_box = amrex_mojo_multifab_tile_box(comm_source, tile_index);
+        const auto tile_array = amrex_mojo_multifab_array4(comm_source, tile_index);
+        fill_valid_box(
+            tile_array,
+            tile_box,
+            static_cast<double>(amrex_mojo_parallel_myproc() + 1)
+        );
+    }
+
+    expect(!has_nonzero_ghost_cells(comm_source), "comm_source ghosts should start at zero.");
+    expect(
+        amrex_mojo_multifab_fill_boundary(comm_source, geometry, 0, 1, 0) == AMREX_MOJO_STATUS_OK,
+        "multifab_fill_boundary failed."
+    );
+    expect(has_nonzero_ghost_cells(comm_source), "fill_boundary should populate ghost cells.");
+
+    expect(
+        amrex_mojo_multifab_parallel_copy(
+            comm_destination,
+            comm_source,
+            geometry,
+            0,
+            0,
+            1,
+            amrex_mojo_intvect_3d{0, 0, 0},
+            amrex_mojo_intvect_3d{1, 1, 1}
+        ) == AMREX_MOJO_STATUS_OK,
+        "multifab_parallel_copy failed."
+    );
+    expect(
+        close_enough(
+            amrex_mojo_multifab_sum(comm_destination, 0),
+            amrex_mojo_multifab_sum(comm_source, 0)
+        ),
+        "parallel_copy should preserve the valid-region sum."
+    );
+    expect(
+        has_nonzero_ghost_cells(comm_destination),
+        "parallel_copy should populate destination ghost cells."
+    );
+
     amrex_mojo_parmparse_t* parmparse = amrex_mojo_parmparse_create(runtime, "capi_test");
     expect(parmparse != nullptr, "parmparse_create returned null.");
     expect(
@@ -226,6 +352,8 @@ auto main() -> int
     expect(std::filesystem::exists(plotfile / "Header"), "plotfile Header was not written.");
 
     amrex_mojo_parmparse_destroy(parmparse);
+    amrex_mojo_multifab_destroy(comm_destination);
+    amrex_mojo_multifab_destroy(comm_source);
     amrex_mojo_multifab_destroy(multifab);
     amrex_mojo_geometry_destroy(geometry);
     amrex_mojo_distmap_destroy(distmap);

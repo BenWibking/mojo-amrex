@@ -1,6 +1,7 @@
 from amrex.space3d import (
     AmrexRuntime,
     Array4F64View,
+    Box3D,
     BoxArray,
     DistributionMapping,
     Geometry,
@@ -37,6 +38,49 @@ def expect_equal(
     actual: Float64, expected: Float64, message: StringLiteral
 ) raises:
     expect(actual == expected, message)
+
+
+def box_contains(box: Box3D, i: Int, j: Int, k: Int) raises -> Bool:
+    return (
+        i >= Int(box.small_end.x)
+        and i <= Int(box.big_end.x)
+        and j >= Int(box.small_end.y)
+        and j <= Int(box.big_end.y)
+        and k >= Int(box.small_end.z)
+        and k <= Int(box.big_end.z)
+    )
+
+
+def fill_box_value[
+    owner_origin: Origin[mut=True]
+](array: Array4F64View[owner_origin], box: Box3D, value: Float64) raises:
+    for k in range(Int(box.small_end.z), Int(box.big_end.z) + 1):
+        for j in range(Int(box.small_end.y), Int(box.big_end.y) + 1):
+            for i in range(Int(box.small_end.x), Int(box.big_end.x) + 1):
+                array[i, j, k] = value
+
+
+def has_nonzero_ghost_cells(mut multifab: MultiFab) raises -> Bool:
+    var mfi = multifab.mfiter()
+    while mfi.is_valid():
+        var valid_box = mfi.validbox()
+        var fab_box = mfi.fabbox()
+        var array = multifab.array(mfi)
+        for k in range(Int(fab_box.small_end.z), Int(fab_box.big_end.z) + 1):
+            for j in range(
+                Int(fab_box.small_end.y), Int(fab_box.big_end.y) + 1
+            ):
+                for i in range(
+                    Int(fab_box.small_end.x), Int(fab_box.big_end.x) + 1
+                ):
+                    if (
+                        not box_contains(valid_box, i, j, k)
+                        and array[i, j, k] != 0.0
+                    ):
+                        return True
+        mfi.next()
+
+    return False
 
 
 def fill_source_tile[
@@ -156,6 +200,52 @@ def main() raises:
         copy_target.sum(0),
         destination.sum(0),
         "copy_target.sum mismatch",
+    )
+
+    var comm_source = MultiFab(
+        runtime, boxarray, distmap, 1, intvect3d(1, 1, 1)
+    )
+    var comm_destination = MultiFab(
+        runtime, boxarray, distmap, 1, intvect3d(1, 1, 1)
+    )
+    comm_source.set_val(0.0)
+    comm_destination.set_val(0.0)
+
+    var comm_mfi = comm_source.mfiter()
+    var rank_value = Float64(runtime.myproc() + 1)
+    while comm_mfi.is_valid():
+        fill_box_value(
+            comm_source.array(comm_mfi), comm_mfi.tilebox(), rank_value
+        )
+        comm_mfi.next()
+
+    expect(
+        not has_nonzero_ghost_cells(comm_source),
+        "comm_source ghosts should start at zero",
+    )
+    comm_source.fill_boundary(geometry)
+    expect(
+        has_nonzero_ghost_cells(comm_source),
+        "fill_boundary should populate ghost cells",
+    )
+
+    comm_destination.parallel_copy_from(
+        comm_source,
+        geometry,
+        0,
+        0,
+        1,
+        intvect3d(0, 0, 0),
+        intvect3d(1, 1, 1),
+    )
+    expect_equal(
+        comm_destination.sum(0),
+        comm_source.sum(0),
+        "parallel_copy_from should preserve the valid-region sum",
+    )
+    expect(
+        has_nonzero_ghost_cells(comm_destination),
+        "parallel_copy_from should populate destination ghost cells",
     )
 
     var plotfile_path = String("build/multifab_functional_test_plotfile")

@@ -168,6 +168,35 @@ def runtime_create(ref lib: OwnedDLHandle) raises -> RuntimeHandle:
     return lib.call["amrex_mojo_runtime_create_default", RuntimeHandle]()
 
 
+def runtime_create(
+    ref lib: OwnedDLHandle,
+    argv: List[String],
+    use_parmparse: Bool = False,
+) raises -> RuntimeHandle:
+    var argc = len(argv)
+    if argc == 0:
+        return lib.call["amrex_mojo_runtime_create", RuntimeHandle](
+            c_int(0),
+            UnsafePointer[UnsafePointer[c_char, MutAnyOrigin], MutAnyOrigin](),
+            c_int(1 if use_parmparse else 0),
+        )
+
+    var argv_storage = List[String](length=argc, fill=String(""))
+    for i in range(argc):
+        argv_storage[i] = argv[i].copy()
+
+    var first_ptr = argv_storage[0].as_c_string_slice().unsafe_ptr()
+    var argv_ptrs = List[type_of(first_ptr)](length=argc, fill=first_ptr)
+    for i in range(1, argc):
+        argv_ptrs[i] = argv_storage[i].as_c_string_slice().unsafe_ptr()
+
+    return lib.call["amrex_mojo_runtime_create", RuntimeHandle](
+        c_int(argc),
+        argv_ptrs.unsafe_ptr(),
+        c_int(1 if use_parmparse else 0),
+    )
+
+
 def runtime_destroy(ref lib: OwnedDLHandle, runtime: RuntimeHandle) raises:
     lib.call["amrex_mojo_runtime_destroy"](runtime)
 
@@ -747,6 +776,50 @@ def multifab_copy(
             c_int(dst_comp),
             c_int(ncomp),
             ngrow,
+        )
+    )
+
+
+def multifab_parallel_copy(
+    ref lib: OwnedDLHandle,
+    dst_multifab: MultiFabHandle,
+    src_multifab: MultiFabHandle,
+    geometry: GeometryHandle,
+    src_comp: Int,
+    dst_comp: Int,
+    ncomp: Int,
+    src_ngrow: IntVect3D,
+    dst_ngrow: IntVect3D,
+) raises -> Int:
+    return Int(
+        lib.call["amrex_mojo_multifab_parallel_copy", c_int](
+            dst_multifab,
+            src_multifab,
+            geometry,
+            c_int(src_comp),
+            c_int(dst_comp),
+            c_int(ncomp),
+            src_ngrow,
+            dst_ngrow,
+        )
+    )
+
+
+def multifab_fill_boundary(
+    ref lib: OwnedDLHandle,
+    multifab: MultiFabHandle,
+    geometry: GeometryHandle,
+    start_comp: Int,
+    ncomp: Int,
+    cross: Bool = False,
+) raises -> Int:
+    return Int(
+        lib.call["amrex_mojo_multifab_fill_boundary", c_int](
+            multifab,
+            geometry,
+            c_int(start_comp),
+            c_int(ncomp),
+            c_int(1 if cross else 0),
         )
     )
 
