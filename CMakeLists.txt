@@ -3,6 +3,7 @@ cmake_minimum_required(VERSION 3.24)
 project(amrex_mojo LANGUAGES C CXX)
 
 include(FetchContent)
+include(CTest)
 
 option(
     AMREX_MOJO_ENABLE_AMREX
@@ -84,3 +85,7 @@ if(NOT TARGET AMReX::amrex_3d AND NOT TARGET AMReX::amrex)
 endif()
 
 add_subdirectory(src/capi)
+
+if(BUILD_TESTING)
+    add_subdirectory(tests/capi)
+endif()

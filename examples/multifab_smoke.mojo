@@ -77,8 +77,8 @@ def main() raises:
         def update_tile(
             ctx: type_of(update_ctx), i: Int, j: Int, k: Int
         ) raises:
-            ctx.dst_array[i, j, k] = (
-                ctx.src_array[i, j, k] + Float64(ctx.fill_value - 1)
+            ctx.dst_array[i, j, k] = ctx.src_array[i, j, k] + Float64(
+                ctx.fill_value - 1
             )
 
         ParallelFor[body=update_tile](tile_box, update_ctx)

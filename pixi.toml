@@ -8,6 +8,7 @@ version = "0.1.0"
 [tasks]
 configure = "cmake -S . -B build"
 build-capi = "cmake --build build --target amrex_mojo_capi_3d"
+build-tests = { depends-on = ["configure"], cmd = "cmake --build build" }
 install-capi = "cmake --install build --prefix .pixi/envs/default"
 package-mojo = "mojo package mojo/amrex -o amrex.mojopkg"
 install-mojo-package = "mkdir -p .pixi/envs/default/lib/mojo && mojo package mojo/amrex -o .pixi/envs/default/lib/mojo/amrex.mojopkg"
@@ -16,7 +17,12 @@ bootstrap = { depends-on = ["configure", "build-capi", "install-amrex"] }
 build-multifab-smoke = "mojo build examples/multifab_smoke.mojo -o build/multifab_smoke"
 run-multifab-smoke = "./build/multifab_smoke"
 run-multifab-smoke-script = "mojo examples/multifab_smoke.mojo"
-format-mojo = "mojo format mojo/amrex examples"
+test-capi = { depends-on = ["build-tests"], cmd = "ctest --test-dir build --output-on-failure" }
+test-mojo-runtime = { depends-on = ["build-tests"], cmd = "AMREX_MOJO_LIBRARY_PATH=./build/src/capi/libamrex_mojo_capi_3d.dylib mojo tests/mojo/runtime_geometry_test.mojo -I mojo" }
+test-mojo-multifab = { depends-on = ["build-tests"], cmd = "AMREX_MOJO_LIBRARY_PATH=./build/src/capi/libamrex_mojo_capi_3d.dylib mojo tests/mojo/multifab_functional_test.mojo -I mojo" }
+test-mojo = { depends-on = ["test-mojo-runtime", "test-mojo-multifab"] }
+test = { depends-on = ["test-capi", "test-mojo"] }
+format-mojo = "mojo format mojo/amrex examples tests/mojo"
 
 [dependencies]
 mojo = ">=0.26.2.0.dev2026030905,<0.27"

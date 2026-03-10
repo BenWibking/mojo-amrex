@@ -1,6 +1,9 @@
-# Smoke Tests
+# Smoke Example
 
-The repository now has a working smoke path in `examples/multifab_smoke.mojo`.
+The repository now also has automated tests under `tests/README.md`, but the
+manual smoke path in `examples/multifab_smoke.mojo` is still useful for an
+interactive end-to-end run.
+
 The intended smoke sequence is:
 
 1. build the C ABI library

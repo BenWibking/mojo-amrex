@@ -1,6 +1,6 @@
 # Mojo Bindings Plan for AMReX
 
-Last updated: 2026-03-09
+Last updated: 2026-03-10
 
 ## Goal
 
@@ -36,6 +36,25 @@ particular:
 - opaque-handle wrappers should be move-only by default unless the C ABI
   provides an explicit clone operation
 - destructors must be infallible and safe to call on moved-from or null handles
+
+## Current Status
+
+The repository has already completed the initial MVP bring-up described in this
+plan:
+
+- Phase 0 bootstrap is in place
+- Phase 1 value types and runtime basics are implemented
+- Phase 2 `MultiFab` and tile iteration are implemented
+- Phase 3 explicit `MFIter`, minimal `ParmParse`, and plotfile smoke path are
+  implemented
+
+That means the first vertical slice is no longer the next task. The main work
+remaining is:
+
+- Phase 4 quality and ergonomics
+- automated test coverage beyond the existing smoke path
+- later Phase 5 expansion items such as MPI, OpenMP, GPU, particles, EB, and
+  broader dimensional coverage
 
 ## Key Findings
 
@@ -481,7 +500,7 @@ is important.
 
 ## Phased Implementation Plan
 
-### Phase 0: bootstrap
+### Phase 0: bootstrap (completed)
 
 Deliverables:
 
@@ -498,7 +517,7 @@ Exit criteria:
 - `AmrexRuntime` creation and destruction succeed
 - the loaded shared library stays alive for the duration of runtime-owned values
 
-### Phase 1: value types and runtime basics
+### Phase 1: value types and runtime basics (completed)
 
 Deliverables:
 
@@ -515,7 +534,7 @@ Exit criteria:
 - create and inspect domain objects from Mojo
 - verify sizes, bounds, and box splitting behavior
 
-### Phase 2: `MultiFab` and tile iteration
+### Phase 2: `MultiFab` and tile iteration (completed)
 
 Deliverables:
 
@@ -532,7 +551,7 @@ Exit criteria:
 - fill and modify data
 - validate results against expected reductions
 
-### Phase 3: explicit iterator API, utility, and I/O
+### Phase 3: explicit iterator API, utility, and I/O (completed)
 
 Deliverables:
 
@@ -547,7 +566,7 @@ Exit criteria:
 - configure simple values through `ParmParse`
 - write a plotfile from Mojo
 
-### Phase 4: quality and ergonomics
+### Phase 4: quality and ergonomics (remaining)
 
 Deliverables:
 
@@ -561,7 +580,7 @@ Exit criteria:
 
 - enough stability to use bindings in a small AMReX-driven workflow
 
-### Phase 5: expansion
+### Phase 5: expansion (future)
 
 Potential additions:
 
@@ -652,20 +671,20 @@ not literal code translation.
 
 ## Recommended Next Step
 
-The next implementation step should be to create the repository skeleton and the
-first C ABI header, then wire one complete vertical slice:
+The next implementation step should be to close out Phase 4 by turning the
+existing smoke-path implementation into a better-verified and better-documented
+binding layer:
 
-1. build shared library
-2. load it from Mojo
-3. create `AmrexRuntime`
-4. construct `BoxArray`
-5. construct `DistributionMapping`
-6. construct `MultiFab`
-7. iterate tiles with a callback-style API
-8. fill a tile through `Array4`
-9. let `AmrexRuntime` and owners clean up through destruction
+1. add automated Mojo smoke and functional tests for the current API surface
+2. add C++ C-ABI tests for the shim layer
+3. improve wrapper error reporting and null-handle diagnostics
+4. add focused user documentation around runtime ownership, `MFIter`, and
+   `Array4` borrowing rules
+5. decide whether any owner types need explicit clone support or whether
+   move-only semantics remain sufficient for the MVP
 
-That slice will validate the overall architecture before expanding the API.
+That work should make the existing 3D CPU binding set stable before taking on
+Phase 5 expansion.
 
 ## References
 

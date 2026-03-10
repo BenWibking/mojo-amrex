@@ -99,9 +99,7 @@ struct Array4F64View[origin: Origin[mut=True]](Copyable):
     def __getitem__(self, i: Int, j: Int, k: Int) raises -> Float64:
         return self.data[self.offset(i, j, k)]
 
-    def __getitem__(
-        self, i: Int, j: Int, k: Int, comp: Int
-    ) raises -> Float64:
+    def __getitem__(self, i: Int, j: Int, k: Int, comp: Int) raises -> Float64:
         return self.data[self.offset(i, j, k, comp)]
 
     def __setitem__(self, i: Int, j: Int, k: Int, value: Float64) raises:

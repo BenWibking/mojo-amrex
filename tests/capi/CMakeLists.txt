@@ -1,0 +1,6 @@
+add_executable(amrex_mojo_capi_test runtime_multifab_test.cpp)
+
+target_link_libraries(amrex_mojo_capi_test PRIVATE amrex_mojo_capi_3d)
+target_compile_features(amrex_mojo_capi_test PRIVATE cxx_std_17)
+
+add_test(NAME amrex_mojo_capi_test COMMAND amrex_mojo_capi_test)

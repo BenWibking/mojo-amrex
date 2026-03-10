@@ -7,6 +7,7 @@ The current repo contains:
 - a design note in `docs/mojo-amrex-bindings-plan.md`
 - a real AMReX-backed C ABI under `src/capi`
 - a Mojo package under `mojo/amrex`
+- automated C++ and Mojo tests under `tests/`
 - an install path that exposes `amrex` as a top-level Mojo package in the active environment
 - a working MultiFab smoke example in `examples/multifab_smoke.mojo`
 
@@ -62,11 +63,16 @@ With `pixi`:
 pixi run bootstrap
 pixi run configure
 pixi run build-capi
+pixi run build-tests
 pixi run install-amrex
 pixi run package-mojo
 pixi run build-multifab-smoke
 pixi run run-multifab-smoke
 pixi run run-multifab-smoke-script
+pixi run test-capi
+pixi run test-mojo-runtime
+pixi run test-mojo-multifab
+pixi run test
 pixi run format-mojo
 ```
 
@@ -84,9 +90,43 @@ Notes:
   `lib/` directory and installs `amrex.mojopkg` into the env's `lib/mojo/`
   directory, so bare commands like `mojo examples/multifab_smoke.mojo` work
   from the repo root inside `pixi shell` without `-I mojo`.
+- `pixi run test` runs the C++ ABI test through `ctest` and the Mojo
+  functional tests against the local build tree. The Mojo test tasks set
+  `AMREX_MOJO_LIBRARY_PATH=./build/src/capi/libamrex_mojo_capi_3d.dylib` and
+  use `-I mojo`, so they validate the in-tree sources directly.
 - The public Mojo surface now uses move-only wrapper objects such as
   `AmrexRuntime`, `BoxArray`, `Geometry`, and `MultiFab`. The raw handle-level
   bindings remain available under `amrex.ffi`.
+
+## Testing
+
+The automated test suite currently has three pieces:
+
+- `tests/capi/runtime_multifab_test.cpp` exercises the exported C ABI directly
+  through runtime, geometry, `MultiFab`, `MFIter`, `ParmParse`, and plotfile
+  paths.
+- `tests/mojo/runtime_geometry_test.mojo` covers runtime queries plus core
+  domain and geometry objects from Mojo.
+- `tests/mojo/multifab_functional_test.mojo` covers `for_each_tile`, `MFIter`,
+  borrowed `Array4` access, arithmetic, reductions, `ParmParse`, and plotfile
+  output from Mojo.
+
+Run `pixi run test` after changes to the bindings layer.
+
+## Ownership
+
+The binding model is intentionally strict about ownership:
+
+- `AmrexRuntime` is the root owner. `BoxArray`, `Geometry`, `MultiFab`, and
+  other owning wrappers retain a runtime lease so AMReX finalization cannot
+  race object destruction.
+- `MultiFab.for_each_tile` and `MultiFab.array(mfi)` expose borrowed tile views.
+  Treat those `TileF64View` and `Array4F64View` values as non-escaping borrows;
+  they are only valid while the owning `MultiFab` and iterator state remain
+  live.
+- If library discovery fails, the loader now reports the concrete path it tried
+  and suggests either `pixi run install-amrex` or
+  `AMREX_MOJO_LIBRARY_PATH=/path/to/libamrex_mojo_capi_3d.dylib`.
 
 ## License
 
