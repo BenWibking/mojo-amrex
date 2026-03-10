@@ -1,5 +1,8 @@
 #include "capi_internal.H"
 
+#include <cerrno>
+#include <cstdlib>
+#include <limits>
 #include <mutex>
 #include <vector>
 
@@ -7,6 +10,12 @@ namespace
 {
     std::mutex g_runtime_mutex;
     amrex_mojo::detail::runtime_state* g_runtime_state = nullptr;
+
+    struct mpi_world_size_hint
+    {
+        const char* env_var = nullptr;
+        int32_t size = 0;
+    };
 
     auto build_argv_storage(int32_t argc, const char* const* argv) -> std::vector<std::string>
     {
@@ -31,6 +40,61 @@ namespace
             argv_ptrs.push_back(arg.data());
         }
         return argv_ptrs;
+    }
+
+    auto parse_positive_env_int(const char* env_var) -> int32_t
+    {
+        const char* value = std::getenv(env_var);
+        if (value == nullptr || *value == '\0') {
+            return 0;
+        }
+
+        errno = 0;
+        char* end = nullptr;
+        const long parsed = std::strtol(value, &end, 10);
+        if (errno != 0 || end == value || *end != '\0' || parsed <= 0
+            || parsed > std::numeric_limits<int32_t>::max())
+        {
+            return 0;
+        }
+
+        return static_cast<int32_t>(parsed);
+    }
+
+    auto detect_mpi_world_size_from_environment() -> mpi_world_size_hint
+    {
+        static constexpr const char* env_vars[] = {
+            "OMPI_COMM_WORLD_SIZE",
+            "PMI_SIZE",
+            "PMIX_SIZE",
+            "MV2_COMM_WORLD_SIZE"
+        };
+
+        for (const auto* env_var : env_vars) {
+            const auto size = parse_positive_env_int(env_var);
+            if (size > 0) {
+                return mpi_world_size_hint{env_var, size};
+            }
+        }
+
+        return {};
+    }
+
+    auto non_mpi_launch_error(const mpi_world_size_hint& hint) -> std::string
+    {
+        std::string message =
+            "The loaded AMReX Mojo library was built without MPI, but this process was launched "
+            "under MPI";
+        if (hint.env_var != nullptr && hint.size > 0) {
+            message += " with ";
+            message += hint.env_var;
+            message += "=";
+            message += std::to_string(hint.size);
+        }
+        message +=
+            ". Set AMREX_MOJO_LIBRARY_PATH=./build-mpi/src/capi/libamrex_mojo_capi_3d.dylib "
+            "or run `pixi run run-multifab-mpi-exchange`.";
+        return message;
     }
 }
 
@@ -105,17 +169,32 @@ amrex_mojo_runtime_create(int32_t argc, const char* const* argv, int32_t use_par
 
         auto* state = g_runtime_state;
         if (state == nullptr) {
-            auto* new_state = new amrex_mojo::detail::runtime_state{};
             if (!amrex::Initialized()) {
+#if !defined(AMREX_USE_MPI)
+                const auto mpi_world_size = detect_mpi_world_size_from_environment();
+                if (mpi_world_size.size > 1) {
+                    amrex_mojo::detail::set_last_error(
+                        AMREX_MOJO_STATUS_INVALID_ARGUMENT,
+                        non_mpi_launch_error(mpi_world_size)
+                    );
+                    return nullptr;
+                }
+#endif
+
+                auto* new_state = new amrex_mojo::detail::runtime_state{};
                 auto argv_storage = build_argv_storage(argc, argv);
                 auto argv_ptrs = build_argv_ptrs(argv_storage);
                 int argc_local = static_cast<int>(argv_ptrs.size());
                 char** argv_local = argv_ptrs.data();
                 amrex::Initialize(argc_local, argv_local, use_parmparse != 0);
                 new_state->owns_initialization = true;
+                state = new_state;
+                g_runtime_state = state;
+            } else {
+                auto* new_state = new amrex_mojo::detail::runtime_state{};
+                state = new_state;
+                g_runtime_state = state;
             }
-            state = new_state;
-            g_runtime_state = state;
         }
 
         auto* runtime = new amrex_mojo_runtime{state};
