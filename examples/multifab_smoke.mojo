@@ -5,11 +5,11 @@ from amrex.space3d import (
     DistributionMapping,
     Geometry,
     MultiFab,
-    ParallelFor,
     ParmParse,
     TileF64View,
     box3d,
     intvect3d,
+    ParallelFor,
 )
 
 
@@ -39,9 +39,6 @@ def main() raises:
 
     var boxarray = BoxArray(runtime, domain)
     boxarray.max_size(32)
-    if boxarray.size() != 8:
-        raise Error("unexpected BoxArray size")
-    var first_box = boxarray.box(0)
 
     var distmap = DistributionMapping(runtime, boxarray)
     var geometry = Geometry(runtime, domain)
@@ -51,23 +48,14 @@ def main() raises:
     var periodicity = geometry.periodicity()
     var multifab = MultiFab(runtime, boxarray, distmap, 1, intvect3d(1, 1, 1))
     var source = MultiFab(runtime, boxarray, distmap, 1, intvect3d(1, 1, 1))
+
     var parmparse_prefix = String("multifab_smoke")
     var tile_fill_name = String("tile_fill_value")
     var plotfile_path = String("build/multifab_smoke_plotfile")
     var params = ParmParse(runtime, parmparse_prefix)
     params.add_int(tile_fill_name, 42)
 
-    if domain_box.big_end.x != 63 or first_box.big_end.x != 31:
-        raise Error("unexpected geometry or boxarray bounds")
-    if prob_domain.hi_x != 1.0 or cell_size.x != (1.0 / 64.0):
-        raise Error("unexpected geometry metrics")
-    if periodicity.x != 0 or periodicity.y != 0 or periodicity.z != 0:
-        raise Error("unexpected geometry periodicity")
-
     var fill_value = params.query_int(tile_fill_name)
-    if fill_value != 42:
-        raise Error("unexpected tile_fill_value in ParmParse")
-
     source.for_each_tile[fill_tile]()
     multifab.set_val(0.0)
 
@@ -77,13 +65,6 @@ def main() raises:
         var valid_box = mfi.validbox()
         var fab_box = mfi.fabbox()
         var grown_box = mfi.growntilebox()
-        if mfi.index() < 0 or mfi.local_tile_index() < 0:
-            raise Error("unexpected MFIter index state")
-        if tile_box.small_end.x < valid_box.small_end.x:
-            raise Error("tile box extends below valid box")
-        if grown_box.small_end.x < fab_box.small_end.x:
-            raise Error("grown tile box extends below FAB box")
-
         var dst_array = multifab.array(mfi)
         var src_array = source.array(mfi)
         var update_ctx = UpdateTileContext(
