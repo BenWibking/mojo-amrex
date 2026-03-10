@@ -3,7 +3,9 @@
 from amrex.ffi import Box3D
 
 
-def ParallelFor[body: fn(Int, Int, Int) capturing -> None](tile_box: Box3D) raises:
+def ParallelFor[
+    body: fn(Int, Int, Int) capturing -> None
+](tile_box: Box3D) raises:
     for k in range(Int(tile_box.small_end.z), Int(tile_box.big_end.z) + 1):
         for j in range(Int(tile_box.small_end.y), Int(tile_box.big_end.y) + 1):
             for i in range(

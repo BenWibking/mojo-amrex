@@ -99,7 +99,9 @@ struct Array4F64View[origin: Origin[mut=True]](Copyable):
     def load(self, i: Int, j: Int, k: Int, comp: Int = 0) raises -> Float64:
         return self.data[self.offset(i, j, k, comp)]
 
-    def store(self, i: Int, j: Int, k: Int, value: Float64, comp: Int = 0) raises:
+    def store(
+        self, i: Int, j: Int, k: Int, value: Float64, comp: Int = 0
+    ) raises:
         self.data[self.offset(i, j, k, comp)] = value
 
     def fill(self, box: Box3D, value: Float64, comp: Int = 0) raises:
@@ -164,7 +166,9 @@ def runtime_destroy(ref lib: OwnedDLHandle, runtime: RuntimeHandle) raises:
     lib.call["amrex_mojo_runtime_destroy"](runtime)
 
 
-def runtime_initialized(ref lib: OwnedDLHandle, runtime: RuntimeHandle) raises -> Bool:
+def runtime_initialized(
+    ref lib: OwnedDLHandle, runtime: RuntimeHandle
+) raises -> Bool:
     return lib.call["amrex_mojo_runtime_initialized", c_int](runtime) != 0
 
 
@@ -215,7 +219,9 @@ def boxarray_max_size(
     )
 
 
-def boxarray_size(ref lib: OwnedDLHandle, boxarray: BoxArrayHandle) raises -> Int:
+def boxarray_size(
+    ref lib: OwnedDLHandle, boxarray: BoxArrayHandle
+) raises -> Int:
     return Int(lib.call["amrex_mojo_boxarray_size", c_int](boxarray))
 
 
@@ -229,7 +235,9 @@ def distmap_create_from_boxarray(
     ](runtime, boxarray)
 
 
-def distmap_destroy(ref lib: OwnedDLHandle, distmap: DistributionMappingHandle) raises:
+def distmap_destroy(
+    ref lib: OwnedDLHandle, distmap: DistributionMappingHandle
+) raises:
     lib.call["amrex_mojo_distmap_destroy"](distmap)
 
 
@@ -277,7 +285,9 @@ def multifab_destroy(ref lib: OwnedDLHandle, multifab: MultiFabHandle) raises:
     lib.call["amrex_mojo_multifab_destroy"](multifab)
 
 
-def multifab_ncomp(ref lib: OwnedDLHandle, multifab: MultiFabHandle) raises -> Int:
+def multifab_ncomp(
+    ref lib: OwnedDLHandle, multifab: MultiFabHandle
+) raises -> Int:
     return Int(lib.call["amrex_mojo_multifab_ncomp", c_int](multifab))
 
 
@@ -295,11 +305,15 @@ def multifab_set_val(
     )
 
 
-def multifab_tile_count(ref lib: OwnedDLHandle, multifab: MultiFabHandle) raises -> Int:
+def multifab_tile_count(
+    ref lib: OwnedDLHandle, multifab: MultiFabHandle
+) raises -> Int:
     return Int(lib.call["amrex_mojo_multifab_tile_count", c_int](multifab))
 
 
-def mfiter_create(ref lib: OwnedDLHandle, multifab: MultiFabHandle) raises -> MFIterHandle:
+def mfiter_create(
+    ref lib: OwnedDLHandle, multifab: MultiFabHandle
+) raises -> MFIterHandle:
     var out_handle = List[MFIterHandle](length=1, fill=MFIterHandle())
     _ = lib.call["amrex_mojo_mfiter_create", c_int](
         multifab,
@@ -312,7 +326,9 @@ def mfiter_destroy(ref lib: OwnedDLHandle, mfiter: MFIterHandle) raises:
     lib.call["amrex_mojo_mfiter_destroy"](mfiter)
 
 
-def mfiter_is_valid(ref lib: OwnedDLHandle, mfiter: MFIterHandle) raises -> Bool:
+def mfiter_is_valid(
+    ref lib: OwnedDLHandle, mfiter: MFIterHandle
+) raises -> Bool:
     return lib.call["amrex_mojo_mfiter_is_valid", c_int](mfiter) != 0
 
 
@@ -430,7 +446,9 @@ def box_from_parts(
     )
 
 
-def tile_view[owner_origin: Origin[mut=True]](
+def tile_view[
+    owner_origin: Origin[mut=True]
+](
     ref lib: OwnedDLHandle, multifab: MultiFabHandle, tile_index: Int
 ) raises -> TileF64View[owner_origin]:
     var tile_lo = List[c_int](length=3, fill=0)
@@ -459,9 +477,7 @@ def tile_view[owner_origin: Origin[mut=True]](
         data=lib.call[
             "amrex_mojo_multifab_data_ptr",
             UnsafePointer[c_double, owner_origin],
-        ](
-            multifab, c_int(tile_index)
-        ),
+        ](multifab, c_int(tile_index)),
         lo_x=data_lo[0],
         lo_y=data_lo[1],
         lo_z=data_lo[2],
@@ -482,7 +498,9 @@ def tile_view[owner_origin: Origin[mut=True]](
     )
 
 
-def array4_view_from_mfiter[owner_origin: Origin[mut=True]](
+def array4_view_from_mfiter[
+    owner_origin: Origin[mut=True]
+](
     ref lib: OwnedDLHandle,
     multifab: MultiFabHandle,
     mfiter: MFIterHandle,
@@ -783,7 +801,9 @@ def parmparse_create(
     )
 
 
-def parmparse_destroy(ref lib: OwnedDLHandle, parmparse: ParmParseHandle) raises:
+def parmparse_destroy(
+    ref lib: OwnedDLHandle, parmparse: ParmParseHandle
+) raises:
     lib.call["amrex_mojo_parmparse_destroy"](parmparse)
 
 

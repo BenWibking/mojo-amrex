@@ -24,9 +24,7 @@ struct ParmParse(Movable):
         if not self.handle:
             raise Error(last_error_message(self.runtime[].lib))
 
-    def __init__(
-        out self, ref runtime: AmrexRuntime, prefix: String
-    ) raises:
+    def __init__(out self, ref runtime: AmrexRuntime, prefix: String) raises:
         self.runtime = runtime._lease()
         self.handle = parmparse_create(
             self.runtime[].lib, self.runtime[].handle, prefix
@@ -56,9 +54,7 @@ struct ParmParse(Movable):
     def query_int(ref self, name: StringLiteral) raises -> Int:
         return self.query_int(String(name))
 
-    def query_int_or(
-        ref self, name: String, default_value: Int
-    ) raises -> Int:
+    def query_int_or(ref self, name: String, default_value: Int) raises -> Int:
         var result = parmparse_query_int(self.runtime[].lib, self.handle, name)
         if result.status != 0:
             raise Error(last_error_message(self.runtime[].lib))

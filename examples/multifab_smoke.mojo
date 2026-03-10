@@ -93,7 +93,9 @@ def main() raises:
         )
 
         @parameter
-        def update_tile(ctx: type_of(update_ctx), i: Int, j: Int, k: Int) raises:
+        def update_tile(
+            ctx: type_of(update_ctx), i: Int, j: Int, k: Int
+        ) raises:
             ctx.dst_array.store(
                 i,
                 j,

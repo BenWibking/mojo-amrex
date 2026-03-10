@@ -45,9 +45,7 @@ struct AmrexRuntime(Movable):
         var handle = runtime_create(lib)
         if not handle:
             raise Error(last_error_message(lib))
-        self.state = RuntimeLease(
-            _AmrexRuntimeState(lib^, handle, path_owned^)
-        )
+        self.state = RuntimeLease(_AmrexRuntimeState(lib^, handle, path_owned^))
 
     def abi_version(ref self) raises -> Int:
         return abi_version(self.state[].lib)

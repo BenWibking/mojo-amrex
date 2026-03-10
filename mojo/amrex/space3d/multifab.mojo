@@ -87,27 +87,35 @@ struct MultiFab(Movable):
             self.ngrow_vect,
         )
 
-    def array[owner_origin: Origin[mut=True]](
-        ref[owner_origin] self, tile_index: Int
-    ) raises -> Array4F64View[owner_origin]:
+    def array[
+        owner_origin: Origin[mut=True]
+    ](ref[owner_origin] self, tile_index: Int) raises -> Array4F64View[
+        owner_origin
+    ]:
         return self.tile(tile_index).array()
 
-    def array[owner_origin: Origin[mut=True]](
-        ref[owner_origin] self, ref mfi: MFIter
-    ) raises -> Array4F64View[owner_origin]:
+    def array[
+        owner_origin: Origin[mut=True]
+    ](ref[owner_origin] self, ref mfi: MFIter) raises -> Array4F64View[
+        owner_origin
+    ]:
         return self.tile(mfi).array()
 
-    def tile[owner_origin: Origin[mut=True]](
-        ref[owner_origin] self, tile_index: Int
-    ) raises -> TileF64View[owner_origin]:
+    def tile[
+        owner_origin: Origin[mut=True]
+    ](ref[owner_origin] self, tile_index: Int) raises -> TileF64View[
+        owner_origin
+    ]:
         self._require_tile_index(tile_index)
         return tile_view[owner_origin](
             self.runtime[].lib, self.handle, tile_index
         )
 
-    def tile[owner_origin: Origin[mut=True]](
-        ref[owner_origin] self, ref mfi: MFIter
-    ) raises -> TileF64View[owner_origin]:
+    def tile[
+        owner_origin: Origin[mut=True]
+    ](ref[owner_origin] self, ref mfi: MFIter) raises -> TileF64View[
+        owner_origin
+    ]:
         var tile_box = mfi.tilebox()
         var valid_box = mfi.validbox()
         var array_view = array4_view_from_mfiter[owner_origin](
