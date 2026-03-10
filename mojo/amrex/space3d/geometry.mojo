@@ -13,6 +13,7 @@ from amrex.ffi import (
     geometry_prob_domain,
     last_error_message,
 )
+from amrex.ownership import require_live_handle
 from amrex.runtime import AmrexRuntime, RuntimeLease
 
 
@@ -33,28 +34,39 @@ struct Geometry(Movable):
             self.runtime[].lib.call["amrex_mojo_geometry_destroy"](self.handle)
 
     def domain(ref self) raises -> Box3D:
-        var result = geometry_domain(self.runtime[].lib, self.handle)
+        var handle = self._handle()
+        var result = geometry_domain(self.runtime[].lib, handle)
         if result.status != 0:
             raise Error(last_error_message(self.runtime[].lib))
         return result.value.copy()
 
     def prob_domain(ref self) raises -> RealBox3D:
-        var result = geometry_prob_domain(self.runtime[].lib, self.handle)
+        var handle = self._handle()
+        var result = geometry_prob_domain(self.runtime[].lib, handle)
         if result.status != 0:
             raise Error(last_error_message(self.runtime[].lib))
         return result.value.copy()
 
     def cell_size(ref self) raises -> RealVect3D:
-        var result = geometry_cell_size(self.runtime[].lib, self.handle)
+        var handle = self._handle()
+        var result = geometry_cell_size(self.runtime[].lib, handle)
         if result.status != 0:
             raise Error(last_error_message(self.runtime[].lib))
         return result.value.copy()
 
     def periodicity(ref self) raises -> IntVect3D:
-        var result = geometry_periodicity(self.runtime[].lib, self.handle)
+        var handle = self._handle()
+        var result = geometry_periodicity(self.runtime[].lib, handle)
         if result.status != 0:
             raise Error(last_error_message(self.runtime[].lib))
         return result.value.copy()
 
     def _handle(ref self) raises -> GeometryHandle:
+        require_live_handle(
+            self.handle,
+            (
+                "Geometry no longer owns a live AMReX handle. The value may"
+                " have been moved from."
+            ),
+        )
         return self.handle

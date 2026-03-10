@@ -10,6 +10,7 @@ from amrex.ffi import (
     runtime_initialized,
 )
 from amrex.loader import default_library_path, load_library
+from amrex.ownership import require_live_handle
 from std.ffi import OwnedDLHandle
 from std.memory import ArcPointer
 
@@ -30,6 +31,7 @@ comptime RuntimeLease = ArcPointer[_AmrexRuntimeState]
 
 struct AmrexRuntime(Movable):
     var state: RuntimeLease
+    var handle: RuntimeHandle
 
     def __init__(out self) raises:
         var path = default_library_path()
@@ -38,6 +40,7 @@ struct AmrexRuntime(Movable):
         if not handle:
             raise Error(last_error_message(lib))
         self.state = RuntimeLease(_AmrexRuntimeState(lib^, handle, path^))
+        self.handle = handle
 
     def __init__(out self, path: String) raises:
         var path_owned = path.copy()
@@ -46,30 +49,46 @@ struct AmrexRuntime(Movable):
         if not handle:
             raise Error(last_error_message(lib))
         self.state = RuntimeLease(_AmrexRuntimeState(lib^, handle, path_owned^))
+        self.handle = handle
 
     def abi_version(ref self) raises -> Int:
-        return abi_version(self.state[].lib)
+        var state = self._lease()
+        return abi_version(state[].lib)
 
     def initialized(ref self) raises -> Bool:
-        return runtime_initialized(self.state[].lib, self.state[].handle)
+        var state = self._lease()
+        return runtime_initialized(state[].lib, state[].handle)
 
     def nprocs(ref self) raises -> Int:
-        return parallel_nprocs(self.state[].lib)
+        var state = self._lease()
+        return parallel_nprocs(state[].lib)
 
     def myproc(ref self) raises -> Int:
-        return parallel_myproc(self.state[].lib)
+        var state = self._lease()
+        return parallel_myproc(state[].lib)
 
     def ioprocessor(ref self) raises -> Bool:
-        return parallel_ioprocessor(self.state[].lib)
+        var state = self._lease()
+        return parallel_ioprocessor(state[].lib)
 
     def ioprocessor_number(ref self) raises -> Int:
-        return parallel_ioprocessor_number(self.state[].lib)
+        var state = self._lease()
+        return parallel_ioprocessor_number(state[].lib)
 
     def library_path(ref self) raises -> String:
-        return self.state[].path.copy()
+        var state = self._lease()
+        return state[].path.copy()
 
     def _lease(ref self) raises -> RuntimeLease:
+        require_live_handle(
+            self.handle,
+            (
+                "AmrexRuntime no longer owns a live AMReX runtime. The value"
+                " may have been moved from."
+            ),
+        )
         return self.state
 
     def _handle(ref self) raises -> RuntimeHandle:
-        return self.state[].handle
+        _ = self._lease()
+        return self.handle

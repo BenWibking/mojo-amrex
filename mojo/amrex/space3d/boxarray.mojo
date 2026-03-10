@@ -13,6 +13,7 @@ from amrex.ffi import (
     intvect3d,
     last_error_message,
 )
+from amrex.ownership import require_live_handle
 from amrex.runtime import AmrexRuntime, RuntimeLease
 
 
@@ -33,22 +34,32 @@ struct BoxArray(Movable):
             self.runtime[].lib.call["amrex_mojo_boxarray_destroy"](self.handle)
 
     def max_size(mut self, max_size: IntVect3D) raises:
-        if boxarray_max_size(self.runtime[].lib, self.handle, max_size) != 0:
+        var handle = self._handle()
+        if boxarray_max_size(self.runtime[].lib, handle, max_size) != 0:
             raise Error(last_error_message(self.runtime[].lib))
 
     def max_size(mut self, max_size: Int) raises:
         self.max_size(intvect3d(max_size, max_size, max_size))
 
     def size(ref self) raises -> Int:
-        return boxarray_size(self.runtime[].lib, self.handle)
+        var handle = self._handle()
+        return boxarray_size(self.runtime[].lib, handle)
 
     def box(ref self, index: Int) raises -> Box3D:
-        var result = boxarray_box(self.runtime[].lib, self.handle, index)
+        var handle = self._handle()
+        var result = boxarray_box(self.runtime[].lib, handle, index)
         if result.status != 0:
             raise Error(last_error_message(self.runtime[].lib))
         return result.value.copy()
 
     def _handle(ref self) raises -> BoxArrayHandle:
+        require_live_handle(
+            self.handle,
+            (
+                "BoxArray no longer owns a live AMReX handle. The value may"
+                " have been moved from."
+            ),
+        )
         return self.handle
 
 
@@ -71,4 +82,11 @@ struct DistributionMapping(Movable):
             self.runtime[].lib.call["amrex_mojo_distmap_destroy"](self.handle)
 
     def _handle(ref self) raises -> DistributionMappingHandle:
+        require_live_handle(
+            self.handle,
+            (
+                "DistributionMapping no longer owns a live AMReX handle. The"
+                " value may have been moved from."
+            ),
+        )
         return self.handle

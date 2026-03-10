@@ -45,6 +45,30 @@ auto main() -> int
         std::string(amrex_mojo_last_error_message()).find("argc") != std::string::npos,
         "runtime_create should report an argc validation error."
     );
+    expect(
+        amrex_mojo_boxarray_size(nullptr) == -1,
+        "boxarray_size should reject a null boxarray."
+    );
+    expect(
+        std::string(amrex_mojo_last_error_message()).find("boxarray") != std::string::npos,
+        "boxarray_size should report a null-handle diagnostic."
+    );
+    expect(
+        amrex_mojo_multifab_set_val(nullptr, 0.0, 0, 1) == AMREX_MOJO_STATUS_INVALID_ARGUMENT,
+        "multifab_set_val should reject a null multifab."
+    );
+    expect(
+        std::string(amrex_mojo_last_error_message()).find("multifab") != std::string::npos,
+        "multifab_set_val should report a null-handle diagnostic."
+    );
+    expect(
+        amrex_mojo_mfiter_next(nullptr) == AMREX_MOJO_STATUS_INVALID_ARGUMENT,
+        "mfiter_next should reject a null iterator."
+    );
+    expect(
+        std::string(amrex_mojo_last_error_message()).find("iterator") != std::string::npos,
+        "mfiter_next should report a null-handle diagnostic."
+    );
 
     amrex_mojo_runtime_t* runtime = amrex_mojo_runtime_create_default();
     expect(runtime != nullptr, "runtime_create_default returned null.");

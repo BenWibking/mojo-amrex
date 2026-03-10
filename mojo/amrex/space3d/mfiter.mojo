@@ -16,6 +16,7 @@ from amrex.ffi import (
     mfiter_tile_box,
     mfiter_valid_box,
 )
+from amrex.ownership import require_live_handle
 from amrex.runtime import RuntimeLease
 
 
@@ -39,10 +40,12 @@ struct MFIter(Movable):
             self.runtime[].lib.call["amrex_mojo_mfiter_destroy"](self.handle)
 
     def is_valid(ref self) raises -> Bool:
-        return mfiter_is_valid(self.runtime[].lib, self.handle)
+        var handle = self._handle()
+        return mfiter_is_valid(self.runtime[].lib, handle)
 
     def next(mut self) raises:
-        if mfiter_next(self.runtime[].lib, self.handle) != 0:
+        var handle = self._handle()
+        if mfiter_next(self.runtime[].lib, handle) != 0:
             raise Error(last_error_message(self.runtime[].lib))
 
     def index(ref self) raises -> Int:
@@ -55,21 +58,24 @@ struct MFIter(Movable):
 
     def tilebox(ref self) raises -> Box3D:
         self._require_valid()
-        var result = mfiter_tile_box(self.runtime[].lib, self.handle)
+        var handle = self._handle()
+        var result = mfiter_tile_box(self.runtime[].lib, handle)
         if result.status != 0:
             raise Error(last_error_message(self.runtime[].lib))
         return result.value.copy()
 
     def validbox(ref self) raises -> Box3D:
         self._require_valid()
-        var result = mfiter_valid_box(self.runtime[].lib, self.handle)
+        var handle = self._handle()
+        var result = mfiter_valid_box(self.runtime[].lib, handle)
         if result.status != 0:
             raise Error(last_error_message(self.runtime[].lib))
         return result.value.copy()
 
     def fabbox(ref self) raises -> Box3D:
         self._require_valid()
-        var result = mfiter_fab_box(self.runtime[].lib, self.handle)
+        var handle = self._handle()
+        var result = mfiter_fab_box(self.runtime[].lib, handle)
         if result.status != 0:
             raise Error(last_error_message(self.runtime[].lib))
         return result.value.copy()
@@ -106,6 +112,13 @@ struct MFIter(Movable):
             raise Error("MFIter is not positioned on a valid tile.")
 
     def _handle(ref self) raises -> MFIterHandle:
+        require_live_handle(
+            self.handle,
+            (
+                "MFIter no longer owns a live AMReX handle. The value may have"
+                " been moved from."
+            ),
+        )
         return self.handle
 
 

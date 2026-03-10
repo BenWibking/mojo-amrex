@@ -23,6 +23,7 @@ from amrex.ffi import (
     multifab_write_single_level_plotfile,
     tile_view,
 )
+from amrex.ownership import require_live_handle
 from amrex.runtime import AmrexRuntime, RuntimeLease
 from amrex.space3d.boxarray import BoxArray, DistributionMapping
 from amrex.space3d.geometry import Geometry
@@ -60,15 +61,17 @@ struct MultiFab(Movable):
             self.runtime[].lib.call["amrex_mojo_multifab_destroy"](self.handle)
 
     def ncomp(ref self) raises -> Int:
-        return multifab_ncomp(self.runtime[].lib, self.handle)
+        var handle = self._handle()
+        return multifab_ncomp(self.runtime[].lib, handle)
 
     def ngrow(ref self) raises -> IntVect3D:
         return self.ngrow_vect.copy()
 
     def set_val(mut self, value: Float64, start_comp: Int, ncomp: Int) raises:
+        var handle = self._handle()
         if (
             multifab_set_val(
-                self.runtime[].lib, self.handle, value, start_comp, ncomp
+                self.runtime[].lib, handle, value, start_comp, ncomp
             )
             != 0
         ):
@@ -78,12 +81,14 @@ struct MultiFab(Movable):
         self.set_val(value, 0, self.ncomp())
 
     def tile_count(ref self) raises -> Int:
-        return multifab_tile_count(self.runtime[].lib, self.handle)
+        var handle = self._handle()
+        return multifab_tile_count(self.runtime[].lib, handle)
 
     def mfiter(ref self) raises -> MFIter:
+        var handle = self._handle()
         return create_mfiter(
             self.runtime,
-            self.handle,
+            handle,
             self.ngrow_vect,
         )
 
@@ -107,20 +112,20 @@ struct MultiFab(Movable):
         owner_origin
     ]:
         self._require_tile_index(tile_index)
-        return tile_view[owner_origin](
-            self.runtime[].lib, self.handle, tile_index
-        )
+        var handle = self._handle()
+        return tile_view[owner_origin](self.runtime[].lib, handle, tile_index)
 
     def tile[
         owner_origin: Origin[mut=True]
     ](ref[owner_origin] self, ref mfi: MFIter) raises -> TileF64View[
         owner_origin
     ]:
+        var handle = self._handle()
         var tile_box = mfi.tilebox()
         var valid_box = mfi.validbox()
         var array_view = array4_view_from_mfiter[owner_origin](
             self.runtime[].lib,
-            self.handle,
+            handle,
             mfi._handle(),
         )
         if not array_view.data:
@@ -140,22 +145,28 @@ struct MultiFab(Movable):
             tile_func(self.tile(tile_index))
 
     def min(ref self, comp: Int) raises -> Float64:
-        return multifab_min(self.runtime[].lib, self.handle, comp)
+        var handle = self._handle()
+        return multifab_min(self.runtime[].lib, handle, comp)
 
     def max(ref self, comp: Int) raises -> Float64:
-        return multifab_max(self.runtime[].lib, self.handle, comp)
+        var handle = self._handle()
+        return multifab_max(self.runtime[].lib, handle, comp)
 
     def sum(ref self, comp: Int) raises -> Float64:
-        return multifab_sum(self.runtime[].lib, self.handle, comp)
+        var handle = self._handle()
+        return multifab_sum(self.runtime[].lib, handle, comp)
 
     def norm0(ref self, comp: Int) raises -> Float64:
-        return multifab_norm0(self.runtime[].lib, self.handle, comp)
+        var handle = self._handle()
+        return multifab_norm0(self.runtime[].lib, handle, comp)
 
     def norm1(ref self, comp: Int) raises -> Float64:
-        return multifab_norm1(self.runtime[].lib, self.handle, comp)
+        var handle = self._handle()
+        return multifab_norm1(self.runtime[].lib, handle, comp)
 
     def norm2(ref self, comp: Int) raises -> Float64:
-        return multifab_norm2(self.runtime[].lib, self.handle, comp)
+        var handle = self._handle()
+        return multifab_norm2(self.runtime[].lib, handle, comp)
 
     def plus(
         mut self,
@@ -164,10 +175,11 @@ struct MultiFab(Movable):
         ncomp: Int,
         ngrow: IntVect3D = IntVect3D(x=0, y=0, z=0),
     ) raises:
+        var handle = self._handle()
         if (
             multifab_plus(
                 self.runtime[].lib,
-                self.handle,
+                handle,
                 value,
                 start_comp,
                 ncomp,
@@ -184,10 +196,11 @@ struct MultiFab(Movable):
         ncomp: Int,
         ngrow: IntVect3D = IntVect3D(x=0, y=0, z=0),
     ) raises:
+        var handle = self._handle()
         if (
             multifab_mult(
                 self.runtime[].lib,
-                self.handle,
+                handle,
                 value,
                 start_comp,
                 ncomp,
@@ -205,10 +218,11 @@ struct MultiFab(Movable):
         ncomp: Int,
         ngrow: IntVect3D = IntVect3D(x=0, y=0, z=0),
     ) raises:
+        var handle = self._handle()
         if (
             multifab_copy(
                 self.runtime[].lib,
-                self.handle,
+                handle,
                 source._handle(),
                 src_comp,
                 dst_comp,
@@ -226,10 +240,11 @@ struct MultiFab(Movable):
         time: Float64 = 0.0,
         level_step: Int = 0,
     ) raises:
+        var handle = self._handle()
         if (
             multifab_write_single_level_plotfile(
                 self.runtime[].lib,
-                self.handle,
+                handle,
                 geometry._handle(),
                 plotfile,
                 time,
@@ -258,4 +273,11 @@ struct MultiFab(Movable):
             raise Error("tile index is out of range.")
 
     def _handle(ref self) raises -> MultiFabHandle:
+        require_live_handle(
+            self.handle,
+            (
+                "MultiFab no longer owns a live AMReX handle. The value may"
+                " have been moved from."
+            ),
+        )
         return self.handle

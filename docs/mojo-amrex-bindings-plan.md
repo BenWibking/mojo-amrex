@@ -47,12 +47,13 @@ plan:
 - Phase 2 `MultiFab` and tile iteration are implemented
 - Phase 3 explicit `MFIter`, minimal `ParmParse`, and plotfile smoke path are
   implemented
+- Phase 4 quality and ergonomics is implemented for the MVP binding surface:
+  move-only owner wrappers, wrapper-side live-handle diagnostics, automated
+  tests, and focused user documentation are in place
 
 That means the first vertical slice is no longer the next task. The main work
 remaining is:
 
-- Phase 4 quality and ergonomics
-- automated test coverage beyond the existing smoke path
 - later Phase 5 expansion items such as MPI, OpenMP, GPU, particles, EB, and
   broader dimensional coverage
 
@@ -566,12 +567,12 @@ Exit criteria:
 - configure simple values through `ParmParse`
 - write a plotfile from Mojo
 
-### Phase 4: quality and ergonomics (remaining)
+### Phase 4: quality and ergonomics (completed)
 
 Deliverables:
 
-- clone operations for selected owner types where warranted
-- safer wrapper APIs
+- explicit decision to keep owner wrappers move-only for the MVP
+- safer wrapper APIs with live-handle diagnostics
 - better error messages
 - docs and examples
 - broader test coverage
@@ -671,20 +672,22 @@ not literal code translation.
 
 ## Recommended Next Step
 
-The next implementation step should be to close out Phase 4 by turning the
-existing smoke-path implementation into a better-verified and better-documented
-binding layer:
+Phase 4 is complete for the current 3D CPU binding layer. The next
+implementation step is to choose the first Phase 5 expansion target based on the
+next concrete workflow the bindings need to support.
 
-1. add automated Mojo smoke and functional tests for the current API surface
-2. add C++ C-ABI tests for the shim layer
-3. improve wrapper error reporting and null-handle diagnostics
-4. add focused user documentation around runtime ownership, `MFIter`, and
-   `Array4` borrowing rules
-5. decide whether any owner types need explicit clone support or whether
-   move-only semantics remain sufficient for the MVP
+Recommended expansion order:
 
-That work should make the existing 3D CPU binding set stable before taking on
-Phase 5 expansion.
+1. MPI support, because it unlocks real AMReX workflows without changing the
+   core ownership model
+2. 1D and 2D builds, because dimensional coverage expands the same API design
+   without introducing major new subsystems
+3. OpenMP support, because it broadens CPU execution without changing the C ABI
+   object model
+
+GPU, particles, EB, and broader `AmrCore` functionality should still follow
+after the CPU ownership and iteration model has been exercised through those
+smaller expansion steps.
 
 ## References
 

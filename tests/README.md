@@ -11,7 +11,8 @@ Automated test entry points:
 
 Coverage summary:
 
-- `tests/capi/runtime_multifab_test.cpp` validates the C ABI directly.
+- `tests/capi/runtime_multifab_test.cpp` validates the C ABI directly,
+  including null-handle diagnostics.
 - `tests/mojo/runtime_geometry_test.mojo` validates runtime and geometry basics.
 - `tests/mojo/multifab_functional_test.mojo` validates tile iteration, borrowed
   `Array4` access, reductions, arithmetic, `ParmParse`, and plotfile output.

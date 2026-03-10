@@ -103,8 +103,8 @@ Notes:
 The automated test suite currently has three pieces:
 
 - `tests/capi/runtime_multifab_test.cpp` exercises the exported C ABI directly
-  through runtime, geometry, `MultiFab`, `MFIter`, `ParmParse`, and plotfile
-  paths.
+  through runtime, geometry, `MultiFab`, `MFIter`, `ParmParse`, plotfile, and
+  null-handle diagnostic paths.
 - `tests/mojo/runtime_geometry_test.mojo` covers runtime queries plus core
   domain and geometry objects from Mojo.
 - `tests/mojo/multifab_functional_test.mojo` covers `for_each_tile`, `MFIter`,
@@ -120,6 +120,8 @@ The binding model is intentionally strict about ownership:
 - `AmrexRuntime` is the root owner. `BoxArray`, `Geometry`, `MultiFab`, and
   other owning wrappers retain a runtime lease so AMReX finalization cannot
   race object destruction.
+- Owner wrappers remain move-only for the MVP. There are no explicit clone APIs
+  until a concrete workflow demonstrates that shared owner semantics are needed.
 - `MultiFab.for_each_tile` and `MultiFab.array(mfi)` expose borrowed tile views.
   Treat those `TileF64View` and `Array4F64View` values as non-escaping borrows;
   they are only valid while the owning `MultiFab` and iterator state remain
@@ -127,6 +129,9 @@ The binding model is intentionally strict about ownership:
 - If library discovery fails, the loader now reports the concrete path it tried
   and suggests either `pixi run install-amrex` or
   `AMREX_MOJO_LIBRARY_PATH=/path/to/libamrex_mojo_capi_3d.dylib`.
+
+Focused usage notes for ownership, borrowing, and diagnostics live in
+`docs/mojo-amrex-usage.md`.
 
 ## License
 
