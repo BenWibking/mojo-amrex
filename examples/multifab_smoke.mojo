@@ -23,13 +23,13 @@ struct UpdateTileContext[
     var fill_value: Int
 
 
-fn fill_tile[
+def fill_tile[
     owner_origin: Origin[mut=True]
 ](tile: TileF64View[owner_origin]) raises:
     tile.fill(1.0)
 
 
-fn main() raises:
+def main() raises:
     var runtime = AmrexRuntime()
 
     var domain = box3d(
@@ -93,7 +93,7 @@ fn main() raises:
         )
 
         @parameter
-        fn update_tile(ctx: type_of(update_ctx), i: Int, j: Int, k: Int):
+        def update_tile(ctx: type_of(update_ctx), i: Int, j: Int, k: Int) raises:
             ctx.dst_array.store(
                 i,
                 j,

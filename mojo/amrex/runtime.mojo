@@ -7,7 +7,6 @@ from amrex.ffi import (
     parallel_myproc,
     parallel_nprocs,
     runtime_create,
-    runtime_destroy,
     runtime_initialized,
 )
 from amrex.loader import default_library_path, load_library
@@ -23,7 +22,7 @@ struct _AmrexRuntimeState(Movable):
 
     fn __del__(deinit self):
         if self.handle:
-            runtime_destroy(self.lib, self.handle)
+            self.lib.call["amrex_mojo_runtime_destroy"](self.handle)
 
 
 comptime RuntimeLease = ArcPointer[_AmrexRuntimeState]
@@ -32,7 +31,7 @@ comptime RuntimeLease = ArcPointer[_AmrexRuntimeState]
 struct AmrexRuntime(Movable):
     var state: RuntimeLease
 
-    fn __init__(out self) raises:
+    def __init__(out self) raises:
         var path = default_library_path()
         var lib = load_library(path)
         var handle = runtime_create(lib)
@@ -40,7 +39,7 @@ struct AmrexRuntime(Movable):
             raise Error(last_error_message(lib))
         self.state = RuntimeLease(_AmrexRuntimeState(lib^, handle, path^))
 
-    fn __init__(out self, path: String) raises:
+    def __init__(out self, path: String) raises:
         var path_owned = path.copy()
         var lib = load_library(path_owned)
         var handle = runtime_create(lib)
@@ -50,29 +49,29 @@ struct AmrexRuntime(Movable):
             _AmrexRuntimeState(lib^, handle, path_owned^)
         )
 
-    fn abi_version(ref self) -> Int:
+    def abi_version(ref self) raises -> Int:
         return abi_version(self.state[].lib)
 
-    fn initialized(ref self) -> Bool:
+    def initialized(ref self) raises -> Bool:
         return runtime_initialized(self.state[].lib, self.state[].handle)
 
-    fn nprocs(ref self) -> Int:
+    def nprocs(ref self) raises -> Int:
         return parallel_nprocs(self.state[].lib)
 
-    fn myproc(ref self) -> Int:
+    def myproc(ref self) raises -> Int:
         return parallel_myproc(self.state[].lib)
 
-    fn ioprocessor(ref self) -> Bool:
+    def ioprocessor(ref self) raises -> Bool:
         return parallel_ioprocessor(self.state[].lib)
 
-    fn ioprocessor_number(ref self) -> Int:
+    def ioprocessor_number(ref self) raises -> Int:
         return parallel_ioprocessor_number(self.state[].lib)
 
-    fn library_path(ref self) -> String:
+    def library_path(ref self) raises -> String:
         return self.state[].path.copy()
 
-    fn _lease(ref self) -> RuntimeLease:
+    def _lease(ref self) raises -> RuntimeLease:
         return self.state
 
-    fn _handle(ref self) -> RuntimeHandle:
+    def _handle(ref self) raises -> RuntimeHandle:
         return self.state[].handle

@@ -3,7 +3,7 @@ from std.os import getenv
 from std.os.path import exists
 
 
-fn installed_library_path() -> String:
+def installed_library_path() raises -> String:
     var override_path = getenv("AMREX_MOJO_LIBRARY_PATH")
     if override_path:
         return override_path
@@ -23,17 +23,17 @@ fn installed_library_path() -> String:
     return String("")
 
 
-fn default_library_path() -> String:
+def default_library_path() raises -> String:
     var installed_path = installed_library_path()
     if installed_path:
         return installed_path
     return String("./build/src/capi/libamrex_mojo_capi_3d.dylib")
 
 
-fn load_library(ref path: String) raises -> OwnedDLHandle:
+def load_library(ref path: String) raises -> OwnedDLHandle:
     return OwnedDLHandle(path)
 
 
-fn load_default_library() raises -> OwnedDLHandle:
+def load_default_library() raises -> OwnedDLHandle:
     var path = default_library_path()
     return load_library(path)

@@ -9,7 +9,6 @@ from amrex.ffi import (
     geometry_cell_size,
     geometry_create,
     geometry_domain,
-    geometry_destroy,
     geometry_periodicity,
     geometry_prob_domain,
     last_error_message,
@@ -21,7 +20,7 @@ struct Geometry(Movable):
     var runtime: RuntimeLease
     var handle: GeometryHandle
 
-    fn __init__(out self, ref runtime: AmrexRuntime, domain: Box3D) raises:
+    def __init__(out self, ref runtime: AmrexRuntime, domain: Box3D) raises:
         self.runtime = runtime._lease()
         self.handle = geometry_create(
             self.runtime[].lib, self.runtime[].handle, domain
@@ -31,31 +30,31 @@ struct Geometry(Movable):
 
     fn __del__(deinit self):
         if self.handle:
-            geometry_destroy(self.runtime[].lib, self.handle)
+            self.runtime[].lib.call["amrex_mojo_geometry_destroy"](self.handle)
 
-    fn domain(ref self) raises -> Box3D:
+    def domain(ref self) raises -> Box3D:
         var result = geometry_domain(self.runtime[].lib, self.handle)
         if result.status != 0:
             raise Error(last_error_message(self.runtime[].lib))
         return result.value.copy()
 
-    fn prob_domain(ref self) raises -> RealBox3D:
+    def prob_domain(ref self) raises -> RealBox3D:
         var result = geometry_prob_domain(self.runtime[].lib, self.handle)
         if result.status != 0:
             raise Error(last_error_message(self.runtime[].lib))
         return result.value.copy()
 
-    fn cell_size(ref self) raises -> RealVect3D:
+    def cell_size(ref self) raises -> RealVect3D:
         var result = geometry_cell_size(self.runtime[].lib, self.handle)
         if result.status != 0:
             raise Error(last_error_message(self.runtime[].lib))
         return result.value.copy()
 
-    fn periodicity(ref self) raises -> IntVect3D:
+    def periodicity(ref self) raises -> IntVect3D:
         var result = geometry_periodicity(self.runtime[].lib, self.handle)
         if result.status != 0:
             raise Error(last_error_message(self.runtime[].lib))
         return result.value.copy()
 
-    fn _handle(ref self) -> GeometryHandle:
+    def _handle(ref self) raises -> GeometryHandle:
         return self.handle

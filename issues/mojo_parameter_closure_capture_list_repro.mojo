@@ -1,15 +1,15 @@
 from std.collections import List
 
 
-fn apply[body: fn() capturing -> Int]() -> Int:
+def apply[body: fn() raises capturing -> Int]() raises -> Int:
     return body()
 
 
-fn main():
+def main() raises:
     var src = List[Int](length=1, fill=2)
 
     @parameter
-    fn compute() -> Int:
+    def compute() raises -> Int:
         return src[0]
 
     print(apply[compute]())

@@ -9,7 +9,6 @@ from amrex.ffi import (
     last_error_message,
     multifab_copy,
     multifab_create,
-    multifab_destroy,
     multifab_max,
     multifab_min,
     multifab_mult,
@@ -23,7 +22,6 @@ from amrex.ffi import (
     multifab_tile_count,
     multifab_write_single_level_plotfile,
     tile_view,
-    zero_intvect3d,
 )
 from amrex.runtime import AmrexRuntime, RuntimeLease
 from amrex.space3d.boxarray import BoxArray, DistributionMapping
@@ -36,13 +34,13 @@ struct MultiFab(Movable):
     var handle: MultiFabHandle
     var ngrow_vect: IntVect3D
 
-    fn __init__(
+    def __init__(
         out self,
         ref runtime: AmrexRuntime,
         ref boxarray: BoxArray,
         ref distmap: DistributionMapping,
         ncomp: Int,
-        ngrow: IntVect3D = zero_intvect3d(),
+        ngrow: IntVect3D = IntVect3D(x=0, y=0, z=0),
     ) raises:
         self.runtime = runtime._lease()
         self.handle = multifab_create(
@@ -59,15 +57,15 @@ struct MultiFab(Movable):
 
     fn __del__(deinit self):
         if self.handle:
-            multifab_destroy(self.runtime[].lib, self.handle)
+            self.runtime[].lib.call["amrex_mojo_multifab_destroy"](self.handle)
 
-    fn ncomp(ref self) -> Int:
+    def ncomp(ref self) raises -> Int:
         return multifab_ncomp(self.runtime[].lib, self.handle)
 
-    fn ngrow(ref self) -> IntVect3D:
+    def ngrow(ref self) raises -> IntVect3D:
         return self.ngrow_vect.copy()
 
-    fn set_val(mut self, value: Float64, start_comp: Int, ncomp: Int) raises:
+    def set_val(mut self, value: Float64, start_comp: Int, ncomp: Int) raises:
         if (
             multifab_set_val(
                 self.runtime[].lib, self.handle, value, start_comp, ncomp
@@ -76,30 +74,30 @@ struct MultiFab(Movable):
         ):
             raise Error(last_error_message(self.runtime[].lib))
 
-    fn set_val(mut self, value: Float64) raises:
+    def set_val(mut self, value: Float64) raises:
         self.set_val(value, 0, self.ncomp())
 
-    fn tile_count(ref self) -> Int:
+    def tile_count(ref self) raises -> Int:
         return multifab_tile_count(self.runtime[].lib, self.handle)
 
-    fn mfiter(ref self) raises -> MFIter:
+    def mfiter(ref self) raises -> MFIter:
         return create_mfiter(
             self.runtime,
             self.handle,
             self.ngrow_vect,
         )
 
-    fn array[owner_origin: Origin[mut=True]](
+    def array[owner_origin: Origin[mut=True]](
         ref[owner_origin] self, tile_index: Int
     ) raises -> Array4F64View[owner_origin]:
         return self.tile(tile_index).array()
 
-    fn array[owner_origin: Origin[mut=True]](
+    def array[owner_origin: Origin[mut=True]](
         ref[owner_origin] self, ref mfi: MFIter
     ) raises -> Array4F64View[owner_origin]:
         return self.tile(mfi).array()
 
-    fn tile[owner_origin: Origin[mut=True]](
+    def tile[owner_origin: Origin[mut=True]](
         ref[owner_origin] self, tile_index: Int
     ) raises -> TileF64View[owner_origin]:
         self._require_tile_index(tile_index)
@@ -107,7 +105,7 @@ struct MultiFab(Movable):
             self.runtime[].lib, self.handle, tile_index
         )
 
-    fn tile[owner_origin: Origin[mut=True]](
+    def tile[owner_origin: Origin[mut=True]](
         ref[owner_origin] self, ref mfi: MFIter
     ) raises -> TileF64View[owner_origin]:
         var tile_box = mfi.tilebox()
@@ -125,7 +123,7 @@ struct MultiFab(Movable):
             array_view=array_view.copy(),
         )
 
-    fn for_each_tile[
+    def for_each_tile[
         tile_func: fn[borrow_origin: Origin[mut=True]](
             TileF64View[borrow_origin]
         ) raises -> None
@@ -133,30 +131,30 @@ struct MultiFab(Movable):
         for tile_index in range(self.tile_count()):
             tile_func(self.tile(tile_index))
 
-    fn min(ref self, comp: Int) -> Float64:
+    def min(ref self, comp: Int) raises -> Float64:
         return multifab_min(self.runtime[].lib, self.handle, comp)
 
-    fn max(ref self, comp: Int) -> Float64:
+    def max(ref self, comp: Int) raises -> Float64:
         return multifab_max(self.runtime[].lib, self.handle, comp)
 
-    fn sum(ref self, comp: Int) -> Float64:
+    def sum(ref self, comp: Int) raises -> Float64:
         return multifab_sum(self.runtime[].lib, self.handle, comp)
 
-    fn norm0(ref self, comp: Int) -> Float64:
+    def norm0(ref self, comp: Int) raises -> Float64:
         return multifab_norm0(self.runtime[].lib, self.handle, comp)
 
-    fn norm1(ref self, comp: Int) -> Float64:
+    def norm1(ref self, comp: Int) raises -> Float64:
         return multifab_norm1(self.runtime[].lib, self.handle, comp)
 
-    fn norm2(ref self, comp: Int) -> Float64:
+    def norm2(ref self, comp: Int) raises -> Float64:
         return multifab_norm2(self.runtime[].lib, self.handle, comp)
 
-    fn plus(
+    def plus(
         mut self,
         value: Float64,
         start_comp: Int,
         ncomp: Int,
-        ngrow: IntVect3D = zero_intvect3d(),
+        ngrow: IntVect3D = IntVect3D(x=0, y=0, z=0),
     ) raises:
         if (
             multifab_plus(
@@ -171,12 +169,12 @@ struct MultiFab(Movable):
         ):
             raise Error(last_error_message(self.runtime[].lib))
 
-    fn mult(
+    def mult(
         mut self,
         value: Float64,
         start_comp: Int,
         ncomp: Int,
-        ngrow: IntVect3D = zero_intvect3d(),
+        ngrow: IntVect3D = IntVect3D(x=0, y=0, z=0),
     ) raises:
         if (
             multifab_mult(
@@ -191,13 +189,13 @@ struct MultiFab(Movable):
         ):
             raise Error(last_error_message(self.runtime[].lib))
 
-    fn copy_from(
+    def copy_from(
         mut self,
         ref source: MultiFab,
         src_comp: Int,
         dst_comp: Int,
         ncomp: Int,
-        ngrow: IntVect3D = zero_intvect3d(),
+        ngrow: IntVect3D = IntVect3D(x=0, y=0, z=0),
     ) raises:
         if (
             multifab_copy(
@@ -213,7 +211,7 @@ struct MultiFab(Movable):
         ):
             raise Error(last_error_message(self.runtime[].lib))
 
-    fn write_single_level_plotfile(
+    def write_single_level_plotfile(
         ref self,
         plotfile: String,
         ref geometry: Geometry,
@@ -233,7 +231,7 @@ struct MultiFab(Movable):
         ):
             raise Error(last_error_message(self.runtime[].lib))
 
-    fn write_single_level_plotfile(
+    def write_single_level_plotfile(
         ref self,
         plotfile: StringLiteral,
         ref geometry: Geometry,
@@ -247,9 +245,9 @@ struct MultiFab(Movable):
             level_step,
         )
 
-    fn _require_tile_index(ref self, tile_index: Int) raises:
+    def _require_tile_index(ref self, tile_index: Int) raises:
         if tile_index < 0 or tile_index >= self.tile_count():
             raise Error("tile index is out of range.")
 
-    fn _handle(ref self) -> MultiFabHandle:
+    def _handle(ref self) raises -> MultiFabHandle:
         return self.handle

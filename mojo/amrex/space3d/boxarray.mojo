@@ -7,11 +7,9 @@ from amrex.ffi import (
     IntVect3D,
     boxarray_box,
     boxarray_create_from_box,
-    boxarray_destroy,
     boxarray_max_size,
     boxarray_size,
     distmap_create_from_boxarray,
-    distmap_destroy,
     intvect3d,
     last_error_message,
 )
@@ -22,7 +20,7 @@ struct BoxArray(Movable):
     var runtime: RuntimeLease
     var handle: BoxArrayHandle
 
-    fn __init__(out self, ref runtime: AmrexRuntime, domain: Box3D) raises:
+    def __init__(out self, ref runtime: AmrexRuntime, domain: Box3D) raises:
         self.runtime = runtime._lease()
         self.handle = boxarray_create_from_box(
             self.runtime[].lib, self.runtime[].handle, domain
@@ -32,25 +30,25 @@ struct BoxArray(Movable):
 
     fn __del__(deinit self):
         if self.handle:
-            boxarray_destroy(self.runtime[].lib, self.handle)
+            self.runtime[].lib.call["amrex_mojo_boxarray_destroy"](self.handle)
 
-    fn max_size(mut self, max_size: IntVect3D) raises:
+    def max_size(mut self, max_size: IntVect3D) raises:
         if boxarray_max_size(self.runtime[].lib, self.handle, max_size) != 0:
             raise Error(last_error_message(self.runtime[].lib))
 
-    fn max_size(mut self, max_size: Int) raises:
+    def max_size(mut self, max_size: Int) raises:
         self.max_size(intvect3d(max_size, max_size, max_size))
 
-    fn size(ref self) -> Int:
+    def size(ref self) raises -> Int:
         return boxarray_size(self.runtime[].lib, self.handle)
 
-    fn box(ref self, index: Int) raises -> Box3D:
+    def box(ref self, index: Int) raises -> Box3D:
         var result = boxarray_box(self.runtime[].lib, self.handle, index)
         if result.status != 0:
             raise Error(last_error_message(self.runtime[].lib))
         return result.value.copy()
 
-    fn _handle(ref self) -> BoxArrayHandle:
+    def _handle(ref self) raises -> BoxArrayHandle:
         return self.handle
 
 
@@ -58,7 +56,7 @@ struct DistributionMapping(Movable):
     var runtime: RuntimeLease
     var handle: DistributionMappingHandle
 
-    fn __init__(
+    def __init__(
         out self, ref runtime: AmrexRuntime, ref boxarray: BoxArray
     ) raises:
         self.runtime = runtime._lease()
@@ -70,7 +68,7 @@ struct DistributionMapping(Movable):
 
     fn __del__(deinit self):
         if self.handle:
-            distmap_destroy(self.runtime[].lib, self.handle)
+            self.runtime[].lib.call["amrex_mojo_distmap_destroy"](self.handle)
 
-    fn _handle(ref self) -> DistributionMappingHandle:
+    def _handle(ref self) raises -> DistributionMappingHandle:
         return self.handle
