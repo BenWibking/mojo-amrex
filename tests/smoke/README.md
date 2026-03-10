@@ -21,7 +21,6 @@ Useful commands:
 ```bash
 pixi run configure
 pixi run build-capi
-pixi run install-capi
 pixi run install-mojo-package
 pixi run install-amrex
 pixi run build-multifab-smoke
@@ -31,3 +30,7 @@ pixi run build-multifab-smoke-apple-gpu
 pixi run run-multifab-smoke-apple-gpu
 pixi run run-multifab-smoke-apple-gpu-script
 ```
+
+`pixi run build-capi` now refreshes the active env's
+`lib/libamrex_mojo_capi_3d.dylib` automatically, so `pixi run install-capi` is
+only needed when you specifically want the rest of the CMake install artifacts.

@@ -54,4 +54,5 @@ failure.
 - Mojo wrappers surface those failures as `Error` exceptions with the reported
   message.
 - Loader failures include the concrete library path that was attempted and point
-  users to either `pixi run install-amrex` or `AMREX_MOJO_LIBRARY_PATH=...`.
+  users to `pixi run build-capi`, `pixi run install-amrex`, or
+  `AMREX_MOJO_LIBRARY_PATH=...`.

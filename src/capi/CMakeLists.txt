@@ -33,6 +33,22 @@ else()
     message(FATAL_ERROR "No compatible AMReX target was found.")
 endif()
 
+# Keep the active pixi env copy in sync with the build tree so bare `mojo`
+# runs do not pick up a stale installed dylib after local rebuilds.
+if(CMAKE_INSTALL_PREFIX)
+    set(AMREX_MOJO_ENV_LIB_DIR "${CMAKE_INSTALL_PREFIX}/lib")
+    add_custom_command(
+        TARGET amrex_mojo_capi_3d
+        POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E make_directory "${AMREX_MOJO_ENV_LIB_DIR}"
+        COMMAND
+            ${CMAKE_COMMAND} -E copy_if_different
+            $<TARGET_FILE:amrex_mojo_capi_3d>
+            "${AMREX_MOJO_ENV_LIB_DIR}/$<TARGET_FILE_NAME:amrex_mojo_capi_3d>"
+        VERBATIM
+    )
+endif()
+
 install(
     TARGETS amrex_mojo_capi_3d
     LIBRARY DESTINATION lib

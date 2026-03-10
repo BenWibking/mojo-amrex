@@ -122,18 +122,18 @@ Notes:
   arithmetic.
 - To build against a local AMReX checkout instead, configure with
   `-DAMREX_MOJO_AMREX_SOURCE_DIR=/path/to/amrex`.
-- `pixi run install-amrex` installs the C API library into the active env's
-  `lib/` directory and installs `amrex.mojopkg` into the env's `lib/mojo/`
-  directory, so bare commands like `mojo examples/multifab_smoke.mojo` work
-  from the repo root inside `pixi shell` without `-I mojo`. After `bootstrap`,
-  `mpiexec -n 2 mojo examples/multifab_mpi_exchange.mojo` also uses that same
-  installed library by default.
+- `pixi run build-capi` now also refreshes the C API dylib in the active env's
+  `lib/` directory after each successful build, so bare commands like
+  `mojo examples/multifab_smoke.mojo` do not pick up a stale installed copy.
+- `pixi run install-amrex` still installs `amrex.mojopkg` into the env's
+  `lib/mojo/` directory and runs the full CMake install step for headers and
+  other install artifacts.
 - `pixi run test` runs the C++ ABI test through `ctest` and the Mojo
-  functional tests against the local build tree. The Mojo test tasks rebuild
-  and install `amrex.mojopkg` into the active pixi env before running, then set
-  `AMREX_MOJO_LIBRARY_PATH=./build/src/capi/libamrex_mojo_capi_3d.dylib`.
+  functional tests against the current env-installed library. The Mojo test
+  tasks rebuild the C API, install `amrex.mojopkg` into the active pixi env,
+  and then run without an explicit `AMREX_MOJO_LIBRARY_PATH` override.
 - `pixi run run-multifab-mpi-exchange` packages the current Mojo bindings,
-  points them at the default `build/` tree, and runs the MPI example with
+  rebuilds the C API into the active env, and runs the MPI example with
   `mpiexec -n 2`.
 - `pixi run test-mpi` runs the two-rank MPI variants of the C++ and Mojo tests
   from the default MPI-enabled `build/` tree.
@@ -178,7 +178,8 @@ The binding model is intentionally strict about ownership:
   allocation; otherwise the wrapper raises instead of handing out an invalid
   host pointer.
 - If library discovery fails, the loader now reports the concrete path it tried
-  and suggests either `pixi run install-amrex` or
+  and suggests either `pixi run build-capi`,
+  `pixi run install-amrex`, or
   `AMREX_MOJO_LIBRARY_PATH=/path/to/libamrex_mojo_capi_3d.dylib`.
 
 Focused usage notes for ownership, borrowing, and diagnostics live in

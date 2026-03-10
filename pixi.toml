@@ -23,13 +23,13 @@ run-multifab-smoke-script = "mojo examples/multifab_smoke.mojo"
 build-multifab-smoke-apple-gpu = "mojo build examples/multifab_smoke_apple_gpu.mojo -o build/multifab_smoke_apple_gpu"
 run-multifab-smoke-apple-gpu = "./build/multifab_smoke_apple_gpu"
 run-multifab-smoke-apple-gpu-script = "mojo examples/multifab_smoke_apple_gpu.mojo"
-run-multifab-mpi-exchange = { depends-on = ["configure-mpi", "build-capi-mpi", "install-mojo-package"], cmd = "AMREX_MOJO_LIBRARY_PATH=./build/src/capi/libamrex_mojo_capi_3d.dylib mpiexec --oversubscribe --map-by slot -n 2 mojo examples/multifab_mpi_exchange.mojo" }
+run-multifab-mpi-exchange = { depends-on = ["configure-mpi", "build-capi-mpi", "install-mojo-package"], cmd = "mpiexec --oversubscribe --map-by slot -n 2 mojo examples/multifab_mpi_exchange.mojo" }
 test-capi = { depends-on = ["build-tests"], cmd = "ctest --test-dir build --output-on-failure" }
 test-capi-mpi = { depends-on = ["build-tests-mpi"], cmd = "mpiexec --oversubscribe --map-by slot -n 2 ./build/tests/capi/amrex_mojo_capi_test" }
-test-mojo-runtime = { depends-on = ["build-tests", "install-mojo-package"], cmd = "AMREX_MOJO_LIBRARY_PATH=./build/src/capi/libamrex_mojo_capi_3d.dylib mojo tests/mojo/runtime_geometry_test.mojo" }
-test-mojo-runtime-mpi = { depends-on = ["build-tests-mpi", "install-mojo-package"], cmd = "AMREX_MOJO_LIBRARY_PATH=./build/src/capi/libamrex_mojo_capi_3d.dylib mpiexec --oversubscribe --map-by slot -n 2 mojo tests/mojo/runtime_geometry_test.mojo" }
-test-mojo-multifab = { depends-on = ["build-tests", "install-mojo-package"], cmd = "AMREX_MOJO_LIBRARY_PATH=./build/src/capi/libamrex_mojo_capi_3d.dylib mojo tests/mojo/multifab_functional_test.mojo" }
-test-mojo-multifab-mpi = { depends-on = ["build-tests-mpi", "install-mojo-package"], cmd = "AMREX_MOJO_LIBRARY_PATH=./build/src/capi/libamrex_mojo_capi_3d.dylib mpiexec --oversubscribe --map-by slot -n 2 mojo tests/mojo/multifab_functional_test.mojo" }
+test-mojo-runtime = { depends-on = ["build-tests", "install-mojo-package"], cmd = "mojo tests/mojo/runtime_geometry_test.mojo" }
+test-mojo-runtime-mpi = { depends-on = ["build-tests-mpi", "install-mojo-package"], cmd = "mpiexec --oversubscribe --map-by slot -n 2 mojo tests/mojo/runtime_geometry_test.mojo" }
+test-mojo-multifab = { depends-on = ["build-tests", "install-mojo-package"], cmd = "mojo tests/mojo/multifab_functional_test.mojo" }
+test-mojo-multifab-mpi = { depends-on = ["build-tests-mpi", "install-mojo-package"], cmd = "mpiexec --oversubscribe --map-by slot -n 2 mojo tests/mojo/multifab_functional_test.mojo" }
 test-mojo = { depends-on = ["test-mojo-runtime", "test-mojo-multifab"] }
 test-mpi = { depends-on = ["test-capi-mpi", "test-mojo-runtime-mpi", "test-mojo-multifab-mpi"] }
 test = { depends-on = ["test-capi", "test-mojo"] }

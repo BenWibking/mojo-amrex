@@ -34,14 +34,15 @@ def load_library(ref path: String) raises -> OwnedDLHandle:
     if not path:
         raise Error(
             "Unable to determine the AMReX Mojo C API library path. Set "
-            + "AMREX_MOJO_LIBRARY_PATH or run `pixi run install-amrex`."
+            + "AMREX_MOJO_LIBRARY_PATH or run `pixi run build-capi`."
         )
     if not exists(path):
         raise Error(
             "AMReX Mojo C API library not found at '"
             + path
             + "'. Run "
-            + "`pixi run install-amrex` or set AMREX_MOJO_LIBRARY_PATH."
+            + "`pixi run build-capi`, `pixi run install-amrex`, or set "
+            + "AMREX_MOJO_LIBRARY_PATH."
         )
     return OwnedDLHandle(path)
 
