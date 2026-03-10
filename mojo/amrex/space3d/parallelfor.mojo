@@ -13,7 +13,7 @@ def ParallelFor[body: fn(Int, Int, Int) capturing -> None](tile_box: Box3D) rais
 
 
 def ParallelFor[
-    body: fn(Int, Int, Int) raises capturing -> None
+    body: def(Int, Int, Int) raises capturing -> None
 ](tile_box: Box3D) raises:
     for k in range(Int(tile_box.small_end.z), Int(tile_box.big_end.z) + 1):
         for j in range(Int(tile_box.small_end.y), Int(tile_box.big_end.y) + 1):
@@ -37,7 +37,7 @@ def ParallelFor[
 
 def ParallelFor[
     ctx_type: Copyable,
-    body: fn(ctx_type, Int, Int, Int) raises capturing -> None,
+    body: def(ctx_type, Int, Int, Int) raises capturing -> None,
 ](tile_box: Box3D, ctx: ctx_type) raises:
     for k in range(Int(tile_box.small_end.z), Int(tile_box.big_end.z) + 1):
         for j in range(Int(tile_box.small_end.y), Int(tile_box.big_end.y) + 1):

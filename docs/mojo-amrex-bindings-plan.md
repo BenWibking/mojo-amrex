@@ -268,7 +268,13 @@ Things not worth copying directly:
 ```mojo
 from amrex.space3d import *
 
-fn main() raises:
+def fill_tile[
+    owner_origin: Origin[mut=True]
+](tile: TileF64View[owner_origin]) raises:
+    tile.array().fill(42.0)
+
+
+def main() raises:
     var rt = AmrexRuntime()
 
     let small = IntVect3D(0, 0, 0)
@@ -282,9 +288,7 @@ fn main() raises:
     let geom = Geometry(rt, domain)
     var mf = MultiFab(rt, ba, dm, n_comp=1, n_grow=1)
 
-    mf.for_each_tile(fn (tile):
-        tile.array().fill(42.0)
-    )
+    mf.for_each_tile[fill_tile]()
 ```
 
 This should be the user experience target for the first milestone.

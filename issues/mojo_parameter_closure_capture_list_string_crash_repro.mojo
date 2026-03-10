@@ -1,7 +1,7 @@
 from std.collections import List
 
 
-def apply[body: fn() raises capturing -> String]() raises -> String:
+def apply[body: def() raises capturing -> String]() raises -> String:
     return body()
 
 

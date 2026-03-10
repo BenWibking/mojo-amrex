@@ -1,7 +1,7 @@
 from std.collections import List
 
 
-def apply[body: fn() raises capturing -> Int]() raises -> Int:
+def apply[body: def() raises capturing -> Int]() raises -> Int:
     return body()
 
 

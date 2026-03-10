@@ -124,7 +124,7 @@ struct MultiFab(Movable):
         )
 
     def for_each_tile[
-        tile_func: fn[borrow_origin: Origin[mut=True]](
+        tile_func: def[borrow_origin: Origin[mut=True]](
             TileF64View[borrow_origin]
         ) raises -> None
     ](mut self) raises:

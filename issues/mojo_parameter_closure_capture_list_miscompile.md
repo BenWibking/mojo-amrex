@@ -23,6 +23,11 @@ macOS arm64
 
 Saved as `issues/mojo_parameter_closure_capture_list_repro.mojo`.
 
+The snippets below intentionally preserve the original March 9, 2026
+`fn`-based syntax from the bug report. The checked-in `.mojo` repro files have
+since been migrated to equivalent `def` syntax where the current toolchain
+accepts it.
+
 ```mojo
 from std.collections import List
 
