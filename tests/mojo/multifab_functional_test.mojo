@@ -103,12 +103,27 @@ def main() raises:
 
     var distmap = DistributionMapping(runtime, boxarray)
     var geometry = Geometry(runtime, domain)
-    var source = MultiFab(runtime, boxarray, distmap, 1, intvect3d(1, 1, 1))
+    var default_multifab = MultiFab(runtime, boxarray, distmap, 1)
+    var default_memory = default_multifab.memory_info()
+    if runtime.gpu_enabled():
+        expect(
+            default_memory.device_accessible,
+            "default multifab should be device-accessible with CUDA/HIP backend",
+        )
+    else:
+        expect(
+            default_memory.host_accessible,
+            "default multifab should be host-accessible without AMReX GPU backend",
+        )
+
+    var source = MultiFab(
+        runtime, boxarray, distmap, 1, intvect3d(1, 1, 1), host_only=True
+    )
     var destination = MultiFab(
-        runtime, boxarray, distmap, 1, intvect3d(1, 1, 1)
+        runtime, boxarray, distmap, 1, intvect3d(1, 1, 1), host_only=True
     )
     var copy_target = MultiFab(
-        runtime, boxarray, distmap, 1, intvect3d(1, 1, 1)
+        runtime, boxarray, distmap, 1, intvect3d(1, 1, 1), host_only=True
     )
 
     expect(source.ncomp() == 1, "source should have one component")
@@ -203,10 +218,10 @@ def main() raises:
     )
 
     var comm_source = MultiFab(
-        runtime, boxarray, distmap, 1, intvect3d(1, 1, 1)
+        runtime, boxarray, distmap, 1, intvect3d(1, 1, 1), host_only=True
     )
     var comm_destination = MultiFab(
-        runtime, boxarray, distmap, 1, intvect3d(1, 1, 1)
+        runtime, boxarray, distmap, 1, intvect3d(1, 1, 1), host_only=True
     )
     comm_source.set_val(0.0)
     comm_destination.set_val(0.0)

@@ -16,7 +16,7 @@ The current MVP covers:
 
 1. runtime initialization and shutdown
 2. `BoxArray`, `DistributionMapping`, `Geometry`, and `MultiFab`
-3. tile metadata plus zero-copy `Array4` pointer access on CPU
+3. tile metadata plus zero-copy `Array4` pointer access for host-accessible storage
 4. reductions for `MultiFab`
 5. a Mojo example that allocates a `MultiFab`, fills all tiles, and validates the sum
 
@@ -94,12 +94,23 @@ Notes:
   runs `configure`, `build-capi`, and `install-amrex`.
 - By default the CMake build fetches AMReX from
   `https://github.com/AMReX-Codes/amrex/releases/download/26.03/amrex-26.03.tar.gz`
-  and verifies the pinned SHA-256 before configuring a 3D, CPU-only,
-  double-precision MPI-enabled build suitable for the MVP bindings.
+  and verifies the pinned SHA-256 before configuring a 3D, double-precision
+  MPI-enabled build suitable for the MVP bindings. The default backend is
+  `AMREX_MOJO_GPU_BACKEND=NONE`.
 - `pixi run configure` now uses the pixi-provided OpenMPI wrapper compilers so
   the default `build/` tree and installed C ABI are MPI-capable.
 - `pixi run configure-mpi`, `build-capi-mpi`, and `build-tests-mpi` remain as
   explicit MPI task aliases, but they target the same default `build/` tree.
+- To enable an AMReX GPU backend, configure with
+  `-DAMREX_MOJO_GPU_BACKEND=CUDA` or `-DAMREX_MOJO_GPU_BACKEND=HIP`.
+- When `AMREX_MOJO_GPU_BACKEND` is `CUDA` or `HIP`, default `MultiFab`
+  allocations are device-backed through `The_Async_Arena()`. Use
+  `MultiFab(..., host_only=True)` from Mojo, or
+  `AMREX_MOJO_MULTIFAB_MEMORY_HOST_ONLY` through the C ABI, when you need a
+  host-resident `MultiFab` for direct `Array4` writes.
+- On Apple Silicon, the AMReX backend still runs as `NONE`/host-only, but
+  `Array4` views remain usable for Mojo device kernels via shared physical
+  memory. That path is separate from AMReX's CUDA/HIP backend support.
 - To build against a local AMReX checkout instead, configure with
   `-DAMREX_MOJO_AMREX_SOURCE_DIR=/path/to/amrex`.
 - `pixi run install-amrex` installs the C API library into the active env's
@@ -132,7 +143,10 @@ The automated test suite currently has three pieces:
   domain and geometry objects from Mojo.
 - `tests/mojo/multifab_functional_test.mojo` covers `for_each_tile`, `MFIter`,
   borrowed `Array4` access, arithmetic, reductions, `ParmParse`, and plotfile
-  output from Mojo, including `fill_boundary` and `parallel_copy_from`.
+  output from Mojo, including `fill_boundary` and `parallel_copy_from`. The
+  direct `Array4` tests use explicit `host_only=True` allocations so the same
+  suite can run when the AMReX backend defaults to device-backed `MultiFab`
+  storage.
 
 Run `pixi run test` after changes to the bindings layer.
 Run `pixi run test-mpi` to exercise the MPI-enabled build on 2 ranks.
@@ -150,6 +164,10 @@ The binding model is intentionally strict about ownership:
   Treat those `TileF64View` and `Array4F64View` values as non-escaping borrows;
   they are only valid while the owning `MultiFab` and iterator state remain
   live.
+- When CUDA/HIP support is enabled, default `MultiFab` storage is device-backed.
+  Host-side `Array4` access then requires an explicit `host_only=True`
+  allocation; otherwise the wrapper raises instead of handing out an invalid
+  host pointer.
 - If library discovery fails, the loader now reports the concrete path it tried
   and suggests either `pixi run install-amrex` or
   `AMREX_MOJO_LIBRARY_PATH=/path/to/libamrex_mojo_capi_3d.dylib`.

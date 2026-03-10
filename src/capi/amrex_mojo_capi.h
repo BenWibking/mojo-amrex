@@ -24,6 +24,19 @@ typedef enum amrex_mojo_status_code
     AMREX_MOJO_STATUS_INTERNAL_ERROR = 3
 } amrex_mojo_status_code_t;
 
+typedef enum amrex_mojo_gpu_backend
+{
+    AMREX_MOJO_GPU_BACKEND_NONE = 0,
+    AMREX_MOJO_GPU_BACKEND_CUDA = 1,
+    AMREX_MOJO_GPU_BACKEND_HIP = 2
+} amrex_mojo_gpu_backend_t;
+
+typedef enum amrex_mojo_multifab_memory_kind
+{
+    AMREX_MOJO_MULTIFAB_MEMORY_DEFAULT = 0,
+    AMREX_MOJO_MULTIFAB_MEMORY_HOST_ONLY = 1
+} amrex_mojo_multifab_memory_kind_t;
+
 typedef struct amrex_mojo_intvect_3d
 {
     int32_t x;
@@ -71,6 +84,16 @@ typedef struct amrex_mojo_array4_view_f64
     int32_t ncomp;
 } amrex_mojo_array4_view_f64;
 
+typedef struct amrex_mojo_multifab_memory_info
+{
+    int32_t requested_kind;
+    int32_t host_accessible;
+    int32_t device_accessible;
+    int32_t is_managed;
+    int32_t is_device;
+    int32_t is_pinned;
+} amrex_mojo_multifab_memory_info_t;
+
 int32_t amrex_mojo_abi_version(void);
 const char* amrex_mojo_last_error_message(void);
 
@@ -82,6 +105,9 @@ amrex_mojo_runtime_t* amrex_mojo_runtime_create(
 amrex_mojo_runtime_t* amrex_mojo_runtime_create_default(void);
 void amrex_mojo_runtime_destroy(amrex_mojo_runtime_t* runtime);
 int32_t amrex_mojo_runtime_initialized(const amrex_mojo_runtime_t* runtime);
+amrex_mojo_gpu_backend_t amrex_mojo_gpu_backend(void);
+int32_t amrex_mojo_gpu_enabled(void);
+amrex_mojo_status_code_t amrex_mojo_gpu_stream_synchronize(void);
 
 int32_t amrex_mojo_parallel_nprocs(void);
 int32_t amrex_mojo_parallel_myproc(void);
@@ -179,6 +205,14 @@ amrex_mojo_multifab_t* amrex_mojo_multifab_create(
     int32_t ncomp,
     amrex_mojo_intvect_3d ngrow
 );
+amrex_mojo_multifab_t* amrex_mojo_multifab_create_with_memory(
+    amrex_mojo_runtime_t* runtime,
+    const amrex_mojo_boxarray_t* boxarray,
+    const amrex_mojo_distmap_t* distmap,
+    int32_t ncomp,
+    amrex_mojo_intvect_3d ngrow,
+    amrex_mojo_multifab_memory_kind_t memory_kind
+);
 amrex_mojo_multifab_t* amrex_mojo_multifab_create_xyz(
     amrex_mojo_runtime_t* runtime,
     const amrex_mojo_boxarray_t* boxarray,
@@ -188,9 +222,23 @@ amrex_mojo_multifab_t* amrex_mojo_multifab_create_xyz(
     int32_t ngrow_y,
     int32_t ngrow_z
 );
+amrex_mojo_multifab_t* amrex_mojo_multifab_create_with_memory_xyz(
+    amrex_mojo_runtime_t* runtime,
+    const amrex_mojo_boxarray_t* boxarray,
+    const amrex_mojo_distmap_t* distmap,
+    int32_t ncomp,
+    int32_t ngrow_x,
+    int32_t ngrow_y,
+    int32_t ngrow_z,
+    amrex_mojo_multifab_memory_kind_t memory_kind
+);
 void amrex_mojo_multifab_destroy(amrex_mojo_multifab_t* multifab);
 int32_t amrex_mojo_multifab_ncomp(const amrex_mojo_multifab_t* multifab);
 amrex_mojo_intvect_3d amrex_mojo_multifab_ngrow(const amrex_mojo_multifab_t* multifab);
+amrex_mojo_status_code_t amrex_mojo_multifab_memory_info(
+    const amrex_mojo_multifab_t* multifab,
+    amrex_mojo_multifab_memory_info_t* out_info
+);
 amrex_mojo_status_code_t amrex_mojo_multifab_set_val(
     amrex_mojo_multifab_t* multifab,
     double value,

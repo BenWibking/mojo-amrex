@@ -74,6 +74,16 @@ struct IntVect3DResult(Copyable):
 
 
 @fieldwise_init
+struct MultiFabMemoryInfo(Copyable):
+    var requested_kind: Int
+    var host_accessible: Bool
+    var device_accessible: Bool
+    var is_managed: Bool
+    var is_device: Bool
+    var is_pinned: Bool
+
+
+@fieldwise_init
 struct Array4F64View[origin: Origin[mut=True]](Copyable):
     var data: UnsafePointer[c_double, Self.origin]
     var lo_x: c_int
@@ -207,6 +217,18 @@ def runtime_initialized(
     return lib.call["amrex_mojo_runtime_initialized", c_int](runtime) != 0
 
 
+def gpu_backend(ref lib: OwnedDLHandle) raises -> Int:
+    return Int(lib.call["amrex_mojo_gpu_backend", c_int]())
+
+
+def gpu_enabled(ref lib: OwnedDLHandle) raises -> Bool:
+    return lib.call["amrex_mojo_gpu_enabled", c_int]() != 0
+
+
+def gpu_stream_synchronize(ref lib: OwnedDLHandle) raises -> Int:
+    return Int(lib.call["amrex_mojo_gpu_stream_synchronize", c_int]())
+
+
 def parallel_nprocs(ref lib: OwnedDLHandle) raises -> Int:
     return Int(lib.call["amrex_mojo_parallel_nprocs", c_int]())
 
@@ -304,8 +326,9 @@ def multifab_create(
     distmap: DistributionMappingHandle,
     ncomp: Int,
     ngrow: IntVect3D,
+    host_only: Bool = False,
 ) raises -> MultiFabHandle:
-    return lib.call["amrex_mojo_multifab_create_xyz", MultiFabHandle](
+    return lib.call["amrex_mojo_multifab_create_with_memory_xyz", MultiFabHandle](
         runtime,
         boxarray,
         distmap,
@@ -313,6 +336,7 @@ def multifab_create(
         ngrow.x,
         ngrow.y,
         ngrow.z,
+        c_int(1 if host_only else 0),
     )
 
 
@@ -324,6 +348,23 @@ def multifab_ncomp(
     ref lib: OwnedDLHandle, multifab: MultiFabHandle
 ) raises -> Int:
     return Int(lib.call["amrex_mojo_multifab_ncomp", c_int](multifab))
+
+
+def multifab_memory_info(
+    ref lib: OwnedDLHandle, multifab: MultiFabHandle
+) raises -> MultiFabMemoryInfo:
+    var raw = List[c_int](length=6, fill=0)
+    _ = lib.call["amrex_mojo_multifab_memory_info", c_int](
+        multifab, raw.unsafe_ptr()
+    )
+    return MultiFabMemoryInfo(
+        requested_kind=Int(raw[0]),
+        host_accessible=raw[1] != 0,
+        device_accessible=raw[2] != 0,
+        is_managed=raw[3] != 0,
+        is_device=raw[4] != 0,
+        is_pinned=raw[5] != 0,
+    )
 
 
 def multifab_set_val(

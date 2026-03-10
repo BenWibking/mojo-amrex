@@ -12,7 +12,7 @@ from amrex.ffi import (
 from amrex.loader import default_library_path, load_library
 from amrex.ownership import require_live_handle
 from std.collections import List
-from std.ffi import OwnedDLHandle
+from std.ffi import OwnedDLHandle, c_int
 from std.memory import ArcPointer
 
 
@@ -81,6 +81,27 @@ struct AmrexRuntime(Movable):
     def initialized(ref self) raises -> Bool:
         var state = self._lease()
         return runtime_initialized(state[].lib, state[].handle)
+
+    def gpu_backend(ref self) raises -> Int:
+        var state = self._lease()
+        return Int(state[].lib.call["amrex_mojo_gpu_backend", c_int]())
+
+    def gpu_enabled(ref self) raises -> Bool:
+        var state = self._lease()
+        return state[].lib.call["amrex_mojo_gpu_enabled", c_int]() != 0
+
+    def gpu_backend_name(ref self) raises -> String:
+        var backend = self.gpu_backend()
+        if backend == 1:
+            return String("cuda")
+        if backend == 2:
+            return String("hip")
+        return String("none")
+
+    def gpu_stream_synchronize(ref self) raises:
+        var state = self._lease()
+        if state[].lib.call["amrex_mojo_gpu_stream_synchronize", c_int]() != 0:
+            raise Error(last_error_message(state[].lib))
 
     def nprocs(ref self) raises -> Int:
         var state = self._lease()

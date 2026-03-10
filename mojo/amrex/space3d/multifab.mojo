@@ -3,6 +3,7 @@
 from amrex.ffi import (
     Array4F64View,
     IntVect3D,
+    MultiFabMemoryInfo,
     MultiFabHandle,
     TileF64View,
     array4_view_from_mfiter,
@@ -11,6 +12,7 @@ from amrex.ffi import (
     multifab_create,
     multifab_fill_boundary,
     multifab_max,
+    multifab_memory_info,
     multifab_min,
     multifab_mult,
     multifab_ncomp,
@@ -44,6 +46,7 @@ struct MultiFab(Movable):
         ref distmap: DistributionMapping,
         ncomp: Int,
         ngrow: IntVect3D = IntVect3D(x=0, y=0, z=0),
+        host_only: Bool = False,
     ) raises:
         self.runtime = runtime._lease()
         self.handle = multifab_create(
@@ -53,6 +56,7 @@ struct MultiFab(Movable):
             distmap._handle(),
             ncomp,
             ngrow,
+            host_only,
         )
         self.ngrow_vect = ngrow.copy()
         if not self.handle:
@@ -68,6 +72,10 @@ struct MultiFab(Movable):
 
     def ngrow(ref self) raises -> IntVect3D:
         return self.ngrow_vect.copy()
+
+    def memory_info(ref self) raises -> MultiFabMemoryInfo:
+        var handle = self._handle()
+        return multifab_memory_info(self.runtime[].lib, handle)
 
     def set_val(mut self, value: Float64, start_comp: Int, ncomp: Int) raises:
         var handle = self._handle()
@@ -115,7 +123,10 @@ struct MultiFab(Movable):
     ]:
         self._require_tile_index(tile_index)
         var handle = self._handle()
-        return tile_view[owner_origin](self.runtime[].lib, handle, tile_index)
+        var tile = tile_view[owner_origin](self.runtime[].lib, handle, tile_index)
+        if not tile.array_view.data:
+            raise Error(last_error_message(self.runtime[].lib))
+        return tile.copy()
 
     def tile[
         owner_origin: Origin[mut=True]

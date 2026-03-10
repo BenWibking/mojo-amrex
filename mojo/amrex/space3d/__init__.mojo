@@ -4,6 +4,7 @@ from amrex.ffi import (
     Array4F64View,
     Box3D,
     IntVect3D,
+    MultiFabMemoryInfo,
     RealBox3D,
     RealVect3D,
     TileF64View,

@@ -119,6 +119,86 @@ namespace
 
         return AMREX_MOJO_STATUS_OK;
     }
+
+    auto arena_for_memory_kind(amrex_mojo_multifab_memory_kind_t memory_kind) -> amrex::Arena*
+    {
+        switch (memory_kind) {
+#ifdef AMREX_USE_GPU
+        case AMREX_MOJO_MULTIFAB_MEMORY_DEFAULT: return amrex::The_Async_Arena();
+#else
+        case AMREX_MOJO_MULTIFAB_MEMORY_DEFAULT: return nullptr;
+#endif
+        case AMREX_MOJO_MULTIFAB_MEMORY_HOST_ONLY: return amrex::The_Cpu_Arena();
+        default: return nullptr;
+        }
+    }
+
+    auto is_valid_memory_kind(amrex_mojo_multifab_memory_kind_t memory_kind) -> bool
+    {
+        switch (memory_kind) {
+        case AMREX_MOJO_MULTIFAB_MEMORY_DEFAULT:
+        case AMREX_MOJO_MULTIFAB_MEMORY_HOST_ONLY: return true;
+        default: return false;
+        }
+    }
+
+    auto mfinfo_for_memory_kind(amrex_mojo_multifab_memory_kind_t memory_kind) -> amrex::MFInfo
+    {
+        auto info = amrex::MFInfo{};
+        if (auto* arena = arena_for_memory_kind(memory_kind); arena != nullptr) {
+            info.SetArena(arena);
+        }
+        return info;
+    }
+
+    auto populate_tiles(amrex::MultiFab& multifab) -> std::vector<amrex_mojo::detail::tile_descriptor>
+    {
+        std::vector<amrex_mojo::detail::tile_descriptor> tiles;
+        for (amrex::MFIter mfi(multifab, amrex::MFItInfo().EnableTiling()); mfi.isValid(); ++mfi) {
+            tiles.push_back(amrex_mojo::detail::tile_descriptor{
+                mfi.tilebox(),
+                mfi.validbox(),
+                multifab[mfi].box(),
+                mfi.index(),
+                mfi.LocalTileIndex(),
+                &(multifab[mfi])
+            });
+        }
+        return tiles;
+    }
+
+    auto require_host_accessible(
+        const amrex_mojo::detail::tile_descriptor* tile,
+        const char* context
+    ) -> amrex_mojo_status_code_t
+    {
+        if (tile == nullptr || tile->fab == nullptr) {
+            return amrex_mojo::detail::set_last_error(
+                AMREX_MOJO_STATUS_INTERNAL_ERROR,
+                std::string(context) + " could not resolve backing tile storage."
+            );
+        }
+
+        const auto* arena = tile->fab->arena();
+        if (arena != nullptr && !arena->isHostAccessible()) {
+            return amrex_mojo::detail::set_last_error(
+                AMREX_MOJO_STATUS_INVALID_ARGUMENT,
+                std::string(context) +
+                    " requires host-accessible storage. Construct the MultiFab as host-only or "
+                    "stay on AMReX-side operations for device-backed MultiFabs."
+            );
+        }
+
+#ifdef AMREX_USE_GPU
+        if (arena != nullptr && arena->isDeviceAccessible()) {
+            tile->fab->prefetchToHost();
+            amrex::Gpu::streamSynchronize();
+        }
+#endif
+
+        amrex_mojo::detail::clear_last_error();
+        return AMREX_MOJO_STATUS_OK;
+    }
 }
 
 extern "C" amrex_mojo_multifab_t*
@@ -128,6 +208,26 @@ amrex_mojo_multifab_create(
     const amrex_mojo_distmap_t* distmap,
     int32_t ncomp,
     amrex_mojo_intvect_3d ngrow
+)
+{
+    return amrex_mojo_multifab_create_with_memory(
+        runtime,
+        boxarray,
+        distmap,
+        ncomp,
+        ngrow,
+        AMREX_MOJO_MULTIFAB_MEMORY_DEFAULT
+    );
+}
+
+extern "C" amrex_mojo_multifab_t*
+amrex_mojo_multifab_create_with_memory(
+    amrex_mojo_runtime_t* runtime,
+    const amrex_mojo_boxarray_t* boxarray,
+    const amrex_mojo_distmap_t* distmap,
+    int32_t ncomp,
+    amrex_mojo_intvect_3d ngrow,
+    amrex_mojo_multifab_memory_kind_t memory_kind
 )
 {
     if (runtime == nullptr || runtime->state == nullptr || boxarray == nullptr || distmap == nullptr) {
@@ -146,31 +246,31 @@ amrex_mojo_multifab_create(
         return nullptr;
     }
 
+    if (!is_valid_memory_kind(memory_kind)) {
+        amrex_mojo::detail::set_last_error(
+            AMREX_MOJO_STATUS_INVALID_ARGUMENT,
+            "multifab_create received an unknown memory kind."
+        );
+        return nullptr;
+    }
+
     auto* state = amrex_mojo::detail::retain_runtime(runtime->state);
     try {
         auto multifab_ptr = std::make_unique<amrex::MultiFab>(
             boxarray->value,
             distmap->value,
             ncomp,
-            amrex_mojo::detail::to_intvect(ngrow)
+            amrex_mojo::detail::to_intvect(ngrow),
+            mfinfo_for_memory_kind(memory_kind)
         );
+        auto tiles = populate_tiles(*multifab_ptr);
 
         auto* multifab = new amrex_mojo_multifab{
             state,
             std::move(multifab_ptr),
-            {}
+            memory_kind,
+            std::move(tiles)
         };
-
-        for (amrex::MFIter mfi(*multifab->value, amrex::MFItInfo().EnableTiling()); mfi.isValid(); ++mfi) {
-            multifab->tiles.push_back(amrex_mojo::detail::tile_descriptor{
-                mfi.tilebox(),
-                mfi.validbox(),
-                (*multifab->value)[mfi].box(),
-                mfi.index(),
-                mfi.LocalTileIndex(),
-                &((*multifab->value)[mfi])
-            });
-        }
 
         amrex_mojo::detail::clear_last_error();
         return multifab;
@@ -199,12 +299,37 @@ amrex_mojo_multifab_create_xyz(
     int32_t ngrow_z
 )
 {
-    return amrex_mojo_multifab_create(
+    return amrex_mojo_multifab_create_with_memory_xyz(
         runtime,
         boxarray,
         distmap,
         ncomp,
-        amrex_mojo_intvect_3d{ngrow_x, ngrow_y, ngrow_z}
+        ngrow_x,
+        ngrow_y,
+        ngrow_z,
+        AMREX_MOJO_MULTIFAB_MEMORY_DEFAULT
+    );
+}
+
+extern "C" amrex_mojo_multifab_t*
+amrex_mojo_multifab_create_with_memory_xyz(
+    amrex_mojo_runtime_t* runtime,
+    const amrex_mojo_boxarray_t* boxarray,
+    const amrex_mojo_distmap_t* distmap,
+    int32_t ncomp,
+    int32_t ngrow_x,
+    int32_t ngrow_y,
+    int32_t ngrow_z,
+    amrex_mojo_multifab_memory_kind_t memory_kind
+)
+{
+    return amrex_mojo_multifab_create_with_memory(
+        runtime,
+        boxarray,
+        distmap,
+        ncomp,
+        amrex_mojo_intvect_3d{ngrow_x, ngrow_y, ngrow_z},
+        memory_kind
     );
 }
 
@@ -247,6 +372,29 @@ extern "C" amrex_mojo_intvect_3d amrex_mojo_multifab_ngrow(const amrex_mojo_mult
 
     amrex_mojo::detail::clear_last_error();
     return amrex_mojo::detail::from_intvect(multifab->value->nGrowVect());
+}
+
+extern "C" amrex_mojo_status_code_t amrex_mojo_multifab_memory_info(
+    const amrex_mojo_multifab_t* multifab,
+    amrex_mojo_multifab_memory_info_t* out_info
+)
+{
+    if (multifab == nullptr || multifab->value == nullptr || out_info == nullptr) {
+        return amrex_mojo::detail::set_last_error(
+            AMREX_MOJO_STATUS_INVALID_ARGUMENT,
+            "multifab_memory_info requires a non-null multifab and output pointer."
+        );
+    }
+
+    const auto* arena = multifab->value->arena();
+    out_info->requested_kind = static_cast<int32_t>(multifab->memory_kind);
+    out_info->host_accessible = (arena != nullptr && arena->isHostAccessible()) ? 1 : 0;
+    out_info->device_accessible = (arena != nullptr && arena->isDeviceAccessible()) ? 1 : 0;
+    out_info->is_managed = (arena != nullptr && arena->isManaged()) ? 1 : 0;
+    out_info->is_device = (arena != nullptr && arena->isDevice()) ? 1 : 0;
+    out_info->is_pinned = (arena != nullptr && arena->isPinned()) ? 1 : 0;
+    amrex_mojo::detail::clear_last_error();
+    return AMREX_MOJO_STATUS_OK;
 }
 
 extern "C" amrex_mojo_status_code_t
@@ -326,6 +474,10 @@ amrex_mojo_multifab_array4(const amrex_mojo_multifab_t* multifab, int32_t tile_i
         return amrex_mojo_array4_view_f64{};
     }
 
+    if (require_host_accessible(tile, "multifab_array4") != AMREX_MOJO_STATUS_OK) {
+        return amrex_mojo_array4_view_f64{};
+    }
+
     const auto array = tile->fab->array();
     amrex_mojo_array4_view_f64 view{};
     view.data = array.dataPtr();
@@ -348,6 +500,10 @@ extern "C" double* amrex_mojo_multifab_data_ptr(const amrex_mojo_multifab_t* mul
 {
     const auto* tile = require_tile(multifab, tile_index);
     if (tile == nullptr) {
+        return nullptr;
+    }
+
+    if (require_host_accessible(tile, "multifab_data_ptr") != AMREX_MOJO_STATUS_OK) {
         return nullptr;
     }
 
@@ -448,6 +604,10 @@ amrex_mojo_multifab_data_ptr_for_mfiter(
 {
     const auto* tile = require_multifab_tile_for_mfiter(multifab, mfiter);
     if (tile == nullptr) {
+        return nullptr;
+    }
+
+    if (require_host_accessible(tile, "multifab_data_ptr_for_mfiter") != AMREX_MOJO_STATUS_OK) {
         return nullptr;
     }
 

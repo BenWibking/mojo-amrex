@@ -35,10 +35,11 @@ namespace
     auto build_argv_ptrs(std::vector<std::string>& args) -> std::vector<char*>
     {
         std::vector<char*> argv_ptrs;
-        argv_ptrs.reserve(args.size());
+        argv_ptrs.reserve(args.size() + 1);
         for (auto& arg : args) {
             argv_ptrs.push_back(arg.data());
         }
+        argv_ptrs.push_back(nullptr);
         return argv_ptrs;
     }
 
@@ -184,7 +185,7 @@ amrex_mojo_runtime_create(int32_t argc, const char* const* argv, int32_t use_par
                 auto* new_state = new amrex_mojo::detail::runtime_state{};
                 auto argv_storage = build_argv_storage(argc, argv);
                 auto argv_ptrs = build_argv_ptrs(argv_storage);
-                int argc_local = static_cast<int>(argv_ptrs.size());
+                int argc_local = static_cast<int>(argv_storage.size());
                 char** argv_local = argv_ptrs.data();
                 amrex::Initialize(argc_local, argv_local, use_parmparse != 0);
                 new_state->owns_initialization = true;
@@ -235,6 +236,41 @@ extern "C" int32_t amrex_mojo_runtime_initialized(const amrex_mojo_runtime_t* ru
 {
     amrex_mojo::detail::clear_last_error();
     return (runtime != nullptr && runtime->state != nullptr && amrex::Initialized()) ? 1 : 0;
+}
+
+extern "C" amrex_mojo_gpu_backend_t amrex_mojo_gpu_backend(void)
+{
+#if defined(AMREX_USE_CUDA)
+    return AMREX_MOJO_GPU_BACKEND_CUDA;
+#elif defined(AMREX_USE_HIP)
+    return AMREX_MOJO_GPU_BACKEND_HIP;
+#else
+    return AMREX_MOJO_GPU_BACKEND_NONE;
+#endif
+}
+
+extern "C" int32_t amrex_mojo_gpu_enabled(void)
+{
+    amrex_mojo::detail::clear_last_error();
+    return amrex_mojo_gpu_backend() != AMREX_MOJO_GPU_BACKEND_NONE ? 1 : 0;
+}
+
+extern "C" amrex_mojo_status_code_t amrex_mojo_gpu_stream_synchronize(void)
+{
+    try {
+#ifdef AMREX_USE_GPU
+        amrex::Gpu::streamSynchronize();
+#endif
+        amrex_mojo::detail::clear_last_error();
+        return AMREX_MOJO_STATUS_OK;
+    } catch (const std::exception& ex) {
+        return amrex_mojo::detail::set_last_error(AMREX_MOJO_STATUS_INTERNAL_ERROR, ex.what());
+    } catch (...) {
+        return amrex_mojo::detail::set_last_error(
+            AMREX_MOJO_STATUS_INTERNAL_ERROR,
+            "gpu_stream_synchronize failed with an unknown exception."
+        );
+    }
 }
 
 extern "C" int32_t amrex_mojo_parallel_nprocs(void)

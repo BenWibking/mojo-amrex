@@ -139,6 +139,7 @@ struct amrex_mojo_multifab
 {
     amrex_mojo::detail::runtime_state* state = nullptr;
     std::unique_ptr<amrex::MultiFab> value;
+    amrex_mojo_multifab_memory_kind_t memory_kind = AMREX_MOJO_MULTIFAB_MEMORY_DEFAULT;
     std::vector<amrex_mojo::detail::tile_descriptor> tiles;
 };
 
