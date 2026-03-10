@@ -10,6 +10,7 @@ The current repo contains:
 - automated C++ and Mojo tests under `tests/`
 - an install path that exposes `amrex` as a top-level Mojo package in the active environment
 - a working MultiFab smoke example in `examples/multifab_smoke.mojo`
+- an Apple Silicon GPU variant of the smoke example in `examples/multifab_smoke_apple_gpu.mojo`
 - an MPI ghost-exchange example in `examples/multifab_mpi_exchange.mojo`
 
 The current MVP covers:
@@ -76,6 +77,9 @@ pixi run package-mojo
 pixi run build-multifab-smoke
 pixi run run-multifab-smoke
 pixi run run-multifab-smoke-script
+pixi run build-multifab-smoke-apple-gpu
+pixi run run-multifab-smoke-apple-gpu
+pixi run run-multifab-smoke-apple-gpu-script
 pixi run run-multifab-mpi-exchange
 pixi run test-capi
 pixi run test-capi-mpi
@@ -111,6 +115,11 @@ Notes:
 - On Apple Silicon, the AMReX backend still runs as `NONE`/host-only, but
   `Array4` views remain usable for Mojo device kernels via shared physical
   memory. That path is separate from AMReX's CUDA/HIP backend support.
+- `pixi run run-multifab-smoke-apple-gpu` keeps the smoke-example control flow
+  and output behavior, but stages each tile through
+  `std.gpu.host.DeviceContext` and runs the tile update on Metal. The staging
+  buffers use `Float32` because Apple GPU kernels do not expose `Float64`
+  arithmetic.
 - To build against a local AMReX checkout instead, configure with
   `-DAMREX_MOJO_AMREX_SOURCE_DIR=/path/to/amrex`.
 - `pixi run install-amrex` installs the C API library into the active env's
