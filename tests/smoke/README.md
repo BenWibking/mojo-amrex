@@ -1,9 +1,14 @@
 # Smoke Example
 
 The repository now also has automated tests under `tests/README.md`, but the
-manual smoke paths in `examples/multifab_smoke.mojo` and, on Apple Silicon,
-`examples/multifab_smoke_apple_gpu.mojo` are still useful for an interactive
+manual smoke paths in `examples/multifab_smoke.mojo` and
+`examples/multifab_smoke_mojo_gpu.mojo` are still useful for an interactive
 end-to-end run.
+
+`examples/multifab_smoke_mojo_gpu.mojo` demonstrates Mojo device kernels in
+user code only. AMReX `MultiFab` storage remains host-resident in this repo,
+and the example stages tile data through Mojo `DeviceBuffer`s before launch.
+It is not AMReX GPU-runtime interop.
 
 The intended smoke sequence is:
 
@@ -26,9 +31,9 @@ pixi run install-amrex
 pixi run build-multifab-smoke
 pixi run run-multifab-smoke
 pixi run run-multifab-smoke-script
-pixi run build-multifab-smoke-apple-gpu
-pixi run run-multifab-smoke-apple-gpu
-pixi run run-multifab-smoke-apple-gpu-script
+pixi run build-multifab-smoke-mojo-gpu
+pixi run run-multifab-smoke-mojo-gpu
+pixi run run-multifab-smoke-mojo-gpu-script
 ```
 
 `pixi run build-capi` now refreshes the active env's

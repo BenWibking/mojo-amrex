@@ -1,6 +1,6 @@
 # Mojo AMReX Usage Notes
 
-Last updated: 2026-03-10
+Last updated: 2026-03-11
 
 ## Ownership Model
 
@@ -19,33 +19,43 @@ failure.
 
 ## Borrowing Rules
 
-- `MultiFab.for_each_tile` yields a temporary `TileF64View` borrow for each tile.
-- `MultiFab.array(mfi)` and `MultiFab.tile(mfi)` borrow through both the owning
-  `MultiFab` and the current `MFIter` position.
-- `Array4F64View` and `TileF64View` are non-owning views. Do not store them past
-  the lifetime of the owning `MultiFab`, and do not let them escape the tile or
-  iterator scope that produced them.
+- `MultiFab.for_each_tile` yields a temporary `TileF64View` borrow for each
+  tile, and `MultiFabF32.for_each_tile` yields `TileF32View`.
+- `MultiFab.array(mfi)`, `MultiFab.tile(mfi)`, `MultiFabF32.array(mfi)`, and
+  `MultiFabF32.tile(mfi)` borrow through both the owning multifab and the
+  current `MFIter` position.
+- `Array4F64View`, `TileF64View`, `Array4F32View`, and `TileF32View` are
+  non-owning views. Do not store them past the lifetime of the owning multifab,
+  and do not let them escape the tile or iterator scope that produced them.
 - `MFIter` methods that expose tile metadata require the iterator to be
   positioned on a valid tile. Once iteration is exhausted, metadata accessors
   raise instead of returning stale state.
 
 ## GPU Allocation Rules
 
-- `AmrexRuntime.gpu_backend()` and `AmrexRuntime.gpu_enabled()` report the
-  active AMReX backend only. `CUDA` and `HIP` are the supported device backends
-  for AMReX in this repo.
-- When the AMReX backend is `CUDA` or `HIP`, default `MultiFab` allocations are
-  device-backed. Host-side `Array4` access is intentionally rejected in that
-  case.
-- Use `MultiFab(..., host_only=True)` when you explicitly need host-resident
-  storage, for example to write initial conditions through `Array4` on the CPU
-  before copying or communicating with other `MultiFab`s.
+- AMReX GPU backends are intentionally disabled in this repo. `MultiFab`
+  storage is always host-resident from the AMReX side.
+- `MultiFab(..., host_only=True)` is still accepted for compatibility, but it
+  is currently equivalent to the default allocation path.
 - `MultiFab.memory_info()` exposes whether a given allocation is host
   accessible, device accessible, managed, device-only, or pinned.
-- On Apple Silicon, the AMReX backend remains CPU/host-only, but the resulting
-  host-accessible `Array4` views can still be used by Mojo device kernels via
-  shared physical memory. That is a Mojo-side execution path, not an AMReX GPU
-  backend.
+- Mojo device kernels in user code are still supported. Use the staged view
+  helpers with `std.gpu.host.DeviceContext`, as in the Mojo GPU smoke example.
+  That is a Mojo-side execution path, not an AMReX GPU runtime.
+
+## DevicePassable View Notes
+
+- `Array4F64View`, `Array4F32View`, `TileF64View`, `TileF32View`, `Box3D`, and
+  `IntVect3D` implement Mojo `DevicePassable` so they can be passed to device
+  kernels.
+- The device-side view types intentionally erase pointer provenance to
+  `MutAnyOrigin`. Keeping the original owner origin in `device_type` causes the
+  current Mojo compiler to reject `_to_device_type(...)` during alias/provenance
+  checking.
+- Direct use of native AMReX `Array4`/tile views as if they were already wired
+  to an AMReX GPU runtime is not supported. The current workaround is to stage
+  through a `DeviceBuffer` and then pass a rebuilt
+  `Array4F32View[MutAnyOrigin]` to the kernel.
 
 ## Error Reporting
 

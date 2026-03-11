@@ -1,6 +1,9 @@
 #include "capi_internal.H"
 
+#include <cmath>
+#include <limits>
 #include <string>
+#include <type_traits>
 
 namespace
 {
@@ -22,14 +25,69 @@ namespace
         }
     }
 
+    auto multifab_has_value(const amrex_mojo_multifab_t* multifab) -> bool
+    {
+        if (multifab == nullptr) {
+            return false;
+        }
+
+        return std::visit([](const auto& ptr) { return static_cast<bool>(ptr); }, multifab->value);
+    }
+
+    auto require_live_multifab(
+        const amrex_mojo_multifab_t* multifab,
+        const char* context
+    ) -> bool
+    {
+        if (!multifab_has_value(multifab)) {
+            amrex_mojo::detail::set_last_error(
+                AMREX_MOJO_STATUS_INVALID_ARGUMENT,
+                std::string(context) + " requires a non-null multifab."
+            );
+            return false;
+        }
+
+        return true;
+    }
+
+    template <typename Fn>
+    decltype(auto) visit_multifab(const amrex_mojo_multifab_t* multifab, Fn&& fn)
+    {
+        return std::visit(
+            [&](const auto& ptr) -> decltype(auto) { return fn(*ptr); },
+            multifab->value
+        );
+    }
+
+    template <typename Fn>
+    decltype(auto) visit_multifab(amrex_mojo_multifab_t* multifab, Fn&& fn)
+    {
+        return std::visit(
+            [&](auto& ptr) -> decltype(auto) { return fn(*ptr); },
+            multifab->value
+        );
+    }
+
+    template <typename Fn>
+    decltype(auto) visit_multifab_pair(
+        amrex_mojo_multifab_t* dst_multifab,
+        const amrex_mojo_multifab_t* src_multifab,
+        Fn&& fn
+    )
+    {
+        return std::visit(
+            [&](auto& dst_ptr, const auto& src_ptr) -> decltype(auto) {
+                return fn(*dst_ptr, *src_ptr);
+            },
+            dst_multifab->value,
+            src_multifab->value
+        );
+    }
+
     auto require_tile(const amrex_mojo_multifab_t* multifab, int32_t tile_index)
         -> const amrex_mojo::detail::tile_descriptor*
     {
-        if (multifab == nullptr || multifab->value == nullptr) {
-            amrex_mojo::detail::set_last_error(
-                AMREX_MOJO_STATUS_INVALID_ARGUMENT,
-                "multifab tile access requires a non-null multifab."
-            );
+        if (!require_live_multifab(multifab, "multifab tile access")) {
             return nullptr;
         }
 
@@ -77,11 +135,7 @@ namespace
             return nullptr;
         }
 
-        if (multifab == nullptr || multifab->value == nullptr) {
-            amrex_mojo::detail::set_last_error(
-                AMREX_MOJO_STATUS_INVALID_ARGUMENT,
-                "multifab access by MFIter requires a non-null multifab."
-            );
+        if (!require_live_multifab(multifab, "multifab access by MFIter")) {
             return nullptr;
         }
 
@@ -107,7 +161,8 @@ namespace
         return &multifab_tile;
     }
 
-    auto validate_component_range(const amrex::MultiFab& multifab, int32_t start_comp, int32_t ncomp)
+    template <typename MultifabT>
+    auto validate_component_range(const MultifabT& multifab, int32_t start_comp, int32_t ncomp)
         -> amrex_mojo_status_code_t
     {
         if (start_comp < 0 || ncomp <= 0 || start_comp + ncomp > multifab.nComp()) {
@@ -123,11 +178,7 @@ namespace
     auto arena_for_memory_kind(amrex_mojo_multifab_memory_kind_t memory_kind) -> amrex::Arena*
     {
         switch (memory_kind) {
-#ifdef AMREX_USE_GPU
-        case AMREX_MOJO_MULTIFAB_MEMORY_DEFAULT: return amrex::The_Async_Arena();
-#else
         case AMREX_MOJO_MULTIFAB_MEMORY_DEFAULT: return nullptr;
-#endif
         case AMREX_MOJO_MULTIFAB_MEMORY_HOST_ONLY: return amrex::The_Cpu_Arena();
         default: return nullptr;
         }
@@ -151,7 +202,17 @@ namespace
         return info;
     }
 
-    auto populate_tiles(amrex::MultiFab& multifab) -> std::vector<amrex_mojo::detail::tile_descriptor>
+    auto is_valid_datatype(amrex_mojo_datatype_t datatype) -> bool
+    {
+        switch (datatype) {
+        case AMREX_MOJO_DATATYPE_FLOAT64:
+        case AMREX_MOJO_DATATYPE_FLOAT32: return true;
+        default: return false;
+        }
+    }
+
+    template <typename MultifabT>
+    auto populate_tiles(MultifabT& multifab) -> std::vector<amrex_mojo::detail::tile_descriptor>
     {
         std::vector<amrex_mojo::detail::tile_descriptor> tiles;
         for (amrex::MFIter mfi(multifab, amrex::MFItInfo().EnableTiling()); mfi.isValid(); ++mfi) {
@@ -167,7 +228,8 @@ namespace
         return tiles;
     }
 
-    auto require_host_accessible(
+    template <typename FabT>
+    auto require_host_accessible_typed(
         const amrex_mojo::detail::tile_descriptor* tile,
         const char* context
     ) -> amrex_mojo_status_code_t
@@ -179,25 +241,296 @@ namespace
             );
         }
 
-        const auto* arena = tile->fab->arena();
+        auto* fab = static_cast<FabT*>(tile->fab);
+        const auto* arena = fab->arena();
         if (arena != nullptr && !arena->isHostAccessible()) {
             return amrex_mojo::detail::set_last_error(
                 AMREX_MOJO_STATUS_INVALID_ARGUMENT,
-                std::string(context) +
-                    " requires host-accessible storage. Construct the MultiFab as host-only or "
-                    "stay on AMReX-side operations for device-backed MultiFabs."
+                std::string(context) + " requires host-accessible storage."
             );
         }
 
-#ifdef AMREX_USE_GPU
-        if (arena != nullptr && arena->isDeviceAccessible()) {
-            tile->fab->prefetchToHost();
-            amrex::Gpu::streamSynchronize();
+        amrex_mojo::detail::clear_last_error();
+        return AMREX_MOJO_STATUS_OK;
+    }
+
+    auto require_host_accessible(
+        const amrex_mojo_multifab_t* multifab,
+        const amrex_mojo::detail::tile_descriptor* tile,
+        const char* context
+    ) -> amrex_mojo_status_code_t
+    {
+        switch (multifab->datatype) {
+        case AMREX_MOJO_DATATYPE_FLOAT64:
+            return require_host_accessible_typed<amrex::FArrayBox>(tile, context);
+        case AMREX_MOJO_DATATYPE_FLOAT32:
+            return require_host_accessible_typed<amrex::BaseFab<float>>(tile, context);
+        default:
+            return amrex_mojo::detail::set_last_error(
+                AMREX_MOJO_STATUS_INVALID_ARGUMENT,
+                std::string(context) + " received an unknown multifab datatype."
+            );
         }
-#endif
+    }
+
+    template <typename FabT>
+    void fill_array4_metadata_from_fab(
+        FabT* fab,
+        int32_t* data_lo,
+        int32_t* data_hi,
+        int64_t* stride,
+        int32_t* out_ncomp
+    )
+    {
+        const auto array = fab->array();
+        data_lo[0] = array.begin[0];
+        data_lo[1] = array.begin[1];
+        data_lo[2] = array.begin[2];
+        data_hi[0] = array.end[0] - 1;
+        data_hi[1] = array.end[1] - 1;
+        data_hi[2] = array.end[2] - 1;
+        stride[0] = 1;
+        stride[1] = array.template get_stride<1>();
+        stride[2] = array.template get_stride<2>();
+        stride[3] = array.template get_stride<3>();
+        *out_ncomp = array.nComp();
+    }
+
+    auto fill_array4_metadata_from_tile(
+        const amrex_mojo_multifab_t* multifab,
+        const amrex_mojo::detail::tile_descriptor* tile,
+        int32_t* data_lo,
+        int32_t* data_hi,
+        int64_t* stride,
+        int32_t* out_ncomp
+    ) -> amrex_mojo_status_code_t
+    {
+        if (tile == nullptr || tile->fab == nullptr) {
+            return amrex_mojo::detail::set_last_error(
+                AMREX_MOJO_STATUS_INTERNAL_ERROR,
+                "multifab metadata access could not resolve backing tile storage."
+            );
+        }
+
+        switch (multifab->datatype) {
+        case AMREX_MOJO_DATATYPE_FLOAT64:
+            fill_array4_metadata_from_fab(
+                static_cast<amrex::FArrayBox*>(tile->fab),
+                data_lo,
+                data_hi,
+                stride,
+                out_ncomp
+            );
+            break;
+        case AMREX_MOJO_DATATYPE_FLOAT32:
+            fill_array4_metadata_from_fab(
+                static_cast<amrex::BaseFab<float>*>(tile->fab),
+                data_lo,
+                data_hi,
+                stride,
+                out_ncomp
+            );
+            break;
+        default:
+            return amrex_mojo::detail::set_last_error(
+                AMREX_MOJO_STATUS_INVALID_ARGUMENT,
+                "multifab metadata access received an unknown datatype."
+            );
+        }
 
         amrex_mojo::detail::clear_last_error();
         return AMREX_MOJO_STATUS_OK;
+    }
+
+    template <typename FabT>
+    auto data_ptr_from_tile_typed(const amrex_mojo::detail::tile_descriptor* tile)
+    {
+        return static_cast<FabT*>(tile->fab)->dataPtr();
+    }
+
+    auto require_valid_component(
+        const amrex_mojo_multifab_t* multifab,
+        int32_t comp,
+        const char* context
+    ) -> bool
+    {
+        if (!require_live_multifab(multifab, context)) {
+            return false;
+        }
+
+        const auto ncomp = visit_multifab(multifab, [](const auto& value) { return value.nComp(); });
+        if (comp < 0 || comp >= ncomp) {
+            amrex_mojo::detail::set_last_error(
+                AMREX_MOJO_STATUS_INVALID_ARGUMENT,
+                std::string(context) + " requires a valid component index."
+            );
+            return false;
+        }
+
+        return true;
+    }
+
+    auto reduce_min_f32(const amrex::fMultiFab& multifab, int32_t comp) -> double
+    {
+        const auto local_min = amrex::ReduceMin(
+            multifab,
+            0,
+            [=] AMREX_GPU_HOST_DEVICE (
+                amrex::Box const& bx,
+                amrex::Array4<float const> const& fab
+            ) noexcept -> float {
+                float value = std::numeric_limits<float>::max();
+                const auto lo = amrex::lbound(bx);
+                const auto hi = amrex::ubound(bx);
+                for (int k = lo.z; k <= hi.z; ++k) {
+                    for (int j = lo.y; j <= hi.y; ++j) {
+                        for (int i = lo.x; i <= hi.x; ++i) {
+                            value = std::min(value, fab(i, j, k, comp));
+                        }
+                    }
+                }
+                return value;
+            }
+        );
+        double result = local_min;
+        amrex::ParallelDescriptor::ReduceRealMin(result);
+        return result;
+    }
+
+    auto reduce_max_f32(const amrex::fMultiFab& multifab, int32_t comp) -> double
+    {
+        const auto local_max = amrex::ReduceMax(
+            multifab,
+            0,
+            [=] AMREX_GPU_HOST_DEVICE (
+                amrex::Box const& bx,
+                amrex::Array4<float const> const& fab
+            ) noexcept -> float {
+                float value = std::numeric_limits<float>::lowest();
+                const auto lo = amrex::lbound(bx);
+                const auto hi = amrex::ubound(bx);
+                for (int k = lo.z; k <= hi.z; ++k) {
+                    for (int j = lo.y; j <= hi.y; ++j) {
+                        for (int i = lo.x; i <= hi.x; ++i) {
+                            value = std::max(value, fab(i, j, k, comp));
+                        }
+                    }
+                }
+                return value;
+            }
+        );
+        double result = local_max;
+        amrex::ParallelDescriptor::ReduceRealMax(result);
+        return result;
+    }
+
+    auto reduce_sum_f32(const amrex::fMultiFab& multifab, int32_t comp) -> double
+    {
+        const auto local_sum = amrex::ReduceSum(
+            multifab,
+            0,
+            [=] AMREX_GPU_HOST_DEVICE (
+                amrex::Box const& bx,
+                amrex::Array4<float const> const& fab
+            ) noexcept -> float {
+                float value = 0.0f;
+                const auto lo = amrex::lbound(bx);
+                const auto hi = amrex::ubound(bx);
+                for (int k = lo.z; k <= hi.z; ++k) {
+                    for (int j = lo.y; j <= hi.y; ++j) {
+                        for (int i = lo.x; i <= hi.x; ++i) {
+                            value += fab(i, j, k, comp);
+                        }
+                    }
+                }
+                return value;
+            }
+        );
+        double result = local_sum;
+        amrex::ParallelDescriptor::ReduceRealSum(result);
+        return result;
+    }
+
+    auto reduce_norm0_f32(const amrex::fMultiFab& multifab, int32_t comp) -> double
+    {
+        const auto local_norm = amrex::ReduceMax(
+            multifab,
+            0,
+            [=] AMREX_GPU_HOST_DEVICE (
+                amrex::Box const& bx,
+                amrex::Array4<float const> const& fab
+            ) noexcept -> float {
+                float value = 0.0f;
+                const auto lo = amrex::lbound(bx);
+                const auto hi = amrex::ubound(bx);
+                for (int k = lo.z; k <= hi.z; ++k) {
+                    for (int j = lo.y; j <= hi.y; ++j) {
+                        for (int i = lo.x; i <= hi.x; ++i) {
+                            value = std::max(value, std::abs(fab(i, j, k, comp)));
+                        }
+                    }
+                }
+                return value;
+            }
+        );
+        double result = local_norm;
+        amrex::ParallelDescriptor::ReduceRealMax(result);
+        return result;
+    }
+
+    auto reduce_norm1_f32(const amrex::fMultiFab& multifab, int32_t comp) -> double
+    {
+        const auto local_norm = amrex::ReduceSum(
+            multifab,
+            0,
+            [=] AMREX_GPU_HOST_DEVICE (
+                amrex::Box const& bx,
+                amrex::Array4<float const> const& fab
+            ) noexcept -> float {
+                float value = 0.0f;
+                const auto lo = amrex::lbound(bx);
+                const auto hi = amrex::ubound(bx);
+                for (int k = lo.z; k <= hi.z; ++k) {
+                    for (int j = lo.y; j <= hi.y; ++j) {
+                        for (int i = lo.x; i <= hi.x; ++i) {
+                            value += std::abs(fab(i, j, k, comp));
+                        }
+                    }
+                }
+                return value;
+            }
+        );
+        double result = local_norm;
+        amrex::ParallelDescriptor::ReduceRealSum(result);
+        return result;
+    }
+
+    auto reduce_norm2_f32(const amrex::fMultiFab& multifab, int32_t comp) -> double
+    {
+        const auto local_sum_sq = amrex::ReduceSum(
+            multifab,
+            0,
+            [=] AMREX_GPU_HOST_DEVICE (
+                amrex::Box const& bx,
+                amrex::Array4<float const> const& fab
+            ) noexcept -> float {
+                float value = 0.0f;
+                const auto lo = amrex::lbound(bx);
+                const auto hi = amrex::ubound(bx);
+                for (int k = lo.z; k <= hi.z; ++k) {
+                    for (int j = lo.y; j <= hi.y; ++j) {
+                        for (int i = lo.x; i <= hi.x; ++i) {
+                            const float cell = fab(i, j, k, comp);
+                            value += cell * cell;
+                        }
+                    }
+                }
+                return value;
+            }
+        );
+        double result = local_sum_sq;
+        amrex::ParallelDescriptor::ReduceRealSum(result);
+        return std::sqrt(result);
     }
 }
 
@@ -230,6 +563,28 @@ amrex_mojo_multifab_create_with_memory(
     amrex_mojo_multifab_memory_kind_t memory_kind
 )
 {
+    return amrex_mojo_multifab_create_with_memory_and_datatype(
+        runtime,
+        boxarray,
+        distmap,
+        ncomp,
+        ngrow,
+        memory_kind,
+        AMREX_MOJO_DATATYPE_FLOAT64
+    );
+}
+
+extern "C" amrex_mojo_multifab_t*
+amrex_mojo_multifab_create_with_memory_and_datatype(
+    amrex_mojo_runtime_t* runtime,
+    const amrex_mojo_boxarray_t* boxarray,
+    const amrex_mojo_distmap_t* distmap,
+    int32_t ncomp,
+    amrex_mojo_intvect_3d ngrow,
+    amrex_mojo_multifab_memory_kind_t memory_kind,
+    amrex_mojo_datatype_t datatype
+)
+{
     if (runtime == nullptr || runtime->state == nullptr || boxarray == nullptr || distmap == nullptr) {
         amrex_mojo::detail::set_last_error(
             AMREX_MOJO_STATUS_INVALID_ARGUMENT,
@@ -254,21 +609,58 @@ amrex_mojo_multifab_create_with_memory(
         return nullptr;
     }
 
+    if (!is_valid_datatype(datatype)) {
+        amrex_mojo::detail::set_last_error(
+            AMREX_MOJO_STATUS_INVALID_ARGUMENT,
+            "multifab_create received an unknown datatype."
+        );
+        return nullptr;
+    }
+
     auto* state = amrex_mojo::detail::retain_runtime(runtime->state);
     try {
-        auto multifab_ptr = std::make_unique<amrex::MultiFab>(
-            boxarray->value,
-            distmap->value,
-            ncomp,
-            amrex_mojo::detail::to_intvect(ngrow),
-            mfinfo_for_memory_kind(memory_kind)
-        );
-        auto tiles = populate_tiles(*multifab_ptr);
+        amrex_mojo::detail::multifab_storage_t multifab_ptr;
+        std::vector<amrex_mojo::detail::tile_descriptor> tiles;
+
+        switch (datatype) {
+        case AMREX_MOJO_DATATYPE_FLOAT64: {
+            auto value = std::make_unique<amrex::MultiFab>(
+                boxarray->value,
+                distmap->value,
+                ncomp,
+                amrex_mojo::detail::to_intvect(ngrow),
+                mfinfo_for_memory_kind(memory_kind)
+            );
+            tiles = populate_tiles(*value);
+            multifab_ptr = std::move(value);
+            break;
+        }
+        case AMREX_MOJO_DATATYPE_FLOAT32: {
+            auto value = std::make_unique<amrex::fMultiFab>(
+                boxarray->value,
+                distmap->value,
+                ncomp,
+                amrex_mojo::detail::to_intvect(ngrow),
+                mfinfo_for_memory_kind(memory_kind)
+            );
+            tiles = populate_tiles(*value);
+            multifab_ptr = std::move(value);
+            break;
+        }
+        default:
+            amrex_mojo::detail::release_runtime(state);
+            amrex_mojo::detail::set_last_error(
+                AMREX_MOJO_STATUS_INVALID_ARGUMENT,
+                "multifab_create received an unknown datatype."
+            );
+            return nullptr;
+        }
 
         auto* multifab = new amrex_mojo_multifab{
             state,
             std::move(multifab_ptr),
             memory_kind,
+            datatype,
             std::move(tiles)
         };
 
@@ -323,13 +715,40 @@ amrex_mojo_multifab_create_with_memory_xyz(
     amrex_mojo_multifab_memory_kind_t memory_kind
 )
 {
-    return amrex_mojo_multifab_create_with_memory(
+    return amrex_mojo_multifab_create_with_memory_and_datatype_xyz(
+        runtime,
+        boxarray,
+        distmap,
+        ncomp,
+        ngrow_x,
+        ngrow_y,
+        ngrow_z,
+        memory_kind,
+        AMREX_MOJO_DATATYPE_FLOAT64
+    );
+}
+
+extern "C" amrex_mojo_multifab_t*
+amrex_mojo_multifab_create_with_memory_and_datatype_xyz(
+    amrex_mojo_runtime_t* runtime,
+    const amrex_mojo_boxarray_t* boxarray,
+    const amrex_mojo_distmap_t* distmap,
+    int32_t ncomp,
+    int32_t ngrow_x,
+    int32_t ngrow_y,
+    int32_t ngrow_z,
+    amrex_mojo_multifab_memory_kind_t memory_kind,
+    amrex_mojo_datatype_t datatype
+)
+{
+    return amrex_mojo_multifab_create_with_memory_and_datatype(
         runtime,
         boxarray,
         distmap,
         ncomp,
         amrex_mojo_intvect_3d{ngrow_x, ngrow_y, ngrow_z},
-        memory_kind
+        memory_kind,
+        datatype
     );
 }
 
@@ -348,30 +767,36 @@ extern "C" void amrex_mojo_multifab_destroy(amrex_mojo_multifab_t* multifab)
 
 extern "C" int32_t amrex_mojo_multifab_ncomp(const amrex_mojo_multifab_t* multifab)
 {
-    if (multifab == nullptr || multifab->value == nullptr) {
-        amrex_mojo::detail::set_last_error(
-            AMREX_MOJO_STATUS_INVALID_ARGUMENT,
-            "multifab_ncomp requires a non-null multifab."
-        );
+    if (!require_live_multifab(multifab, "multifab_ncomp")) {
         return -1;
     }
 
     amrex_mojo::detail::clear_last_error();
-    return multifab->value->nComp();
+    return visit_multifab(multifab, [](const auto& value) { return value.nComp(); });
 }
 
 extern "C" amrex_mojo_intvect_3d amrex_mojo_multifab_ngrow(const amrex_mojo_multifab_t* multifab)
 {
-    if (multifab == nullptr || multifab->value == nullptr) {
-        amrex_mojo::detail::set_last_error(
-            AMREX_MOJO_STATUS_INVALID_ARGUMENT,
-            "multifab_ngrow requires a non-null multifab."
-        );
+    if (!require_live_multifab(multifab, "multifab_ngrow")) {
         return amrex_mojo_intvect_3d{};
     }
 
     amrex_mojo::detail::clear_last_error();
-    return amrex_mojo::detail::from_intvect(multifab->value->nGrowVect());
+    return visit_multifab(
+        multifab,
+        [](const auto& value) { return amrex_mojo::detail::from_intvect(value.nGrowVect()); }
+    );
+}
+
+extern "C" amrex_mojo_datatype_t
+amrex_mojo_multifab_datatype(const amrex_mojo_multifab_t* multifab)
+{
+    if (!require_live_multifab(multifab, "multifab_datatype")) {
+        return AMREX_MOJO_DATATYPE_FLOAT64;
+    }
+
+    amrex_mojo::detail::clear_last_error();
+    return multifab->datatype;
 }
 
 extern "C" amrex_mojo_status_code_t amrex_mojo_multifab_memory_info(
@@ -379,14 +804,14 @@ extern "C" amrex_mojo_status_code_t amrex_mojo_multifab_memory_info(
     amrex_mojo_multifab_memory_info_t* out_info
 )
 {
-    if (multifab == nullptr || multifab->value == nullptr || out_info == nullptr) {
+    if (!require_live_multifab(multifab, "multifab_memory_info") || out_info == nullptr) {
         return amrex_mojo::detail::set_last_error(
             AMREX_MOJO_STATUS_INVALID_ARGUMENT,
             "multifab_memory_info requires a non-null multifab and output pointer."
         );
     }
 
-    const auto* arena = multifab->value->arena();
+    const auto* arena = visit_multifab(multifab, [](const auto& value) { return value.arena(); });
     out_info->requested_kind = static_cast<int32_t>(multifab->memory_kind);
     out_info->host_accessible = (arena != nullptr && arena->isHostAccessible()) ? 1 : 0;
     out_info->device_accessible = (arena != nullptr && arena->isDeviceAccessible()) ? 1 : 0;
@@ -405,19 +830,36 @@ amrex_mojo_multifab_set_val(
     int32_t ncomp
 )
 {
-    if (multifab == nullptr || multifab->value == nullptr) {
+    if (!require_live_multifab(multifab, "multifab_set_val")) {
         return amrex_mojo::detail::set_last_error(
             AMREX_MOJO_STATUS_INVALID_ARGUMENT,
             "multifab_set_val requires a non-null multifab."
         );
     }
 
-    if (validate_component_range(*multifab->value, start_comp, ncomp) != AMREX_MOJO_STATUS_OK) {
+    const auto valid = visit_multifab(
+        multifab,
+        [&](const auto& value_ref) {
+            return validate_component_range(value_ref, start_comp, ncomp);
+        }
+    );
+    if (valid != AMREX_MOJO_STATUS_OK) {
         return AMREX_MOJO_STATUS_INVALID_ARGUMENT;
     }
 
     try {
-        multifab->value->setVal(value, start_comp, ncomp, multifab->value->nGrowVect());
+        visit_multifab(
+            multifab,
+            [&](auto& value_ref) {
+                using value_type = typename std::decay_t<decltype(value_ref)>::value_type;
+                value_ref.setVal(
+                    static_cast<value_type>(value),
+                    start_comp,
+                    ncomp,
+                    value_ref.nGrowVect()
+                );
+            }
+        );
         amrex_mojo::detail::clear_last_error();
         return AMREX_MOJO_STATUS_OK;
     } catch (const std::exception& ex) {
@@ -432,11 +874,7 @@ amrex_mojo_multifab_set_val(
 
 extern "C" int32_t amrex_mojo_multifab_tile_count(const amrex_mojo_multifab_t* multifab)
 {
-    if (multifab == nullptr || multifab->value == nullptr) {
-        amrex_mojo::detail::set_last_error(
-            AMREX_MOJO_STATUS_INVALID_ARGUMENT,
-            "multifab_tile_count requires a non-null multifab."
-        );
+    if (!require_live_multifab(multifab, "multifab_tile_count")) {
         return -1;
     }
 
@@ -474,11 +912,19 @@ amrex_mojo_multifab_array4(const amrex_mojo_multifab_t* multifab, int32_t tile_i
         return amrex_mojo_array4_view_f64{};
     }
 
-    if (require_host_accessible(tile, "multifab_array4") != AMREX_MOJO_STATUS_OK) {
+    if (multifab->datatype != AMREX_MOJO_DATATYPE_FLOAT64) {
+        amrex_mojo::detail::set_last_error(
+            AMREX_MOJO_STATUS_INVALID_ARGUMENT,
+            "multifab_array4 requires a Float64 multifab."
+        );
         return amrex_mojo_array4_view_f64{};
     }
 
-    const auto array = tile->fab->array();
+    if (require_host_accessible(multifab, tile, "multifab_array4") != AMREX_MOJO_STATUS_OK) {
+        return amrex_mojo_array4_view_f64{};
+    }
+
+    const auto array = static_cast<amrex::FArrayBox*>(tile->fab)->array();
     amrex_mojo_array4_view_f64 view{};
     view.data = array.dataPtr();
     view.lo_x = array.begin[0];
@@ -503,12 +949,82 @@ extern "C" double* amrex_mojo_multifab_data_ptr(const amrex_mojo_multifab_t* mul
         return nullptr;
     }
 
-    if (require_host_accessible(tile, "multifab_data_ptr") != AMREX_MOJO_STATUS_OK) {
+    if (multifab->datatype != AMREX_MOJO_DATATYPE_FLOAT64) {
+        amrex_mojo::detail::set_last_error(
+            AMREX_MOJO_STATUS_INVALID_ARGUMENT,
+            "multifab_data_ptr requires a Float64 multifab."
+        );
+        return nullptr;
+    }
+
+    if (require_host_accessible(multifab, tile, "multifab_data_ptr") != AMREX_MOJO_STATUS_OK) {
         return nullptr;
     }
 
     amrex_mojo::detail::clear_last_error();
-    return tile->fab->dataPtr();
+    return data_ptr_from_tile_typed<amrex::FArrayBox>(tile);
+}
+
+extern "C" amrex_mojo_array4_view_f32
+amrex_mojo_multifab_array4_f32(const amrex_mojo_multifab_t* multifab, int32_t tile_index)
+{
+    const auto* tile = require_tile(multifab, tile_index);
+    if (tile == nullptr) {
+        return amrex_mojo_array4_view_f32{};
+    }
+
+    if (multifab->datatype != AMREX_MOJO_DATATYPE_FLOAT32) {
+        amrex_mojo::detail::set_last_error(
+            AMREX_MOJO_STATUS_INVALID_ARGUMENT,
+            "multifab_array4_f32 requires a Float32 multifab."
+        );
+        return amrex_mojo_array4_view_f32{};
+    }
+
+    if (require_host_accessible(multifab, tile, "multifab_array4_f32") != AMREX_MOJO_STATUS_OK) {
+        return amrex_mojo_array4_view_f32{};
+    }
+
+    const auto array = static_cast<amrex::BaseFab<float>*>(tile->fab)->array();
+    amrex_mojo_array4_view_f32 view{};
+    view.data = array.dataPtr();
+    view.lo_x = array.begin[0];
+    view.lo_y = array.begin[1];
+    view.lo_z = array.begin[2];
+    view.hi_x = array.end[0] - 1;
+    view.hi_y = array.end[1] - 1;
+    view.hi_z = array.end[2] - 1;
+    view.stride_i = 1;
+    view.stride_j = array.get_stride<1>();
+    view.stride_k = array.get_stride<2>();
+    view.stride_n = array.get_stride<3>();
+    view.ncomp = array.nComp();
+    amrex_mojo::detail::clear_last_error();
+    return view;
+}
+
+extern "C" float*
+amrex_mojo_multifab_data_ptr_f32(const amrex_mojo_multifab_t* multifab, int32_t tile_index)
+{
+    const auto* tile = require_tile(multifab, tile_index);
+    if (tile == nullptr) {
+        return nullptr;
+    }
+
+    if (multifab->datatype != AMREX_MOJO_DATATYPE_FLOAT32) {
+        amrex_mojo::detail::set_last_error(
+            AMREX_MOJO_STATUS_INVALID_ARGUMENT,
+            "multifab_data_ptr_f32 requires a Float32 multifab."
+        );
+        return nullptr;
+    }
+
+    if (require_host_accessible(multifab, tile, "multifab_data_ptr_f32") != AMREX_MOJO_STATUS_OK) {
+        return nullptr;
+    }
+
+    amrex_mojo::detail::clear_last_error();
+    return data_ptr_from_tile_typed<amrex::BaseFab<float>>(tile);
 }
 
 extern "C" amrex_mojo_status_code_t
@@ -538,23 +1054,9 @@ amrex_mojo_multifab_tile_metadata(
         return AMREX_MOJO_STATUS_INVALID_ARGUMENT;
     }
 
-    const auto array = tile->fab->array();
     fill_box_arrays(tile->tile_box, tile_lo, tile_hi, nullptr);
     fill_box_arrays(tile->valid_box, valid_lo, valid_hi, nullptr);
-    data_lo[0] = array.begin[0];
-    data_lo[1] = array.begin[1];
-    data_lo[2] = array.begin[2];
-    data_hi[0] = array.end[0] - 1;
-    data_hi[1] = array.end[1] - 1;
-    data_hi[2] = array.end[2] - 1;
-    stride[0] = 1;
-    stride[1] = array.get_stride<1>();
-    stride[2] = array.get_stride<2>();
-    stride[3] = array.get_stride<3>();
-    *out_ncomp = array.nComp();
-
-    amrex_mojo::detail::clear_last_error();
-    return AMREX_MOJO_STATUS_OK;
+    return fill_array4_metadata_from_tile(multifab, tile, data_lo, data_hi, stride, out_ncomp);
 }
 
 extern "C" amrex_mojo_status_code_t
@@ -579,21 +1081,7 @@ amrex_mojo_multifab_array4_metadata_for_mfiter(
         return AMREX_MOJO_STATUS_INVALID_ARGUMENT;
     }
 
-    const auto array = tile->fab->array();
-    data_lo[0] = array.begin[0];
-    data_lo[1] = array.begin[1];
-    data_lo[2] = array.begin[2];
-    data_hi[0] = array.end[0] - 1;
-    data_hi[1] = array.end[1] - 1;
-    data_hi[2] = array.end[2] - 1;
-    stride[0] = 1;
-    stride[1] = array.get_stride<1>();
-    stride[2] = array.get_stride<2>();
-    stride[3] = array.get_stride<3>();
-    *out_ncomp = array.nComp();
-
-    amrex_mojo::detail::clear_last_error();
-    return AMREX_MOJO_STATUS_OK;
+    return fill_array4_metadata_from_tile(multifab, tile, data_lo, data_hi, stride, out_ncomp);
 }
 
 extern "C" double*
@@ -607,96 +1095,128 @@ amrex_mojo_multifab_data_ptr_for_mfiter(
         return nullptr;
     }
 
-    if (require_host_accessible(tile, "multifab_data_ptr_for_mfiter") != AMREX_MOJO_STATUS_OK) {
+    if (multifab->datatype != AMREX_MOJO_DATATYPE_FLOAT64) {
+        amrex_mojo::detail::set_last_error(
+            AMREX_MOJO_STATUS_INVALID_ARGUMENT,
+            "multifab_data_ptr_for_mfiter requires a Float64 multifab."
+        );
+        return nullptr;
+    }
+
+    if (require_host_accessible(multifab, tile, "multifab_data_ptr_for_mfiter") != AMREX_MOJO_STATUS_OK) {
         return nullptr;
     }
 
     amrex_mojo::detail::clear_last_error();
-    return tile->fab->dataPtr();
+    return data_ptr_from_tile_typed<amrex::FArrayBox>(tile);
+}
+
+extern "C" float*
+amrex_mojo_multifab_data_ptr_for_mfiter_f32(
+    const amrex_mojo_multifab_t* multifab,
+    const amrex_mojo_mfiter_t* mfiter
+)
+{
+    const auto* tile = require_multifab_tile_for_mfiter(multifab, mfiter);
+    if (tile == nullptr) {
+        return nullptr;
+    }
+
+    if (multifab->datatype != AMREX_MOJO_DATATYPE_FLOAT32) {
+        amrex_mojo::detail::set_last_error(
+            AMREX_MOJO_STATUS_INVALID_ARGUMENT,
+            "multifab_data_ptr_for_mfiter_f32 requires a Float32 multifab."
+        );
+        return nullptr;
+    }
+
+    if (
+        require_host_accessible(multifab, tile, "multifab_data_ptr_for_mfiter_f32") !=
+        AMREX_MOJO_STATUS_OK
+    ) {
+        return nullptr;
+    }
+
+    amrex_mojo::detail::clear_last_error();
+    return data_ptr_from_tile_typed<amrex::BaseFab<float>>(tile);
 }
 
 extern "C" double amrex_mojo_multifab_min(const amrex_mojo_multifab_t* multifab, int32_t comp)
 {
-    if (multifab == nullptr || multifab->value == nullptr || comp < 0 || comp >= multifab->value->nComp()) {
-        amrex_mojo::detail::set_last_error(
-            AMREX_MOJO_STATUS_INVALID_ARGUMENT,
-            "multifab_min requires a valid multifab and component index."
-        );
+    if (!require_valid_component(multifab, comp, "multifab_min")) {
         return 0.0;
     }
 
     amrex_mojo::detail::clear_last_error();
-    return multifab->value->min(comp, 0);
+    if (multifab->datatype == AMREX_MOJO_DATATYPE_FLOAT64) {
+        return std::get<0>(multifab->value)->min(comp, 0);
+    }
+    return reduce_min_f32(*std::get<1>(multifab->value), comp);
 }
 
 extern "C" double amrex_mojo_multifab_max(const amrex_mojo_multifab_t* multifab, int32_t comp)
 {
-    if (multifab == nullptr || multifab->value == nullptr || comp < 0 || comp >= multifab->value->nComp()) {
-        amrex_mojo::detail::set_last_error(
-            AMREX_MOJO_STATUS_INVALID_ARGUMENT,
-            "multifab_max requires a valid multifab and component index."
-        );
+    if (!require_valid_component(multifab, comp, "multifab_max")) {
         return 0.0;
     }
 
     amrex_mojo::detail::clear_last_error();
-    return multifab->value->max(comp, 0);
+    if (multifab->datatype == AMREX_MOJO_DATATYPE_FLOAT64) {
+        return std::get<0>(multifab->value)->max(comp, 0);
+    }
+    return reduce_max_f32(*std::get<1>(multifab->value), comp);
 }
 
 extern "C" double amrex_mojo_multifab_sum(const amrex_mojo_multifab_t* multifab, int32_t comp)
 {
-    if (multifab == nullptr || multifab->value == nullptr || comp < 0 || comp >= multifab->value->nComp()) {
-        amrex_mojo::detail::set_last_error(
-            AMREX_MOJO_STATUS_INVALID_ARGUMENT,
-            "multifab_sum requires a valid multifab and component index."
-        );
+    if (!require_valid_component(multifab, comp, "multifab_sum")) {
         return 0.0;
     }
 
     amrex_mojo::detail::clear_last_error();
-    return multifab->value->sum(comp);
+    if (multifab->datatype == AMREX_MOJO_DATATYPE_FLOAT64) {
+        return std::get<0>(multifab->value)->sum(comp);
+    }
+    return reduce_sum_f32(*std::get<1>(multifab->value), comp);
 }
 
 extern "C" double amrex_mojo_multifab_norm0(const amrex_mojo_multifab_t* multifab, int32_t comp)
 {
-    if (multifab == nullptr || multifab->value == nullptr || comp < 0 || comp >= multifab->value->nComp()) {
-        amrex_mojo::detail::set_last_error(
-            AMREX_MOJO_STATUS_INVALID_ARGUMENT,
-            "multifab_norm0 requires a valid multifab and component index."
-        );
+    if (!require_valid_component(multifab, comp, "multifab_norm0")) {
         return 0.0;
     }
 
     amrex_mojo::detail::clear_last_error();
-    return multifab->value->norm0(comp);
+    if (multifab->datatype == AMREX_MOJO_DATATYPE_FLOAT64) {
+        return std::get<0>(multifab->value)->norm0(comp);
+    }
+    return reduce_norm0_f32(*std::get<1>(multifab->value), comp);
 }
 
 extern "C" double amrex_mojo_multifab_norm1(const amrex_mojo_multifab_t* multifab, int32_t comp)
 {
-    if (multifab == nullptr || multifab->value == nullptr || comp < 0 || comp >= multifab->value->nComp()) {
-        amrex_mojo::detail::set_last_error(
-            AMREX_MOJO_STATUS_INVALID_ARGUMENT,
-            "multifab_norm1 requires a valid multifab and component index."
-        );
+    if (!require_valid_component(multifab, comp, "multifab_norm1")) {
         return 0.0;
     }
 
     amrex_mojo::detail::clear_last_error();
-    return multifab->value->norm1(comp);
+    if (multifab->datatype == AMREX_MOJO_DATATYPE_FLOAT64) {
+        return std::get<0>(multifab->value)->norm1(comp);
+    }
+    return reduce_norm1_f32(*std::get<1>(multifab->value), comp);
 }
 
 extern "C" double amrex_mojo_multifab_norm2(const amrex_mojo_multifab_t* multifab, int32_t comp)
 {
-    if (multifab == nullptr || multifab->value == nullptr || comp < 0 || comp >= multifab->value->nComp()) {
-        amrex_mojo::detail::set_last_error(
-            AMREX_MOJO_STATUS_INVALID_ARGUMENT,
-            "multifab_norm2 requires a valid multifab and component index."
-        );
+    if (!require_valid_component(multifab, comp, "multifab_norm2")) {
         return 0.0;
     }
 
     amrex_mojo::detail::clear_last_error();
-    return multifab->value->norm2(comp);
+    if (multifab->datatype == AMREX_MOJO_DATATYPE_FLOAT64) {
+        return std::get<0>(multifab->value)->norm2(comp);
+    }
+    return reduce_norm2_f32(*std::get<1>(multifab->value), comp);
 }
 
 extern "C" amrex_mojo_status_code_t
@@ -708,14 +1228,20 @@ amrex_mojo_multifab_plus(
     amrex_mojo_intvect_3d ngrow
 )
 {
-    if (multifab == nullptr || multifab->value == nullptr) {
+    if (!require_live_multifab(multifab, "multifab_plus")) {
         return amrex_mojo::detail::set_last_error(
             AMREX_MOJO_STATUS_INVALID_ARGUMENT,
             "multifab_plus requires a non-null multifab."
         );
     }
 
-    if (validate_component_range(*multifab->value, start_comp, ncomp) != AMREX_MOJO_STATUS_OK) {
+    const auto valid = visit_multifab(
+        multifab,
+        [&](const auto& value_ref) {
+            return validate_component_range(value_ref, start_comp, ncomp);
+        }
+    );
+    if (valid != AMREX_MOJO_STATUS_OK) {
         return AMREX_MOJO_STATUS_INVALID_ARGUMENT;
     }
 
@@ -728,7 +1254,13 @@ amrex_mojo_multifab_plus(
     }
 
     try {
-        multifab->value->plus(value, start_comp, ncomp, scalar_ngrow);
+        visit_multifab(
+            multifab,
+            [&](auto& value_ref) {
+                using value_type = typename std::decay_t<decltype(value_ref)>::value_type;
+                value_ref.plus(static_cast<value_type>(value), start_comp, ncomp, scalar_ngrow);
+            }
+        );
         amrex_mojo::detail::clear_last_error();
         return AMREX_MOJO_STATUS_OK;
     } catch (const std::exception& ex) {
@@ -750,14 +1282,20 @@ amrex_mojo_multifab_mult(
     amrex_mojo_intvect_3d ngrow
 )
 {
-    if (multifab == nullptr || multifab->value == nullptr) {
+    if (!require_live_multifab(multifab, "multifab_mult")) {
         return amrex_mojo::detail::set_last_error(
             AMREX_MOJO_STATUS_INVALID_ARGUMENT,
             "multifab_mult requires a non-null multifab."
         );
     }
 
-    if (validate_component_range(*multifab->value, start_comp, ncomp) != AMREX_MOJO_STATUS_OK) {
+    const auto valid = visit_multifab(
+        multifab,
+        [&](const auto& value_ref) {
+            return validate_component_range(value_ref, start_comp, ncomp);
+        }
+    );
+    if (valid != AMREX_MOJO_STATUS_OK) {
         return AMREX_MOJO_STATUS_INVALID_ARGUMENT;
     }
 
@@ -770,7 +1308,13 @@ amrex_mojo_multifab_mult(
     }
 
     try {
-        multifab->value->mult(value, start_comp, ncomp, scalar_ngrow);
+        visit_multifab(
+            multifab,
+            [&](auto& value_ref) {
+                using value_type = typename std::decay_t<decltype(value_ref)>::value_type;
+                value_ref.mult(static_cast<value_type>(value), start_comp, ncomp, scalar_ngrow);
+            }
+        );
         amrex_mojo::detail::clear_last_error();
         return AMREX_MOJO_STATUS_OK;
     } catch (const std::exception& ex) {
@@ -793,27 +1337,46 @@ amrex_mojo_multifab_copy(
     amrex_mojo_intvect_3d ngrow
 )
 {
-    if (dst_multifab == nullptr || dst_multifab->value == nullptr || src_multifab == nullptr ||
-        src_multifab->value == nullptr) {
+    if (
+        !require_live_multifab(dst_multifab, "multifab_copy") ||
+        !require_live_multifab(src_multifab, "multifab_copy")
+    ) {
         return amrex_mojo::detail::set_last_error(
             AMREX_MOJO_STATUS_INVALID_ARGUMENT,
             "multifab_copy requires non-null source and destination multifabs."
         );
     }
 
-    if (validate_component_range(*src_multifab->value, src_comp, ncomp) != AMREX_MOJO_STATUS_OK ||
-        validate_component_range(*dst_multifab->value, dst_comp, ncomp) != AMREX_MOJO_STATUS_OK) {
+    const auto src_valid = visit_multifab(
+        src_multifab,
+        [&](const auto& value_ref) {
+            return validate_component_range(value_ref, src_comp, ncomp);
+        }
+    );
+    const auto dst_valid = visit_multifab(
+        dst_multifab,
+        [&](const auto& value_ref) {
+            return validate_component_range(value_ref, dst_comp, ncomp);
+        }
+    );
+    if (src_valid != AMREX_MOJO_STATUS_OK || dst_valid != AMREX_MOJO_STATUS_OK) {
         return AMREX_MOJO_STATUS_INVALID_ARGUMENT;
     }
 
     try {
-        amrex::MultiFab::Copy(
-            *dst_multifab->value,
-            *src_multifab->value,
-            src_comp,
-            dst_comp,
-            ncomp,
-            amrex_mojo::detail::to_intvect(ngrow)
+        visit_multifab_pair(
+            dst_multifab,
+            src_multifab,
+            [&](auto& dst_value, const auto& src_value) {
+                amrex::Copy(
+                    dst_value,
+                    src_value,
+                    src_comp,
+                    dst_comp,
+                    ncomp,
+                    amrex_mojo::detail::to_intvect(ngrow)
+                );
+            }
         );
         amrex_mojo::detail::clear_last_error();
         return AMREX_MOJO_STATUS_OK;
@@ -839,29 +1402,62 @@ amrex_mojo_multifab_parallel_copy(
     amrex_mojo_intvect_3d dst_ngrow
 )
 {
-    if (dst_multifab == nullptr || dst_multifab->value == nullptr || src_multifab == nullptr ||
-        src_multifab->value == nullptr || geometry == nullptr) {
+    if (
+        !require_live_multifab(dst_multifab, "multifab_parallel_copy") ||
+        !require_live_multifab(src_multifab, "multifab_parallel_copy") ||
+        geometry == nullptr
+    ) {
         return amrex_mojo::detail::set_last_error(
             AMREX_MOJO_STATUS_INVALID_ARGUMENT,
             "multifab_parallel_copy requires non-null source, destination, and geometry."
         );
     }
 
-    if (validate_component_range(*src_multifab->value, src_comp, ncomp) != AMREX_MOJO_STATUS_OK ||
-        validate_component_range(*dst_multifab->value, dst_comp, ncomp) != AMREX_MOJO_STATUS_OK) {
+    if (dst_multifab->datatype != src_multifab->datatype) {
+        return amrex_mojo::detail::set_last_error(
+            AMREX_MOJO_STATUS_INVALID_ARGUMENT,
+            "multifab_parallel_copy requires source and destination multifabs with matching datatypes."
+        );
+    }
+
+    const auto src_valid = visit_multifab(
+        src_multifab,
+        [&](const auto& value_ref) {
+            return validate_component_range(value_ref, src_comp, ncomp);
+        }
+    );
+    const auto dst_valid = visit_multifab(
+        dst_multifab,
+        [&](const auto& value_ref) {
+            return validate_component_range(value_ref, dst_comp, ncomp);
+        }
+    );
+    if (src_valid != AMREX_MOJO_STATUS_OK || dst_valid != AMREX_MOJO_STATUS_OK) {
         return AMREX_MOJO_STATUS_INVALID_ARGUMENT;
     }
 
     try {
-        dst_multifab->value->ParallelCopy(
-            *src_multifab->value,
-            src_comp,
-            dst_comp,
-            ncomp,
-            amrex_mojo::detail::to_intvect(src_ngrow),
-            amrex_mojo::detail::to_intvect(dst_ngrow),
-            geometry->value.periodicity()
-        );
+        if (dst_multifab->datatype == AMREX_MOJO_DATATYPE_FLOAT64) {
+            std::get<0>(dst_multifab->value)->ParallelCopy(
+                *std::get<0>(src_multifab->value),
+                src_comp,
+                dst_comp,
+                ncomp,
+                amrex_mojo::detail::to_intvect(src_ngrow),
+                amrex_mojo::detail::to_intvect(dst_ngrow),
+                geometry->value.periodicity()
+            );
+        } else {
+            std::get<1>(dst_multifab->value)->ParallelCopy(
+                *std::get<1>(src_multifab->value),
+                src_comp,
+                dst_comp,
+                ncomp,
+                amrex_mojo::detail::to_intvect(src_ngrow),
+                amrex_mojo::detail::to_intvect(dst_ngrow),
+                geometry->value.periodicity()
+            );
+        }
         amrex_mojo::detail::clear_last_error();
         return AMREX_MOJO_STATUS_OK;
     } catch (const std::exception& ex) {
@@ -883,23 +1479,34 @@ amrex_mojo_multifab_fill_boundary(
     int32_t cross
 )
 {
-    if (multifab == nullptr || multifab->value == nullptr || geometry == nullptr) {
+    if (!require_live_multifab(multifab, "multifab_fill_boundary") || geometry == nullptr) {
         return amrex_mojo::detail::set_last_error(
             AMREX_MOJO_STATUS_INVALID_ARGUMENT,
             "multifab_fill_boundary requires a non-null multifab and geometry."
         );
     }
 
-    if (validate_component_range(*multifab->value, start_comp, ncomp) != AMREX_MOJO_STATUS_OK) {
+    const auto valid = visit_multifab(
+        multifab,
+        [&](const auto& value_ref) {
+            return validate_component_range(value_ref, start_comp, ncomp);
+        }
+    );
+    if (valid != AMREX_MOJO_STATUS_OK) {
         return AMREX_MOJO_STATUS_INVALID_ARGUMENT;
     }
 
     try {
-        multifab->value->FillBoundary(
-            start_comp,
-            ncomp,
-            geometry->value.periodicity(),
-            cross != 0
+        visit_multifab(
+            multifab,
+            [&](auto& value_ref) {
+                value_ref.FillBoundary(
+                    start_comp,
+                    ncomp,
+                    geometry->value.periodicity(),
+                    cross != 0
+                );
+            }
         );
         amrex_mojo::detail::clear_last_error();
         return AMREX_MOJO_STATUS_OK;
@@ -922,7 +1529,7 @@ amrex_mojo_write_single_level_plotfile(
     int32_t level_step
 )
 {
-    if (multifab == nullptr || multifab->value == nullptr || geometry == nullptr || plotfile == nullptr ||
+    if (!require_live_multifab(multifab, "write_single_level_plotfile") || geometry == nullptr || plotfile == nullptr ||
         std::string(plotfile).empty()) {
         return amrex_mojo::detail::set_last_error(
             AMREX_MOJO_STATUS_INVALID_ARGUMENT,
@@ -932,18 +1539,51 @@ amrex_mojo_write_single_level_plotfile(
 
     try {
         amrex::Vector<std::string> varnames;
-        varnames.reserve(multifab->value->nComp());
-        for (int comp = 0; comp < multifab->value->nComp(); ++comp) {
+        const auto ncomp = visit_multifab(multifab, [](const auto& value) { return value.nComp(); });
+        varnames.reserve(ncomp);
+        for (int comp = 0; comp < ncomp; ++comp) {
             varnames.push_back("Var" + std::to_string(comp));
         }
 
-        amrex::WriteSingleLevelPlotfile(
-            std::string(plotfile),
-            *multifab->value,
-            varnames,
-            geometry->value,
-            time,
-            level_step
+        visit_multifab(
+            multifab,
+            [&](const auto& value_ref) {
+                using multifab_type = std::decay_t<decltype(value_ref)>;
+                if constexpr (std::is_same_v<multifab_type, amrex::MultiFab>) {
+                    amrex::WriteSingleLevelPlotfile(
+                        std::string(plotfile),
+                        value_ref,
+                        varnames,
+                        geometry->value,
+                        time,
+                        level_step
+                    );
+                } else {
+                    auto plot_multifab = amrex::MultiFab(
+                        value_ref.boxArray(),
+                        value_ref.DistributionMap(),
+                        value_ref.nComp(),
+                        value_ref.nGrowVect(),
+                        amrex::MFInfo().SetArena(amrex::The_Cpu_Arena())
+                    );
+                    amrex::Copy(
+                        plot_multifab,
+                        value_ref,
+                        0,
+                        0,
+                        value_ref.nComp(),
+                        value_ref.nGrowVect()
+                    );
+                    amrex::WriteSingleLevelPlotfile(
+                        std::string(plotfile),
+                        plot_multifab,
+                        varnames,
+                        geometry->value,
+                        time,
+                        level_step
+                    );
+                }
+            }
         );
         amrex_mojo::detail::clear_last_error();
         return AMREX_MOJO_STATUS_OK;

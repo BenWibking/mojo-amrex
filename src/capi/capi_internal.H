@@ -18,7 +18,12 @@
 #include <atomic>
 #include <memory>
 #include <string>
+#include <variant>
 #include <vector>
+
+#if defined(AMREX_USE_GPU)
+#error "mojo-amrex does not support AMReX GPU backends. Build AMReX with AMReX_GPU_BACKEND=NONE."
+#endif
 
 namespace amrex_mojo::detail
 {
@@ -35,8 +40,12 @@ namespace amrex_mojo::detail
         amrex::Box fab_box;
         int32_t box_index = 0;
         int32_t local_tile_index = 0;
-        amrex::FArrayBox* fab = nullptr;
+        void* fab = nullptr;
     };
+
+    using multifab_storage_t = std::variant<
+        std::unique_ptr<amrex::MultiFab>,
+        std::unique_ptr<amrex::fMultiFab>>;
 
     void clear_last_error() noexcept;
 
@@ -138,8 +147,9 @@ struct amrex_mojo_geometry
 struct amrex_mojo_multifab
 {
     amrex_mojo::detail::runtime_state* state = nullptr;
-    std::unique_ptr<amrex::MultiFab> value;
+    amrex_mojo::detail::multifab_storage_t value;
     amrex_mojo_multifab_memory_kind_t memory_kind = AMREX_MOJO_MULTIFAB_MEMORY_DEFAULT;
+    amrex_mojo_datatype_t datatype = AMREX_MOJO_DATATYPE_FLOAT64;
     std::vector<amrex_mojo::detail::tile_descriptor> tiles;
 };
 

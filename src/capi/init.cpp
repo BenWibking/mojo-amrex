@@ -238,41 +238,6 @@ extern "C" int32_t amrex_mojo_runtime_initialized(const amrex_mojo_runtime_t* ru
     return (runtime != nullptr && runtime->state != nullptr && amrex::Initialized()) ? 1 : 0;
 }
 
-extern "C" amrex_mojo_gpu_backend_t amrex_mojo_gpu_backend(void)
-{
-#if defined(AMREX_USE_CUDA)
-    return AMREX_MOJO_GPU_BACKEND_CUDA;
-#elif defined(AMREX_USE_HIP)
-    return AMREX_MOJO_GPU_BACKEND_HIP;
-#else
-    return AMREX_MOJO_GPU_BACKEND_NONE;
-#endif
-}
-
-extern "C" int32_t amrex_mojo_gpu_enabled(void)
-{
-    amrex_mojo::detail::clear_last_error();
-    return amrex_mojo_gpu_backend() != AMREX_MOJO_GPU_BACKEND_NONE ? 1 : 0;
-}
-
-extern "C" amrex_mojo_status_code_t amrex_mojo_gpu_stream_synchronize(void)
-{
-    try {
-#ifdef AMREX_USE_GPU
-        amrex::Gpu::streamSynchronize();
-#endif
-        amrex_mojo::detail::clear_last_error();
-        return AMREX_MOJO_STATUS_OK;
-    } catch (const std::exception& ex) {
-        return amrex_mojo::detail::set_last_error(AMREX_MOJO_STATUS_INTERNAL_ERROR, ex.what());
-    } catch (...) {
-        return amrex_mojo::detail::set_last_error(
-            AMREX_MOJO_STATUS_INTERNAL_ERROR,
-            "gpu_stream_synchronize failed with an unknown exception."
-        );
-    }
-}
-
 extern "C" int32_t amrex_mojo_parallel_nprocs(void)
 {
     amrex_mojo::detail::clear_last_error();

@@ -417,36 +417,28 @@ The first version should not try to reproduce:
 
 ### GPU ownership and async execution
 
-GPU support should preserve AMReX's native ownership model instead of replacing
-it with Mojo-native buffer ownership.
+Current repo status:
 
-Design guidance:
+- AMReX GPU backends are intentionally disabled.
+- `MultiFab` storage stays host-resident from the AMReX side.
+- Mojo device kernels are still viable in user code, but only by explicitly
+  staging AMReX tile data through Mojo `DeviceBuffer`s.
 
-- keep `MultiFab` storage owned by AMReX, not by Mojo `DeviceBuffer`
-- if a GPU-capable `MultiFab` constructor is added, it should allocate through
-  `MFInfo().SetArena(The_Async_Arena())`
-- AMReX can expose and switch its active stream through existing `Gpu` APIs
-- borrowed `Array4` tile views may be passed directly to kernels if the kernel
-  launch happens while the borrow is live
-- exact C++-style "destroy at scope end" semantics are not available in Mojo;
-  the binding should target the practical guarantee that the underlying AMReX
-  storage remains valid for the launched work
-- Mojo `DeviceBuffer` may still be useful for Mojo-native buffers or staging
-  data, but it should not become the backing store for `MultiFab`
-- Mojo can select among AsyncRT-managed streams, but the public API does not
-  currently appear to support adopting an external AMReX `cudaStream_t` /
-  `hipStream_t` as a `DeviceStream`
+The original design intent was to preserve AMReX's native ownership model
+instead of replacing it with Mojo-native buffer ownership. In practice, that
+interop is not complete because AMReX-managed device allocation, borrowed
+`Array4` device views, and stream/runtime composition between AMReX and Mojo
+are not wired up well enough yet.
 
-This shifts the GPU design problem away from "who owns the memory" and toward
-"which stream owns the work." `The_Async_Arena()` solves async-safe allocation
-and free for AMReX-managed data on the relevant AMReX stream, but stream
-interoperability between Mojo GPU launches and AMReX still needs to be defined
-before GPU support is considered complete. If no raw-stream interop is exposed
-on the Mojo side, the first GPU boundary may need explicit synchronization
-instead of true same-stream asynchronous composition.
+That leaves two distinct execution models:
 
-Those are follow-on interop features, not prerequisites for a functional Mojo
-binding.
+- current supported path: host-backed `MultiFab` plus explicit staging into
+  Mojo buffers for user-launched kernels
+- deferred path: direct AMReX GPU-runtime interop with AMReX-owned device
+  allocation and stream coordination
+
+Until the deferred path is properly defined and tested, this repo should not
+present AMReX GPU support as available.
 
 ## Build System Plan
 

@@ -105,7 +105,7 @@ struct MFIter(Movable):
             box.big_end.y += ngrow.y
         if box.big_end.z == valid.big_end.z:
             box.big_end.z += ngrow.z
-        return box^
+        return box
 
     def _require_valid(ref self) raises:
         if not self.is_valid():

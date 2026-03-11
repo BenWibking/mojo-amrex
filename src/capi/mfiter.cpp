@@ -65,7 +65,10 @@ namespace
 extern "C" amrex_mojo_status_code_t
 amrex_mojo_mfiter_create(amrex_mojo_multifab_t* multifab, amrex_mojo_mfiter_t** out_mfiter)
 {
-    if (multifab == nullptr || multifab->value == nullptr || out_mfiter == nullptr) {
+    const auto multifab_is_live =
+        multifab != nullptr &&
+        std::visit([](const auto& ptr) { return static_cast<bool>(ptr); }, multifab->value);
+    if (!multifab_is_live || out_mfiter == nullptr) {
         return amrex_mojo::detail::set_last_error(
             AMREX_MOJO_STATUS_INVALID_ARGUMENT,
             "mfiter_create requires a non-null multifab and output pointer."
@@ -91,7 +94,12 @@ amrex_mojo_mfiter_create(amrex_mojo_multifab_t* multifab, amrex_mojo_mfiter_t** 
 
         *out_mfiter = new amrex_mojo_mfiter{
             state,
-            amrex_mojo::detail::from_intvect(multifab->value->nGrowVect()),
+            std::visit(
+                [](const auto& ptr) {
+                    return amrex_mojo::detail::from_intvect(ptr->nGrowVect());
+                },
+                multifab->value
+            ),
             std::move(tiles),
             0
         };

@@ -6,6 +6,7 @@
 #include <filesystem>
 #include <iostream>
 #include <string>
+#include <type_traits>
 
 namespace
 {
@@ -41,13 +42,14 @@ namespace
         return nx * ny * nz;
     }
 
+    template <typename Array4View>
     auto array4_value(
-        const amrex_mojo_array4_view_f64& array4,
+        const Array4View& array4,
         int i,
         int j,
         int k,
         int comp = 0
-    ) -> double
+    ) -> typename std::remove_cv_t<std::remove_pointer_t<decltype(array4.data)>>
     {
         const auto offset =
             static_cast<std::ptrdiff_t>(i - array4.lo_x) * array4.stride_i +
@@ -57,10 +59,11 @@ namespace
         return array4.data[offset];
     }
 
+    template <typename Array4View, typename Value>
     void fill_valid_box(
-        const amrex_mojo_array4_view_f64& array4,
+        const Array4View& array4,
         const amrex_mojo_box_3d& box,
-        double value
+        Value value
     )
     {
         for (int k = box.small_end.z; k <= box.big_end.z; ++k) {
@@ -142,15 +145,6 @@ auto main() -> int
     amrex_mojo_runtime_t* runtime = amrex_mojo_runtime_create(1, runtime_argv, 0);
     expect(runtime != nullptr, "runtime_create returned null.");
     expect(amrex_mojo_runtime_initialized(runtime) == 1, "runtime should report initialized.");
-    expect(
-        amrex_mojo_gpu_backend() >= AMREX_MOJO_GPU_BACKEND_NONE &&
-            amrex_mojo_gpu_backend() <= AMREX_MOJO_GPU_BACKEND_HIP,
-        "gpu_backend should report a known value."
-    );
-    expect(
-        amrex_mojo_gpu_stream_synchronize() == AMREX_MOJO_STATUS_OK,
-        "gpu_stream_synchronize should succeed."
-    );
     expect(amrex_mojo_parallel_nprocs() >= 1, "parallel_nprocs should be >= 1.");
     expect(amrex_mojo_parallel_myproc() >= 0, "parallel_myproc should be >= 0.");
     expect(
@@ -241,17 +235,10 @@ auto main() -> int
         amrex_mojo_multifab_memory_info(multifab, &default_memory) == AMREX_MOJO_STATUS_OK,
         "multifab_memory_info should succeed for default allocation."
     );
-    if (amrex_mojo_gpu_enabled() != 0) {
-        expect(
-            default_memory.device_accessible == 1,
-            "default multifab should be device-accessible with CUDA/HIP backend."
-        );
-    } else {
-        expect(
-            default_memory.host_accessible == 1,
-            "default multifab should be host-accessible without AMReX GPU backend."
-        );
-    }
+    expect(
+        default_memory.host_accessible == 1,
+        "default multifab should be host-accessible."
+    );
 
     amrex_mojo_multifab_t* host_multifab = amrex_mojo_multifab_create_with_memory_xyz(
         runtime,
@@ -287,14 +274,7 @@ auto main() -> int
     expect(close_enough(amrex_mojo_multifab_norm0(multifab, 0), 2.0), "multifab_norm0 mismatch.");
 
     amrex_mojo_array4_view_f64 array4 = amrex_mojo_multifab_array4(multifab, 0);
-    if (amrex_mojo_gpu_enabled() != 0) {
-        expect(
-            array4.data == nullptr,
-            "device-backed multifab_array4 should reject host pointer access."
-        );
-    } else {
-        expect(array4.data != nullptr, "multifab_array4 should return a live data pointer.");
-    }
+    expect(array4.data != nullptr, "multifab_array4 should return a live data pointer.");
 
     array4 = amrex_mojo_multifab_array4(host_multifab, 0);
     expect(array4.data != nullptr, "host_only multifab_array4 should return a live data pointer.");
@@ -304,6 +284,51 @@ auto main() -> int
         close_enough(amrex_mojo_multifab_max(host_multifab, 0), 3.0),
         "array4 write should change max for host_only multifab."
     );
+
+    amrex_mojo_multifab_t* float_multifab =
+        amrex_mojo_multifab_create_with_memory_and_datatype_xyz(
+            runtime,
+            boxarray,
+            distmap,
+            1,
+            0,
+            0,
+            0,
+            AMREX_MOJO_MULTIFAB_MEMORY_HOST_ONLY,
+            AMREX_MOJO_DATATYPE_FLOAT32
+        );
+    expect(float_multifab != nullptr, "Float32 multifab create should succeed.");
+    expect(
+        amrex_mojo_multifab_datatype(float_multifab) == AMREX_MOJO_DATATYPE_FLOAT32,
+        "Float32 multifab should report the Float32 datatype."
+    );
+    expect(
+        amrex_mojo_multifab_set_val(float_multifab, 1.5, 0, 1) == AMREX_MOJO_STATUS_OK,
+        "Float32 multifab set_val failed."
+    );
+    expect(
+        amrex_mojo_multifab_array4(float_multifab, 0).data == nullptr,
+        "Float32 multifab_array4 should reject Float64 view access."
+    );
+    auto float_array4 = amrex_mojo_multifab_array4_f32(float_multifab, 0);
+    expect(float_array4.data != nullptr, "Float32 multifab_array4_f32 should return a live pointer.");
+    float_array4.data[0] = 2.5f;
+    expect(
+        close_enough(amrex_mojo_multifab_max(float_multifab, 0), 2.5),
+        "Float32 array4 write should change the multifab max."
+    );
+
+    amrex_mojo_mfiter_t* float_mfiter = nullptr;
+    expect(
+        amrex_mojo_mfiter_create(float_multifab, &float_mfiter) == AMREX_MOJO_STATUS_OK &&
+            float_mfiter != nullptr,
+        "Float32 mfiter_create failed."
+    );
+    expect(
+        amrex_mojo_multifab_data_ptr_for_mfiter_f32(float_multifab, float_mfiter) != nullptr,
+        "Float32 multifab_data_ptr_for_mfiter_f32 should return a live pointer."
+    );
+    amrex_mojo_mfiter_destroy(float_mfiter);
 
     amrex_mojo_mfiter_t* mfiter = nullptr;
     expect(
@@ -436,7 +461,24 @@ auto main() -> int
     );
     expect(std::filesystem::exists(plotfile / "Header"), "plotfile Header was not written.");
 
+    const std::filesystem::path float_plotfile = "build/capi_test_plotfile_f32";
+    expect(
+        amrex_mojo_write_single_level_plotfile(
+            float_multifab,
+            geometry,
+            float_plotfile.string().c_str(),
+            0.0,
+            0
+        ) == AMREX_MOJO_STATUS_OK,
+        "Float32 write_single_level_plotfile failed."
+    );
+    expect(
+        std::filesystem::exists(float_plotfile / "Header"),
+        "Float32 plotfile Header was not written."
+    );
+
     amrex_mojo_parmparse_destroy(parmparse);
+    amrex_mojo_multifab_destroy(float_multifab);
     amrex_mojo_multifab_destroy(host_multifab);
     amrex_mojo_multifab_destroy(comm_destination);
     amrex_mojo_multifab_destroy(comm_source);

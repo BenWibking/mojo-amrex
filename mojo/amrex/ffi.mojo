@@ -1,5 +1,6 @@
 from std.collections import List
-from std.ffi import OwnedDLHandle, c_char, c_double, c_int
+from std.builtin.device_passable import DevicePassable
+from std.ffi import OwnedDLHandle, c_char, c_double, c_float, c_int
 
 
 comptime RuntimeHandle = UnsafePointer[NoneType, MutExternalOrigin]
@@ -10,19 +11,57 @@ comptime MultiFabHandle = UnsafePointer[NoneType, MutExternalOrigin]
 comptime MFIterHandle = UnsafePointer[NoneType, MutExternalOrigin]
 comptime ParmParseHandle = UnsafePointer[NoneType, MutExternalOrigin]
 
+comptime MULTIFAB_DATATYPE_FLOAT64 = 0
+comptime MULTIFAB_DATATYPE_FLOAT32 = 1
+
+
+fn init_device_passable_value[
+    T: TrivialRegisterPassable,
+    mut_origin: Origin[mut=True],
+](value: T, target: UnsafePointer[NoneType, mut_origin]):
+    target.bitcast[T]().init_pointee_copy(value)
+
 
 @fieldwise_init
-struct IntVect3D(Copyable):
+struct IntVect3D(TrivialRegisterPassable, DevicePassable):
+    comptime device_type = Self
+
     var x: c_int
     var y: c_int
     var z: c_int
 
+    fn _to_device_type[
+        mut_origin: Origin[mut=True]
+    ](
+        self,
+        target: UnsafePointer[NoneType, mut_origin],
+    ):
+        init_device_passable_value(self, target)
+
+    @staticmethod
+    fn get_type_name() -> String:
+        return String("IntVect3D")
+
 
 @fieldwise_init
-struct Box3D(Copyable):
+struct Box3D(TrivialRegisterPassable, DevicePassable):
+    comptime device_type = Self
+
     var small_end: IntVect3D
     var big_end: IntVect3D
     var nodal: IntVect3D
+
+    fn _to_device_type[
+        mut_origin: Origin[mut=True]
+    ](
+        self,
+        target: UnsafePointer[NoneType, mut_origin],
+    ):
+        init_device_passable_value(self, target)
+
+    @staticmethod
+    fn get_type_name() -> String:
+        return String("Box3D")
 
 
 @fieldwise_init
@@ -84,7 +123,11 @@ struct MultiFabMemoryInfo(Copyable):
 
 
 @fieldwise_init
-struct Array4F64View[origin: Origin[mut=True]](Copyable):
+struct Array4F64View[origin: Origin[mut=True]](
+    TrivialRegisterPassable, DevicePassable
+):
+    comptime device_type = Array4F64View[MutAnyOrigin]
+
     var data: UnsafePointer[c_double, Self.origin]
     var lo_x: c_int
     var lo_y: c_int
@@ -98,7 +141,35 @@ struct Array4F64View[origin: Origin[mut=True]](Copyable):
     var stride_n: Int64
     var ncomp: c_int
 
-    def offset(self, i: Int, j: Int, k: Int, comp: Int = 0) raises -> Int:
+    fn device_view(self) -> Self.device_type:
+        return Array4F64View[MutAnyOrigin](
+            data=UnsafePointer[c_double, MutAnyOrigin](self.data),
+            lo_x=self.lo_x,
+            lo_y=self.lo_y,
+            lo_z=self.lo_z,
+            hi_x=self.hi_x,
+            hi_y=self.hi_y,
+            hi_z=self.hi_z,
+            stride_i=self.stride_i,
+            stride_j=self.stride_j,
+            stride_k=self.stride_k,
+            stride_n=self.stride_n,
+            ncomp=self.ncomp,
+        )
+
+    fn _to_device_type[
+        mut_origin: Origin[mut=True]
+    ](
+        self,
+        target: UnsafePointer[NoneType, mut_origin],
+    ):
+        init_device_passable_value(self.device_view(), target)
+
+    @staticmethod
+    fn get_type_name() -> String:
+        return String("Array4F64View")
+
+    fn offset(self, i: Int, j: Int, k: Int, comp: Int = 0) -> Int:
         return (
             (i - Int(self.lo_x)) * Int(self.stride_i)
             + (j - Int(self.lo_y)) * Int(self.stride_j)
@@ -106,21 +177,19 @@ struct Array4F64View[origin: Origin[mut=True]](Copyable):
             + comp * Int(self.stride_n)
         )
 
-    def __getitem__(self, i: Int, j: Int, k: Int) raises -> Float64:
+    fn __getitem__(self, i: Int, j: Int, k: Int) -> Float64:
         return self.data[self.offset(i, j, k)]
 
-    def __getitem__(self, i: Int, j: Int, k: Int, comp: Int) raises -> Float64:
+    fn __getitem__(self, i: Int, j: Int, k: Int, comp: Int) -> Float64:
         return self.data[self.offset(i, j, k, comp)]
 
-    def __setitem__(self, i: Int, j: Int, k: Int, value: Float64) raises:
+    fn __setitem__(self, i: Int, j: Int, k: Int, value: Float64):
         self.data[self.offset(i, j, k)] = value
 
-    def __setitem__(
-        self, i: Int, j: Int, k: Int, comp: Int, value: Float64
-    ) raises:
+    fn __setitem__(self, i: Int, j: Int, k: Int, comp: Int, value: Float64):
         self.data[self.offset(i, j, k, comp)] = value
 
-    def fill(self, box: Box3D, value: Float64, comp: Int = 0) raises:
+    fn fill(self, box: Box3D, value: Float64, comp: Int = 0):
         for k in range(Int(box.small_end.z), Int(box.big_end.z) + 1):
             for j in range(Int(box.small_end.y), Int(box.big_end.y) + 1):
                 for i in range(Int(box.small_end.x), Int(box.big_end.x) + 1):
@@ -128,15 +197,148 @@ struct Array4F64View[origin: Origin[mut=True]](Copyable):
 
 
 @fieldwise_init
-struct TileF64View[origin: Origin[mut=True]](Copyable):
+struct Array4F32View[origin: Origin[mut=True]](
+    TrivialRegisterPassable, DevicePassable
+):
+    comptime device_type = Array4F32View[MutAnyOrigin]
+
+    var data: UnsafePointer[c_float, Self.origin]
+    var lo_x: c_int
+    var lo_y: c_int
+    var lo_z: c_int
+    var hi_x: c_int
+    var hi_y: c_int
+    var hi_z: c_int
+    var stride_i: Int64
+    var stride_j: Int64
+    var stride_k: Int64
+    var stride_n: Int64
+    var ncomp: c_int
+
+    fn device_view(self) -> Self.device_type:
+        return Array4F32View[MutAnyOrigin](
+            data=UnsafePointer[c_float, MutAnyOrigin](self.data),
+            lo_x=self.lo_x,
+            lo_y=self.lo_y,
+            lo_z=self.lo_z,
+            hi_x=self.hi_x,
+            hi_y=self.hi_y,
+            hi_z=self.hi_z,
+            stride_i=self.stride_i,
+            stride_j=self.stride_j,
+            stride_k=self.stride_k,
+            stride_n=self.stride_n,
+            ncomp=self.ncomp,
+        )
+
+    fn _to_device_type[
+        mut_origin: Origin[mut=True]
+    ](
+        self,
+        target: UnsafePointer[NoneType, mut_origin],
+    ):
+        init_device_passable_value(self.device_view(), target)
+
+    @staticmethod
+    fn get_type_name() -> String:
+        return String("Array4F32View")
+
+    fn offset(self, i: Int, j: Int, k: Int, comp: Int = 0) -> Int:
+        return (
+            (i - Int(self.lo_x)) * Int(self.stride_i)
+            + (j - Int(self.lo_y)) * Int(self.stride_j)
+            + (k - Int(self.lo_z)) * Int(self.stride_k)
+            + comp * Int(self.stride_n)
+        )
+
+    fn __getitem__(self, i: Int, j: Int, k: Int) -> Float32:
+        return self.data[self.offset(i, j, k)]
+
+    fn __getitem__(self, i: Int, j: Int, k: Int, comp: Int) -> Float32:
+        return self.data[self.offset(i, j, k, comp)]
+
+    fn __setitem__(self, i: Int, j: Int, k: Int, value: Float32):
+        self.data[self.offset(i, j, k)] = value
+
+    fn __setitem__(self, i: Int, j: Int, k: Int, comp: Int, value: Float32):
+        self.data[self.offset(i, j, k, comp)] = value
+
+    fn fill(self, box: Box3D, value: Float32, comp: Int = 0):
+        for k in range(Int(box.small_end.z), Int(box.big_end.z) + 1):
+            for j in range(Int(box.small_end.y), Int(box.big_end.y) + 1):
+                for i in range(Int(box.small_end.x), Int(box.big_end.x) + 1):
+                    self[i, j, k, comp] = value
+
+
+@fieldwise_init
+struct TileF64View[origin: Origin[mut=True]](
+    TrivialRegisterPassable, DevicePassable
+):
+    comptime device_type = TileF64View[MutAnyOrigin]
+
     var tile_box: Box3D
     var valid_box: Box3D
     var array_view: Array4F64View[Self.origin]
 
-    def array(self) raises -> Array4F64View[Self.origin]:
+    fn device_view(self) -> Self.device_type:
+        return TileF64View[MutAnyOrigin](
+            tile_box=self.tile_box.copy(),
+            valid_box=self.valid_box.copy(),
+            array_view=self.array_view.device_view(),
+        )
+
+    fn _to_device_type[
+        mut_origin: Origin[mut=True]
+    ](
+        self,
+        target: UnsafePointer[NoneType, mut_origin],
+    ):
+        init_device_passable_value(self.device_view(), target)
+
+    @staticmethod
+    fn get_type_name() -> String:
+        return String("TileF64View")
+
+    fn array(self) -> Array4F64View[Self.origin]:
         return self.array_view.copy()
 
-    def fill(self, value: Float64, comp: Int = 0) raises:
+    fn fill(self, value: Float64, comp: Int = 0):
+        self.array_view.fill(self.tile_box, value, comp)
+
+
+@fieldwise_init
+struct TileF32View[origin: Origin[mut=True]](
+    TrivialRegisterPassable, DevicePassable
+):
+    comptime device_type = TileF32View[MutAnyOrigin]
+
+    var tile_box: Box3D
+    var valid_box: Box3D
+    var array_view: Array4F32View[Self.origin]
+
+    fn device_view(self) -> Self.device_type:
+        return TileF32View[MutAnyOrigin](
+            tile_box=self.tile_box.copy(),
+            valid_box=self.valid_box.copy(),
+            array_view=self.array_view.device_view(),
+        )
+
+    fn _to_device_type[
+        mut_origin: Origin[mut=True]
+    ](
+        self,
+        target: UnsafePointer[NoneType, mut_origin],
+    ):
+        init_device_passable_value(self.device_view(), target)
+
+    @staticmethod
+    fn get_type_name() -> String:
+        return String("TileF32View")
+
+    fn array(self) -> Array4F32View[Self.origin]:
+        return self.array_view.copy()
+
+    fn fill(self, value: Float32, comp: Int = 0):
         self.array_view.fill(self.tile_box, value, comp)
 
 
@@ -215,18 +417,6 @@ def runtime_initialized(
     ref lib: OwnedDLHandle, runtime: RuntimeHandle
 ) raises -> Bool:
     return lib.call["amrex_mojo_runtime_initialized", c_int](runtime) != 0
-
-
-def gpu_backend(ref lib: OwnedDLHandle) raises -> Int:
-    return Int(lib.call["amrex_mojo_gpu_backend", c_int]())
-
-
-def gpu_enabled(ref lib: OwnedDLHandle) raises -> Bool:
-    return lib.call["amrex_mojo_gpu_enabled", c_int]() != 0
-
-
-def gpu_stream_synchronize(ref lib: OwnedDLHandle) raises -> Int:
-    return Int(lib.call["amrex_mojo_gpu_stream_synchronize", c_int]())
 
 
 def parallel_nprocs(ref lib: OwnedDLHandle) raises -> Int:
@@ -327,8 +517,12 @@ def multifab_create(
     ncomp: Int,
     ngrow: IntVect3D,
     host_only: Bool = False,
+    datatype: Int = MULTIFAB_DATATYPE_FLOAT64,
 ) raises -> MultiFabHandle:
-    return lib.call["amrex_mojo_multifab_create_with_memory_xyz", MultiFabHandle](
+    return lib.call[
+        "amrex_mojo_multifab_create_with_memory_and_datatype_xyz",
+        MultiFabHandle,
+    ](
         runtime,
         boxarray,
         distmap,
@@ -337,6 +531,7 @@ def multifab_create(
         ngrow.y,
         ngrow.z,
         c_int(1 if host_only else 0),
+        c_int(datatype),
     )
 
 
@@ -348,6 +543,12 @@ def multifab_ncomp(
     ref lib: OwnedDLHandle, multifab: MultiFabHandle
 ) raises -> Int:
     return Int(lib.call["amrex_mojo_multifab_ncomp", c_int](multifab))
+
+
+def multifab_datatype(
+    ref lib: OwnedDLHandle, multifab: MultiFabHandle
+) raises -> Int:
+    return Int(lib.call["amrex_mojo_multifab_datatype", c_int](multifab))
 
 
 def multifab_memory_info(
@@ -574,6 +775,58 @@ def tile_view[
     )
 
 
+def tile_view_f32[
+    owner_origin: Origin[mut=True]
+](
+    ref lib: OwnedDLHandle, multifab: MultiFabHandle, tile_index: Int
+) raises -> TileF32View[owner_origin]:
+    var tile_lo = List[c_int](length=3, fill=0)
+    var tile_hi = List[c_int](length=3, fill=0)
+    var valid_lo = List[c_int](length=3, fill=0)
+    var valid_hi = List[c_int](length=3, fill=0)
+    var data_lo = List[c_int](length=3, fill=0)
+    var data_hi = List[c_int](length=3, fill=0)
+    var stride = List[Int64](length=4, fill=0)
+    var ncomp_raw = List[c_int](length=1, fill=0)
+
+    _ = lib.call["amrex_mojo_multifab_tile_metadata", c_int](
+        multifab,
+        c_int(tile_index),
+        tile_lo.unsafe_ptr(),
+        tile_hi.unsafe_ptr(),
+        valid_lo.unsafe_ptr(),
+        valid_hi.unsafe_ptr(),
+        data_lo.unsafe_ptr(),
+        data_hi.unsafe_ptr(),
+        stride.unsafe_ptr(),
+        ncomp_raw.unsafe_ptr(),
+    )
+
+    var array_view = Array4F32View[owner_origin](
+        data=lib.call[
+            "amrex_mojo_multifab_data_ptr_f32",
+            UnsafePointer[c_float, owner_origin],
+        ](multifab, c_int(tile_index)),
+        lo_x=data_lo[0],
+        lo_y=data_lo[1],
+        lo_z=data_lo[2],
+        hi_x=data_hi[0],
+        hi_y=data_hi[1],
+        hi_z=data_hi[2],
+        stride_i=stride[0],
+        stride_j=stride[1],
+        stride_k=stride[2],
+        stride_n=stride[3],
+        ncomp=ncomp_raw[0],
+    )
+
+    return TileF32View[owner_origin](
+        tile_box=box_from_bounds(tile_lo, tile_hi),
+        valid_box=box_from_bounds(valid_lo, valid_hi),
+        array_view=array_view.copy(),
+    )
+
+
 def array4_view_from_mfiter[
     owner_origin: Origin[mut=True]
 ](
@@ -599,6 +852,46 @@ def array4_view_from_mfiter[
         data=lib.call[
             "amrex_mojo_multifab_data_ptr_for_mfiter",
             UnsafePointer[c_double, owner_origin],
+        ](multifab, mfiter),
+        lo_x=data_lo[0],
+        lo_y=data_lo[1],
+        lo_z=data_lo[2],
+        hi_x=data_hi[0],
+        hi_y=data_hi[1],
+        hi_z=data_hi[2],
+        stride_i=stride[0],
+        stride_j=stride[1],
+        stride_k=stride[2],
+        stride_n=stride[3],
+        ncomp=ncomp_raw[0],
+    )
+
+
+def array4_view_from_mfiter_f32[
+    owner_origin: Origin[mut=True]
+](
+    ref lib: OwnedDLHandle,
+    multifab: MultiFabHandle,
+    mfiter: MFIterHandle,
+) raises -> Array4F32View[owner_origin]:
+    var data_lo = List[c_int](length=3, fill=0)
+    var data_hi = List[c_int](length=3, fill=0)
+    var stride = List[Int64](length=4, fill=0)
+    var ncomp_raw = List[c_int](length=1, fill=0)
+
+    _ = lib.call["amrex_mojo_multifab_array4_metadata_for_mfiter", c_int](
+        multifab,
+        mfiter,
+        data_lo.unsafe_ptr(),
+        data_hi.unsafe_ptr(),
+        stride.unsafe_ptr(),
+        ncomp_raw.unsafe_ptr(),
+    )
+
+    return Array4F32View[owner_origin](
+        data=lib.call[
+            "amrex_mojo_multifab_data_ptr_for_mfiter_f32",
+            UnsafePointer[c_float, owner_origin],
         ](multifab, mfiter),
         lo_x=data_lo[0],
         lo_y=data_lo[1],
