@@ -33,7 +33,7 @@ struct ParmParse(Movable):
         if not self.handle:
             raise Error(last_error_message(self.runtime[].lib))
 
-    fn __del__(deinit self):
+    def __del__(deinit self):
         if self.handle:
             self.runtime[].lib.call["amrex_mojo_parmparse_destroy"](self.handle)
 

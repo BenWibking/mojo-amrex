@@ -22,7 +22,7 @@ struct _AmrexRuntimeState(Movable):
     var handle: RuntimeHandle
     var path: String
 
-    fn __del__(deinit self):
+    def __del__(deinit self):
         if self.handle:
             self.lib.call["amrex_mojo_runtime_destroy"](self.handle)
 

@@ -35,7 +35,7 @@ struct MFIter(Movable):
         self.handle = handle
         self.default_ngrow = default_ngrow.copy()
 
-    fn __del__(deinit self):
+    def __del__(deinit self):
         if self.handle:
             self.runtime[].lib.call["amrex_mojo_mfiter_destroy"](self.handle)
 

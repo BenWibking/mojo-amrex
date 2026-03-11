@@ -15,7 +15,7 @@ comptime MULTIFAB_DATATYPE_FLOAT64 = 0
 comptime MULTIFAB_DATATYPE_FLOAT32 = 1
 
 
-fn init_device_passable_value[
+def init_device_passable_value[
     T: TrivialRegisterPassable,
     mut_origin: Origin[mut=True],
 ](value: T, target: UnsafePointer[NoneType, mut_origin]):
@@ -30,7 +30,7 @@ struct IntVect3D(TrivialRegisterPassable, DevicePassable):
     var y: c_int
     var z: c_int
 
-    fn _to_device_type[
+    def _to_device_type[
         mut_origin: Origin[mut=True]
     ](
         self,
@@ -39,7 +39,7 @@ struct IntVect3D(TrivialRegisterPassable, DevicePassable):
         init_device_passable_value(self, target)
 
     @staticmethod
-    fn get_type_name() -> String:
+    def get_type_name() -> String:
         return String("IntVect3D")
 
 
@@ -51,7 +51,7 @@ struct Box3D(TrivialRegisterPassable, DevicePassable):
     var big_end: IntVect3D
     var nodal: IntVect3D
 
-    fn _to_device_type[
+    def _to_device_type[
         mut_origin: Origin[mut=True]
     ](
         self,
@@ -60,7 +60,7 @@ struct Box3D(TrivialRegisterPassable, DevicePassable):
         init_device_passable_value(self, target)
 
     @staticmethod
-    fn get_type_name() -> String:
+    def get_type_name() -> String:
         return String("Box3D")
 
 
@@ -141,7 +141,7 @@ struct Array4F64View[origin: Origin[mut=True]](
     var stride_n: Int64
     var ncomp: c_int
 
-    fn device_view(self) -> Self.device_type:
+    def device_view(self) -> Self.device_type:
         return Array4F64View[MutAnyOrigin](
             data=UnsafePointer[c_double, MutAnyOrigin](self.data),
             lo_x=self.lo_x,
@@ -157,7 +157,7 @@ struct Array4F64View[origin: Origin[mut=True]](
             ncomp=self.ncomp,
         )
 
-    fn _to_device_type[
+    def _to_device_type[
         mut_origin: Origin[mut=True]
     ](
         self,
@@ -166,10 +166,10 @@ struct Array4F64View[origin: Origin[mut=True]](
         init_device_passable_value(self.device_view(), target)
 
     @staticmethod
-    fn get_type_name() -> String:
+    def get_type_name() -> String:
         return String("Array4F64View")
 
-    fn offset(self, i: Int, j: Int, k: Int, comp: Int = 0) -> Int:
+    def offset(self, i: Int, j: Int, k: Int, comp: Int = 0) -> Int:
         return (
             (i - Int(self.lo_x)) * Int(self.stride_i)
             + (j - Int(self.lo_y)) * Int(self.stride_j)
@@ -177,19 +177,19 @@ struct Array4F64View[origin: Origin[mut=True]](
             + comp * Int(self.stride_n)
         )
 
-    fn __getitem__(self, i: Int, j: Int, k: Int) -> Float64:
+    def __getitem__(self, i: Int, j: Int, k: Int) -> Float64:
         return self.data[self.offset(i, j, k)]
 
-    fn __getitem__(self, i: Int, j: Int, k: Int, comp: Int) -> Float64:
+    def __getitem__(self, i: Int, j: Int, k: Int, comp: Int) -> Float64:
         return self.data[self.offset(i, j, k, comp)]
 
-    fn __setitem__(self, i: Int, j: Int, k: Int, value: Float64):
+    def __setitem__(self, i: Int, j: Int, k: Int, value: Float64):
         self.data[self.offset(i, j, k)] = value
 
-    fn __setitem__(self, i: Int, j: Int, k: Int, comp: Int, value: Float64):
+    def __setitem__(self, i: Int, j: Int, k: Int, comp: Int, value: Float64):
         self.data[self.offset(i, j, k, comp)] = value
 
-    fn fill(self, box: Box3D, value: Float64, comp: Int = 0):
+    def fill(self, box: Box3D, value: Float64, comp: Int = 0):
         for k in range(Int(box.small_end.z), Int(box.big_end.z) + 1):
             for j in range(Int(box.small_end.y), Int(box.big_end.y) + 1):
                 for i in range(Int(box.small_end.x), Int(box.big_end.x) + 1):
@@ -215,7 +215,7 @@ struct Array4F32View[origin: Origin[mut=True]](
     var stride_n: Int64
     var ncomp: c_int
 
-    fn device_view(self) -> Self.device_type:
+    def device_view(self) -> Self.device_type:
         return Array4F32View[MutAnyOrigin](
             data=UnsafePointer[c_float, MutAnyOrigin](self.data),
             lo_x=self.lo_x,
@@ -231,7 +231,7 @@ struct Array4F32View[origin: Origin[mut=True]](
             ncomp=self.ncomp,
         )
 
-    fn _to_device_type[
+    def _to_device_type[
         mut_origin: Origin[mut=True]
     ](
         self,
@@ -240,10 +240,10 @@ struct Array4F32View[origin: Origin[mut=True]](
         init_device_passable_value(self.device_view(), target)
 
     @staticmethod
-    fn get_type_name() -> String:
+    def get_type_name() -> String:
         return String("Array4F32View")
 
-    fn offset(self, i: Int, j: Int, k: Int, comp: Int = 0) -> Int:
+    def offset(self, i: Int, j: Int, k: Int, comp: Int = 0) -> Int:
         return (
             (i - Int(self.lo_x)) * Int(self.stride_i)
             + (j - Int(self.lo_y)) * Int(self.stride_j)
@@ -251,19 +251,19 @@ struct Array4F32View[origin: Origin[mut=True]](
             + comp * Int(self.stride_n)
         )
 
-    fn __getitem__(self, i: Int, j: Int, k: Int) -> Float32:
+    def __getitem__(self, i: Int, j: Int, k: Int) -> Float32:
         return self.data[self.offset(i, j, k)]
 
-    fn __getitem__(self, i: Int, j: Int, k: Int, comp: Int) -> Float32:
+    def __getitem__(self, i: Int, j: Int, k: Int, comp: Int) -> Float32:
         return self.data[self.offset(i, j, k, comp)]
 
-    fn __setitem__(self, i: Int, j: Int, k: Int, value: Float32):
+    def __setitem__(self, i: Int, j: Int, k: Int, value: Float32):
         self.data[self.offset(i, j, k)] = value
 
-    fn __setitem__(self, i: Int, j: Int, k: Int, comp: Int, value: Float32):
+    def __setitem__(self, i: Int, j: Int, k: Int, comp: Int, value: Float32):
         self.data[self.offset(i, j, k, comp)] = value
 
-    fn fill(self, box: Box3D, value: Float32, comp: Int = 0):
+    def fill(self, box: Box3D, value: Float32, comp: Int = 0):
         for k in range(Int(box.small_end.z), Int(box.big_end.z) + 1):
             for j in range(Int(box.small_end.y), Int(box.big_end.y) + 1):
                 for i in range(Int(box.small_end.x), Int(box.big_end.x) + 1):
@@ -280,14 +280,14 @@ struct TileF64View[origin: Origin[mut=True]](
     var valid_box: Box3D
     var array_view: Array4F64View[Self.origin]
 
-    fn device_view(self) -> Self.device_type:
+    def device_view(self) -> Self.device_type:
         return TileF64View[MutAnyOrigin](
             tile_box=self.tile_box.copy(),
             valid_box=self.valid_box.copy(),
             array_view=self.array_view.device_view(),
         )
 
-    fn _to_device_type[
+    def _to_device_type[
         mut_origin: Origin[mut=True]
     ](
         self,
@@ -296,13 +296,13 @@ struct TileF64View[origin: Origin[mut=True]](
         init_device_passable_value(self.device_view(), target)
 
     @staticmethod
-    fn get_type_name() -> String:
+    def get_type_name() -> String:
         return String("TileF64View")
 
-    fn array(self) -> Array4F64View[Self.origin]:
+    def array(self) -> Array4F64View[Self.origin]:
         return self.array_view.copy()
 
-    fn fill(self, value: Float64, comp: Int = 0):
+    def fill(self, value: Float64, comp: Int = 0):
         self.array_view.fill(self.tile_box, value, comp)
 
 
@@ -316,14 +316,14 @@ struct TileF32View[origin: Origin[mut=True]](
     var valid_box: Box3D
     var array_view: Array4F32View[Self.origin]
 
-    fn device_view(self) -> Self.device_type:
+    def device_view(self) -> Self.device_type:
         return TileF32View[MutAnyOrigin](
             tile_box=self.tile_box.copy(),
             valid_box=self.valid_box.copy(),
             array_view=self.array_view.device_view(),
         )
 
-    fn _to_device_type[
+    def _to_device_type[
         mut_origin: Origin[mut=True]
     ](
         self,
@@ -332,13 +332,13 @@ struct TileF32View[origin: Origin[mut=True]](
         init_device_passable_value(self.device_view(), target)
 
     @staticmethod
-    fn get_type_name() -> String:
+    def get_type_name() -> String:
         return String("TileF32View")
 
-    fn array(self) -> Array4F32View[Self.origin]:
+    def array(self) -> Array4F32View[Self.origin]:
         return self.array_view.copy()
 
-    fn fill(self, value: Float32, comp: Int = 0):
+    def fill(self, value: Float32, comp: Int = 0):
         self.array_view.fill(self.tile_box, value, comp)
 
 

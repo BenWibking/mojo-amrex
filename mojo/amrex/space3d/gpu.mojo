@@ -8,7 +8,7 @@ from amrex.ffi import Array4F32View, Box3D, TileF32View
 from std.gpu.host import DeviceBuffer, DeviceContext
 
 
-fn array4_storage_size[
+def array4_storage_size[
     origin: Origin[mut=True]
 ](array: Array4F32View[origin]) -> Int:
     return (
@@ -44,7 +44,7 @@ struct StagedArray4F32(Movable):
             ncomp=array.ncomp,
         )
 
-    fn device_view(self) -> Array4F32View[MutAnyOrigin]:
+    def device_view(self) -> Array4F32View[MutAnyOrigin]:
         return self.device_view_.copy()
 
     def load_from_host[
@@ -70,14 +70,14 @@ struct StagedTileF32(Movable):
         self.array_stage = StagedArray4F32(ctx, array)
         self.array_stage.load_from_host(ctx, array)
 
-    fn cell_count(self) -> Int:
+    def cell_count(self) -> Int:
         return (
             (Int(self.tile_box.big_end.x) - Int(self.tile_box.small_end.x) + 1)
             * (Int(self.tile_box.big_end.y) - Int(self.tile_box.small_end.y) + 1)
             * (Int(self.tile_box.big_end.z) - Int(self.tile_box.small_end.z) + 1)
         )
 
-    fn device_view(self) -> Array4F32View[MutAnyOrigin]:
+    def device_view(self) -> Array4F32View[MutAnyOrigin]:
         return self.array_stage.device_view()
 
     def store_to_host[

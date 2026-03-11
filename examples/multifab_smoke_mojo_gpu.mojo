@@ -35,7 +35,7 @@ def fill_tile[
     tile.fill(Float32(1.0))
 
 
-fn update_tile_gpu(
+def update_tile_gpu(
     src: Array4F32View[MutAnyOrigin],
     dst: Array4F32View[MutAnyOrigin],
     tile_box: Box3D,
