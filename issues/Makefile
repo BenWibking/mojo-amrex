@@ -5,8 +5,8 @@ SDKROOT ?= $(shell xcrun --sdk macosx --show-sdk-path 2>/dev/null)
 OBJCFLAGS ?= -std=c11 -fobjc-arc
 FRAMEWORKS := -framework Foundation -framework Metal
 
-SRC := apple_silicon_zero_copy_host_buffer_gpu_repro_metal.m
-OUT_DIR := .build
+SRC := apple_silicon_zero_copy_host_buffer_gpu_repro_metal_malloc.m
+OUT_DIR := .
 BIN := $(OUT_DIR)/apple_silicon_zero_copy_host_buffer_gpu_repro_metal
 
 ifneq ($(SDKROOT),)
