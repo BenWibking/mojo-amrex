@@ -430,6 +430,11 @@ interop is not complete because AMReX-managed device allocation, borrowed
 `Array4` device views, and stream/runtime composition between AMReX and Mojo
 are not wired up well enough yet.
 
+See `docs/mojo-amrex-direct-gpu-interop.md` for the concrete proposal for that
+deferred direct path. The short version is that AMReX should remain the owner
+of both device memory and stream selection, while Mojo adapts its kernel
+launches to the current AMReX stream.
+
 That leaves two distinct execution models:
 
 - current supported path: host-backed `MultiFab` plus explicit staging into
@@ -661,6 +666,9 @@ prefer AMReX-managed allocation via `The_Async_Arena()` over redesigning
 as the main integration risk. The current public Mojo GPU API appears to manage
 its own streams rather than adopt external AMReX stream handles, so boundary
 synchronization may be required unless lower-level interop becomes available.
+`docs/mojo-amrex-direct-gpu-interop.md` captures the proposed path for closing
+that gap by importing the current AMReX stream into Mojo rather than trying to
+make AMReX adopt Mojo-owned streams.
 
 ### 5. Depending too heavily on AMReX's Fortran interface build path
 

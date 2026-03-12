@@ -56,6 +56,8 @@ failure.
   to an AMReX GPU runtime is not supported. The current workaround is to stage
   through a `DeviceBuffer` and then pass a rebuilt
   `Array4F32View[MutAnyOrigin]` to the kernel.
+- The proposed long-term direct path is documented in
+  `docs/mojo-amrex-direct-gpu-interop.md`.
 
 ## Error Reporting
 

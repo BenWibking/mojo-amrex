@@ -113,6 +113,10 @@ Notes:
   through `DeviceBuffer`s before launch and uses `Float32` storage for broad
   backend compatibility. That is Mojo-kernel support in user code, not AMReX
   GPU-runtime interop.
+- The proposed long-term direct path is documented in
+  `docs/mojo-amrex-direct-gpu-interop.md`. That design keeps AMReX in charge of
+  device memory and stream selection and has Mojo launch onto the current
+  AMReX stream.
 - To build against a local AMReX checkout instead, configure with
   `-DAMREX_MOJO_AMREX_SOURCE_DIR=/path/to/amrex`.
 - `pixi run build-capi` now also refreshes the C API dylib in the active env's
