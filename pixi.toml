@@ -36,5 +36,5 @@ test = { depends-on = ["test-capi", "test-mojo"] }
 format-mojo = "mojo format mojo/amrex examples tests/mojo"
 
 [dependencies]
-mojo = ">=0.26.3.0.dev2026031205,<0.27"
+mojo = ">=0.26.3.0.dev2026031305,<0.27"
 openmpi = ">=5.0.10,<6"
