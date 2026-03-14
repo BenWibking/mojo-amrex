@@ -60,9 +60,7 @@ def update_tile_gpu(
         var plane_index = linear_index % cells_per_plane
         var j = tile_lo_y + plane_index // nx
         var i = tile_lo_x + plane_index % nx
-        dst.data[dst.offset(i, j, k)] = (
-            src.data[src.offset(i, j, k)] + add_value
-        )
+        dst[i, j, k] = src[i, j, k] + add_value
 
 
 def launch_update_tile(
