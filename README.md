@@ -1,4 +1,4 @@
-# mojo-amrex
+# mojo-amrex [proof-of-concept]
 
 Mojo bindings to AMReX, implemented as a narrow C ABI plus RAII-style Mojo objects.
 
