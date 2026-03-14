@@ -2,6 +2,7 @@ set(
     AMREX_MOJO_CAPI_SOURCES
     error.cpp
     init.cpp
+    gpu.cpp
     boxarray.cpp
     distmap.cpp
     geometry.cpp

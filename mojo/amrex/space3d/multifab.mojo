@@ -3,12 +3,17 @@
 from amrex.ffi import (
     Array4F32View,
     Array4F64View,
+    Box3D,
     IntVect3D,
     MULTIFAB_DATATYPE_FLOAT32,
     MultiFabMemoryInfo,
     MultiFabHandle,
     TileF32View,
     TileF64View,
+    device_tile_view,
+    device_tile_view_f32,
+    device_array4_view_from_mfiter,
+    device_array4_view_from_mfiter_f32,
     array4_view_from_mfiter_f32,
     array4_view_from_mfiter,
     last_error_message,
@@ -28,6 +33,8 @@ from amrex.ffi import (
     multifab_set_val,
     multifab_sum,
     multifab_tile_count,
+    multifab_tile_box,
+    multifab_valid_box,
     multifab_write_single_level_plotfile,
     tile_view_f32,
     tile_view,
@@ -99,6 +106,16 @@ struct MultiFab(Movable):
         var handle = self._handle()
         return multifab_tile_count(self.runtime[].lib, handle)
 
+    def tile_box(ref self, tile_index: Int) raises -> Box3D:
+        self._require_tile_index(tile_index)
+        return multifab_tile_box(self.runtime[].lib, self._handle(), tile_index)
+
+    def valid_box(ref self, tile_index: Int) raises -> Box3D:
+        self._require_tile_index(tile_index)
+        return multifab_valid_box(
+            self.runtime[].lib, self._handle(), tile_index
+        )
+
     def mfiter(ref self) raises -> MFIter:
         var handle = self._handle()
         return create_mfiter(
@@ -120,6 +137,35 @@ struct MultiFab(Movable):
         owner_origin
     ]:
         return self.tile(mfi).array()
+
+    def unsafe_device_array[
+        owner_origin: Origin[mut=True]
+    ](ref[owner_origin] self, tile_index: Int) raises -> Array4F64View[
+        owner_origin
+    ]:
+        self._require_tile_index(tile_index)
+        var handle = self._handle()
+        var array_view = device_tile_view[owner_origin](
+            self.runtime[].lib, handle, tile_index
+        ).array()
+        if not array_view.data:
+            raise Error(last_error_message(self.runtime[].lib))
+        return array_view.copy()
+
+    def unsafe_device_array[
+        owner_origin: Origin[mut=True]
+    ](ref[owner_origin] self, ref mfi: MFIter) raises -> Array4F64View[
+        owner_origin
+    ]:
+        var handle = self._handle()
+        var array_view = device_array4_view_from_mfiter[owner_origin](
+            self.runtime[].lib,
+            handle,
+            mfi._handle(),
+        )
+        if not array_view.data:
+            raise Error(last_error_message(self.runtime[].lib))
+        return array_view.copy()
 
     def tile[
         owner_origin: Origin[mut=True]
@@ -415,6 +461,16 @@ struct MultiFabF32(Movable):
         var handle = self._handle()
         return multifab_tile_count(self.runtime[].lib, handle)
 
+    def tile_box(ref self, tile_index: Int) raises -> Box3D:
+        self._require_tile_index(tile_index)
+        return multifab_tile_box(self.runtime[].lib, self._handle(), tile_index)
+
+    def valid_box(ref self, tile_index: Int) raises -> Box3D:
+        self._require_tile_index(tile_index)
+        return multifab_valid_box(
+            self.runtime[].lib, self._handle(), tile_index
+        )
+
     def mfiter(ref self) raises -> MFIter:
         var handle = self._handle()
         return create_mfiter(
@@ -436,6 +492,35 @@ struct MultiFabF32(Movable):
         owner_origin
     ]:
         return self.tile(mfi).array()
+
+    def unsafe_device_array[
+        owner_origin: Origin[mut=True]
+    ](ref[owner_origin] self, tile_index: Int) raises -> Array4F32View[
+        owner_origin
+    ]:
+        self._require_tile_index(tile_index)
+        var handle = self._handle()
+        var array_view = device_tile_view_f32[owner_origin](
+            self.runtime[].lib, handle, tile_index
+        ).array()
+        if not array_view.data:
+            raise Error(last_error_message(self.runtime[].lib))
+        return array_view.copy()
+
+    def unsafe_device_array[
+        owner_origin: Origin[mut=True]
+    ](ref[owner_origin] self, ref mfi: MFIter) raises -> Array4F32View[
+        owner_origin
+    ]:
+        var handle = self._handle()
+        var array_view = device_array4_view_from_mfiter_f32[owner_origin](
+            self.runtime[].lib,
+            handle,
+            mfi._handle(),
+        )
+        if not array_view.data:
+            raise Error(last_error_message(self.runtime[].lib))
+        return array_view.copy()
 
     def tile[
         owner_origin: Origin[mut=True]

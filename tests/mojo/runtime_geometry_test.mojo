@@ -24,7 +24,7 @@ def main() raises:
     argv[0] = String("runtime_geometry_test")
     argv[1] = String("runtime_geometry_test.answer=17")
     var runtime = AmrexRuntime(argv, use_parmparse=True)
-    expect(runtime.abi_version() == 2, "unexpected ABI version")
+    expect(runtime.abi_version() == 4, "unexpected ABI version")
     expect(runtime.initialized(), "runtime should be initialized")
     expect(runtime.nprocs() >= 1, "nprocs should be >= 1")
     expect(runtime.myproc() >= 0, "myproc should be >= 0")

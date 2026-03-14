@@ -6,7 +6,7 @@
 extern "C" {
 #endif
 
-#define AMREX_MOJO_ABI_VERSION 2
+#define AMREX_MOJO_ABI_VERSION 4
 
 typedef struct amrex_mojo_runtime amrex_mojo_runtime_t;
 typedef struct amrex_mojo_boxarray amrex_mojo_boxarray_t;
@@ -15,6 +15,7 @@ typedef struct amrex_mojo_geometry amrex_mojo_geometry_t;
 typedef struct amrex_mojo_multifab amrex_mojo_multifab_t;
 typedef struct amrex_mojo_mfiter amrex_mojo_mfiter_t;
 typedef struct amrex_mojo_parmparse amrex_mojo_parmparse_t;
+typedef struct amrex_mojo_external_gpu_stream_scope amrex_mojo_external_gpu_stream_scope_t;
 
 typedef enum amrex_mojo_status_code
 {
@@ -29,6 +30,19 @@ typedef enum amrex_mojo_multifab_memory_kind
     AMREX_MOJO_MULTIFAB_MEMORY_DEFAULT = 0,
     AMREX_MOJO_MULTIFAB_MEMORY_HOST_ONLY = 1
 } amrex_mojo_multifab_memory_kind_t;
+
+typedef enum amrex_mojo_gpu_backend
+{
+    AMREX_MOJO_GPU_BACKEND_NONE = 0,
+    AMREX_MOJO_GPU_BACKEND_CUDA = 1,
+    AMREX_MOJO_GPU_BACKEND_HIP = 2
+} amrex_mojo_gpu_backend_t;
+
+typedef enum amrex_mojo_external_stream_sync
+{
+    AMREX_MOJO_EXTERNAL_STREAM_SYNC_YES = 0,
+    AMREX_MOJO_EXTERNAL_STREAM_SYNC_NO = 1
+} amrex_mojo_external_stream_sync_t;
 
 typedef enum amrex_mojo_datatype
 {
@@ -120,6 +134,14 @@ amrex_mojo_runtime_t* amrex_mojo_runtime_create(
 amrex_mojo_runtime_t* amrex_mojo_runtime_create_default(void);
 void amrex_mojo_runtime_destroy(amrex_mojo_runtime_t* runtime);
 int32_t amrex_mojo_runtime_initialized(const amrex_mojo_runtime_t* runtime);
+amrex_mojo_gpu_backend_t amrex_mojo_gpu_backend(void);
+amrex_mojo_external_gpu_stream_scope_t* amrex_mojo_external_gpu_stream_scope_create(
+    void* stream_handle,
+    amrex_mojo_external_stream_sync_t sync_on_exit
+);
+void amrex_mojo_external_gpu_stream_scope_destroy(
+    amrex_mojo_external_gpu_stream_scope_t* scope
+);
 
 int32_t amrex_mojo_parallel_nprocs(void);
 int32_t amrex_mojo_parallel_myproc(void);
@@ -297,6 +319,14 @@ amrex_mojo_array4_view_f32 amrex_mojo_multifab_array4_f32(
     int32_t tile_index
 );
 float* amrex_mojo_multifab_data_ptr_f32(const amrex_mojo_multifab_t* multifab, int32_t tile_index);
+double* amrex_mojo_multifab_data_ptr_device(
+    const amrex_mojo_multifab_t* multifab,
+    int32_t tile_index
+);
+float* amrex_mojo_multifab_data_ptr_device_f32(
+    const amrex_mojo_multifab_t* multifab,
+    int32_t tile_index
+);
 amrex_mojo_status_code_t amrex_mojo_multifab_tile_metadata(
     const amrex_mojo_multifab_t* multifab,
     int32_t tile_index,
@@ -322,6 +352,14 @@ double* amrex_mojo_multifab_data_ptr_for_mfiter(
     const amrex_mojo_mfiter_t* mfiter
 );
 float* amrex_mojo_multifab_data_ptr_for_mfiter_f32(
+    const amrex_mojo_multifab_t* multifab,
+    const amrex_mojo_mfiter_t* mfiter
+);
+double* amrex_mojo_multifab_data_ptr_for_mfiter_device(
+    const amrex_mojo_multifab_t* multifab,
+    const amrex_mojo_mfiter_t* mfiter
+);
+float* amrex_mojo_multifab_data_ptr_for_mfiter_device_f32(
     const amrex_mojo_multifab_t* multifab,
     const amrex_mojo_mfiter_t* mfiter
 );

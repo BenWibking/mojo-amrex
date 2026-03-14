@@ -10,6 +10,16 @@ comptime GeometryHandle = UnsafePointer[NoneType, MutExternalOrigin]
 comptime MultiFabHandle = UnsafePointer[NoneType, MutExternalOrigin]
 comptime MFIterHandle = UnsafePointer[NoneType, MutExternalOrigin]
 comptime ParmParseHandle = UnsafePointer[NoneType, MutExternalOrigin]
+comptime ExternalGpuStreamScopeHandle = UnsafePointer[
+    NoneType, MutExternalOrigin
+]
+
+comptime GPU_BACKEND_NONE = 0
+comptime GPU_BACKEND_CUDA = 1
+comptime GPU_BACKEND_HIP = 2
+
+comptime EXTERNAL_STREAM_SYNC_YES = 0
+comptime EXTERNAL_STREAM_SYNC_NO = 1
 
 comptime MULTIFAB_DATATYPE_FLOAT64 = 0
 comptime MULTIFAB_DATATYPE_FLOAT32 = 1
@@ -419,6 +429,34 @@ def runtime_initialized(
     return lib.call["amrex_mojo_runtime_initialized", c_int](runtime) != 0
 
 
+def gpu_backend(ref lib: OwnedDLHandle) raises -> Int:
+    return Int(lib.call["amrex_mojo_gpu_backend", c_int]())
+
+
+def external_gpu_stream_scope_create(
+    ref lib: OwnedDLHandle,
+    stream_handle: UnsafePointer[NoneType, MutExternalOrigin],
+    sync_on_exit: Bool = True,
+) raises -> ExternalGpuStreamScopeHandle:
+    return lib.call[
+        "amrex_mojo_external_gpu_stream_scope_create",
+        ExternalGpuStreamScopeHandle,
+    ](
+        stream_handle,
+        c_int(
+            EXTERNAL_STREAM_SYNC_YES
+            if sync_on_exit
+            else EXTERNAL_STREAM_SYNC_NO
+        ),
+    )
+
+
+def external_gpu_stream_scope_destroy(
+    ref lib: OwnedDLHandle, scope: ExternalGpuStreamScopeHandle
+) raises:
+    lib.call["amrex_mojo_external_gpu_stream_scope_destroy"](scope)
+
+
 def parallel_nprocs(ref lib: OwnedDLHandle) raises -> Int:
     return Int(lib.call["amrex_mojo_parallel_nprocs", c_int]())
 
@@ -586,6 +624,22 @@ def multifab_tile_count(
     ref lib: OwnedDLHandle, multifab: MultiFabHandle
 ) raises -> Int:
     return Int(lib.call["amrex_mojo_multifab_tile_count", c_int](multifab))
+
+
+def multifab_tile_box(
+    ref lib: OwnedDLHandle, multifab: MultiFabHandle, tile_index: Int
+) raises -> Box3D:
+    return lib.call["amrex_mojo_multifab_tile_box", Box3D](
+        multifab, c_int(tile_index)
+    )
+
+
+def multifab_valid_box(
+    ref lib: OwnedDLHandle, multifab: MultiFabHandle, tile_index: Int
+) raises -> Box3D:
+    return lib.call["amrex_mojo_multifab_valid_box", Box3D](
+        multifab, c_int(tile_index)
+    )
 
 
 def mfiter_create(
@@ -775,6 +829,58 @@ def tile_view[
     )
 
 
+def device_tile_view[
+    owner_origin: Origin[mut=True]
+](
+    ref lib: OwnedDLHandle, multifab: MultiFabHandle, tile_index: Int
+) raises -> TileF64View[owner_origin]:
+    var tile_lo = List[c_int](length=3, fill=0)
+    var tile_hi = List[c_int](length=3, fill=0)
+    var valid_lo = List[c_int](length=3, fill=0)
+    var valid_hi = List[c_int](length=3, fill=0)
+    var data_lo = List[c_int](length=3, fill=0)
+    var data_hi = List[c_int](length=3, fill=0)
+    var stride = List[Int64](length=4, fill=0)
+    var ncomp_raw = List[c_int](length=1, fill=0)
+
+    _ = lib.call["amrex_mojo_multifab_tile_metadata", c_int](
+        multifab,
+        c_int(tile_index),
+        tile_lo.unsafe_ptr(),
+        tile_hi.unsafe_ptr(),
+        valid_lo.unsafe_ptr(),
+        valid_hi.unsafe_ptr(),
+        data_lo.unsafe_ptr(),
+        data_hi.unsafe_ptr(),
+        stride.unsafe_ptr(),
+        ncomp_raw.unsafe_ptr(),
+    )
+
+    var array_view = Array4F64View[owner_origin](
+        data=lib.call[
+            "amrex_mojo_multifab_data_ptr_device",
+            UnsafePointer[c_double, owner_origin],
+        ](multifab, c_int(tile_index)),
+        lo_x=data_lo[0],
+        lo_y=data_lo[1],
+        lo_z=data_lo[2],
+        hi_x=data_hi[0],
+        hi_y=data_hi[1],
+        hi_z=data_hi[2],
+        stride_i=stride[0],
+        stride_j=stride[1],
+        stride_k=stride[2],
+        stride_n=stride[3],
+        ncomp=ncomp_raw[0],
+    )
+
+    return TileF64View[owner_origin](
+        tile_box=box_from_bounds(tile_lo, tile_hi),
+        valid_box=box_from_bounds(valid_lo, valid_hi),
+        array_view=array_view.copy(),
+    )
+
+
 def tile_view_f32[
     owner_origin: Origin[mut=True]
 ](
@@ -805,6 +911,58 @@ def tile_view_f32[
     var array_view = Array4F32View[owner_origin](
         data=lib.call[
             "amrex_mojo_multifab_data_ptr_f32",
+            UnsafePointer[c_float, owner_origin],
+        ](multifab, c_int(tile_index)),
+        lo_x=data_lo[0],
+        lo_y=data_lo[1],
+        lo_z=data_lo[2],
+        hi_x=data_hi[0],
+        hi_y=data_hi[1],
+        hi_z=data_hi[2],
+        stride_i=stride[0],
+        stride_j=stride[1],
+        stride_k=stride[2],
+        stride_n=stride[3],
+        ncomp=ncomp_raw[0],
+    )
+
+    return TileF32View[owner_origin](
+        tile_box=box_from_bounds(tile_lo, tile_hi),
+        valid_box=box_from_bounds(valid_lo, valid_hi),
+        array_view=array_view.copy(),
+    )
+
+
+def device_tile_view_f32[
+    owner_origin: Origin[mut=True]
+](
+    ref lib: OwnedDLHandle, multifab: MultiFabHandle, tile_index: Int
+) raises -> TileF32View[owner_origin]:
+    var tile_lo = List[c_int](length=3, fill=0)
+    var tile_hi = List[c_int](length=3, fill=0)
+    var valid_lo = List[c_int](length=3, fill=0)
+    var valid_hi = List[c_int](length=3, fill=0)
+    var data_lo = List[c_int](length=3, fill=0)
+    var data_hi = List[c_int](length=3, fill=0)
+    var stride = List[Int64](length=4, fill=0)
+    var ncomp_raw = List[c_int](length=1, fill=0)
+
+    _ = lib.call["amrex_mojo_multifab_tile_metadata", c_int](
+        multifab,
+        c_int(tile_index),
+        tile_lo.unsafe_ptr(),
+        tile_hi.unsafe_ptr(),
+        valid_lo.unsafe_ptr(),
+        valid_hi.unsafe_ptr(),
+        data_lo.unsafe_ptr(),
+        data_hi.unsafe_ptr(),
+        stride.unsafe_ptr(),
+        ncomp_raw.unsafe_ptr(),
+    )
+
+    var array_view = Array4F32View[owner_origin](
+        data=lib.call[
+            "amrex_mojo_multifab_data_ptr_device_f32",
             UnsafePointer[c_float, owner_origin],
         ](multifab, c_int(tile_index)),
         lo_x=data_lo[0],
@@ -867,6 +1025,46 @@ def array4_view_from_mfiter[
     )
 
 
+def device_array4_view_from_mfiter[
+    owner_origin: Origin[mut=True]
+](
+    ref lib: OwnedDLHandle,
+    multifab: MultiFabHandle,
+    mfiter: MFIterHandle,
+) raises -> Array4F64View[owner_origin]:
+    var data_lo = List[c_int](length=3, fill=0)
+    var data_hi = List[c_int](length=3, fill=0)
+    var stride = List[Int64](length=4, fill=0)
+    var ncomp_raw = List[c_int](length=1, fill=0)
+
+    _ = lib.call["amrex_mojo_multifab_array4_metadata_for_mfiter", c_int](
+        multifab,
+        mfiter,
+        data_lo.unsafe_ptr(),
+        data_hi.unsafe_ptr(),
+        stride.unsafe_ptr(),
+        ncomp_raw.unsafe_ptr(),
+    )
+
+    return Array4F64View[owner_origin](
+        data=lib.call[
+            "amrex_mojo_multifab_data_ptr_for_mfiter_device",
+            UnsafePointer[c_double, owner_origin],
+        ](multifab, mfiter),
+        lo_x=data_lo[0],
+        lo_y=data_lo[1],
+        lo_z=data_lo[2],
+        hi_x=data_hi[0],
+        hi_y=data_hi[1],
+        hi_z=data_hi[2],
+        stride_i=stride[0],
+        stride_j=stride[1],
+        stride_k=stride[2],
+        stride_n=stride[3],
+        ncomp=ncomp_raw[0],
+    )
+
+
 def array4_view_from_mfiter_f32[
     owner_origin: Origin[mut=True]
 ](
@@ -891,6 +1089,46 @@ def array4_view_from_mfiter_f32[
     return Array4F32View[owner_origin](
         data=lib.call[
             "amrex_mojo_multifab_data_ptr_for_mfiter_f32",
+            UnsafePointer[c_float, owner_origin],
+        ](multifab, mfiter),
+        lo_x=data_lo[0],
+        lo_y=data_lo[1],
+        lo_z=data_lo[2],
+        hi_x=data_hi[0],
+        hi_y=data_hi[1],
+        hi_z=data_hi[2],
+        stride_i=stride[0],
+        stride_j=stride[1],
+        stride_k=stride[2],
+        stride_n=stride[3],
+        ncomp=ncomp_raw[0],
+    )
+
+
+def device_array4_view_from_mfiter_f32[
+    owner_origin: Origin[mut=True]
+](
+    ref lib: OwnedDLHandle,
+    multifab: MultiFabHandle,
+    mfiter: MFIterHandle,
+) raises -> Array4F32View[owner_origin]:
+    var data_lo = List[c_int](length=3, fill=0)
+    var data_hi = List[c_int](length=3, fill=0)
+    var stride = List[Int64](length=4, fill=0)
+    var ncomp_raw = List[c_int](length=1, fill=0)
+
+    _ = lib.call["amrex_mojo_multifab_array4_metadata_for_mfiter", c_int](
+        multifab,
+        mfiter,
+        data_lo.unsafe_ptr(),
+        data_hi.unsafe_ptr(),
+        stride.unsafe_ptr(),
+        ncomp_raw.unsafe_ptr(),
+    )
+
+    return Array4F32View[owner_origin](
+        data=lib.call[
+            "amrex_mojo_multifab_data_ptr_for_mfiter_device_f32",
             UnsafePointer[c_float, owner_origin],
         ](multifab, mfiter),
         lo_x=data_lo[0],

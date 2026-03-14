@@ -21,10 +21,6 @@
 #include <variant>
 #include <vector>
 
-#if defined(AMREX_USE_GPU)
-#error "mojo-amrex does not support AMReX GPU backends. Build AMReX with AMReX_GPU_BACKEND=NONE."
-#endif
-
 namespace amrex_mojo::detail
 {
     struct runtime_state
@@ -165,4 +161,9 @@ struct amrex_mojo_parmparse
 {
     amrex_mojo::detail::runtime_state* state = nullptr;
     std::unique_ptr<amrex::ParmParse> value;
+};
+
+struct amrex_mojo_external_gpu_stream_scope
+{
+    void* impl = nullptr;
 };

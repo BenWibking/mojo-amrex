@@ -145,6 +145,21 @@ auto main() -> int
     amrex_mojo_runtime_t* runtime = amrex_mojo_runtime_create(1, runtime_argv, 0);
     expect(runtime != nullptr, "runtime_create returned null.");
     expect(amrex_mojo_runtime_initialized(runtime) == 1, "runtime should report initialized.");
+    const auto gpu_backend = amrex_mojo_gpu_backend();
+    expect(
+        gpu_backend >= AMREX_MOJO_GPU_BACKEND_NONE &&
+            gpu_backend <= AMREX_MOJO_GPU_BACKEND_HIP,
+        "gpu_backend should return a known enum value."
+    );
+    if (gpu_backend == AMREX_MOJO_GPU_BACKEND_NONE) {
+        expect(
+            amrex_mojo_external_gpu_stream_scope_create(
+                reinterpret_cast<void*>(0x1),
+                AMREX_MOJO_EXTERNAL_STREAM_SYNC_NO
+            ) == nullptr,
+            "external_gpu_stream_scope_create should fail when CUDA/HIP interop is unavailable."
+        );
+    }
     expect(amrex_mojo_parallel_nprocs() >= 1, "parallel_nprocs should be >= 1.");
     expect(amrex_mojo_parallel_myproc() >= 0, "parallel_myproc should be >= 0.");
     expect(
@@ -257,6 +272,15 @@ auto main() -> int
         "multifab_memory_info should succeed for host_only allocation."
     );
     expect(host_memory.host_accessible == 1, "host_only multifab should be host-accessible.");
+    expect(
+        amrex_mojo_multifab_data_ptr_device(host_multifab, 0) == nullptr,
+        "host_only multifab_data_ptr_device should reject non-device storage."
+    );
+    expect(
+        std::string(amrex_mojo_last_error_message()).find("device-accessible") !=
+            std::string::npos,
+        "multifab_data_ptr_device should report a device-accessibility diagnostic."
+    );
 
     expect(
         amrex_mojo_multifab_set_val(multifab, 2.0, 0, 1) == AMREX_MOJO_STATUS_OK,

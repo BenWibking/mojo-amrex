@@ -1,316 +1,187 @@
-# Direct GPU Interop Proposal for `mojo-amrex`
+# Direct GPU Interop for `mojo-amrex`
 
-Last updated: 2026-03-12
+Last updated: 2026-03-13
 
 ## Goal
 
-Define an opt-in path for launching Mojo GPU kernels directly against
-AMReX-managed `MultiFab` device storage without staging tile data through Mojo
-`DeviceBuffer`s.
+Launch Mojo GPU kernels directly against AMReX-managed `MultiFab` device
+storage without staging tile data through Mojo `DeviceBuffer`s.
 
-This document is a concrete proposal for the deferred GPU path referenced in
-`docs/mojo-amrex-bindings-plan.md`. It is not the current implementation.
+## Status
 
-## Current Status
+This repository now implements an opt-in direct CUDA/HIP path.
 
-Today this repository intentionally disables AMReX GPU backends. The supported
-GPU path is:
+- The default pixi build is still CPU-only from the AMReX side because it uses
+  `AMREX_MOJO_GPU_BACKEND=NONE`.
+- Direct interop is available when AMReX is configured with
+  `AMREX_MOJO_GPU_BACKEND=CUDA` or `AMREX_MOJO_GPU_BACKEND=HIP`.
+- The portable staged path in `mojo/amrex/space3d/gpu.mojo` remains the
+  fallback for CPU builds and for backends that do not support direct AMReX
+  interop.
 
-1. allocate a host-backed `MultiFab`
-2. borrow a host `Array4` tile view
-3. copy tile data into a Mojo `DeviceBuffer`
-4. launch a Mojo kernel
-5. copy results back to the host tile
+## Design
 
-That staged path is correct for the current repo, but it is not direct AMReX
-GPU-runtime interop.
+The working direction is:
 
-## Investigation Summary
+- Mojo exports a raw handle for its current stream
+- AMReX adopts that stream for a scoped region with
+  `setExternalGpuStream` / `ExternalGpuStreamRegion`
+- Mojo and AMReX both issue work onto that same backend stream
 
-### What AMReX already exposes
+The inverse direction is not currently used here. AsyncRT still does not expose
+a working external-stream import path that would let `mojo-amrex` wrap an
+arbitrary AMReX-owned stream as a Mojo `DeviceStream`.
 
-AMReX already exposes the current GPU stream to application code:
+That makes the ownership split:
 
-- `amrex::Gpu::gpuStream()` returns the current backend stream handle
-- on CUDA, `amrex::Gpu::Device::cudaStream()` exposes the CUDA stream directly
-- `setStreamIndex`, `setStream`, and `resetStream` exist, but they operate on
-  AMReX-managed streams
+- AMReX owns `MultiFab` storage, async allocation semantics, and ordering
+- Mojo owns kernel code generation and the stream handle it exports
 
-There are two constraints that matter for `mojo-amrex`:
+## How It Works
 
-- `MFIter` changes the current stream as iteration advances, so the "current
-  stream" is a per-tile execution detail rather than a single process-wide
-  stream
-- AMReX async allocation and deferred free paths rely on `Gpu::gpuStream()`,
-  so AMReX-owned device memory must be used on the AMReX-selected stream to
-  preserve ordering
+### 1. Backend-gated build
 
-AMReX does not appear to support adopting an arbitrary external stream as the
-current stream. Its `setStream(stream)` path resolves the handle through
-AMReX's internal stream pool, which means a non-AMReX stream is not a valid
-drop-in replacement.
+The CMake option `AMREX_MOJO_GPU_BACKEND` controls whether AMReX is built with
+`NONE`, `CUDA`, or `HIP`.
 
-### What Mojo stdlib already exposes
+Today:
 
-Mojo stdlib owns the low-level GPU launch path through
-`std.gpu.host.DeviceContext` and `DeviceStream`.
+- `CUDA` works
+- `HIP` works
 
-That gives `mojo-amrex`:
+### 2. Mojo exports the native stream handle
 
-- compiled kernel launch on a `DeviceStream`
-- creation of Mojo-managed streams with `ctx.create_stream(...)`
-- export of native stream handles from Mojo-owned streams
+At the Mojo layer, `AmrexRuntime.external_gpu_stream_scope(ctx, ...)` inspects
+`ctx.api()` and exports the native stream handle from the current Mojo stream.
 
-The missing piece is the inverse operation. I did not find a public stdlib API
-that imports an external `CUstream` or `hipStream_t` into a Mojo
-`DeviceStream`. Without that, direct launch onto AMReX's current stream is not
-available through public Mojo APIs.
+Current implementation:
 
-## Design Decision
+- CUDA: `std.gpu.host._nvidia_cuda.CUDA(ctx.stream()) -> CUstream`
+- HIP: `std.gpu.host._amdgpu_hip.HIP(ctx.stream()) -> hipStream_t`
 
-AMReX must remain the owner of:
+Those typed handles are erased to `void*` for the C ABI boundary.
 
-- `MultiFab` device memory
-- stream selection
-- async allocation and deallocation ordering
+Important caveat:
 
-Mojo should remain responsible for:
+- those Mojo modules are internal stdlib modules in the currently installed
+  toolchain for this repo
+- they are the mechanism that works today, but they are not a stable public API
 
-- compiling kernels
-- preparing typed launch arguments
-- enqueuing work on the current AMReX stream
+If a stable public stdlib export surface becomes available later, the AMReX
+side of this design does not need to change.
 
-This means the direct path should be:
+### 3. AMReX installs that stream as the current external stream
 
-- Mojo adapts to the current AMReX stream
+The C ABI function
+`amrex_mojo_external_gpu_stream_scope_create(stream_handle, sync_on_exit)`
+constructs an AMReX `ExternalGpuStreamRegion`.
 
-and not:
+That means:
 
-- AMReX adopts a Mojo-created stream
+- every AMReX GPU launch in that scope uses the Mojo stream handle
+- `resetExternalGpuStream(...)` happens automatically when the scope is
+  destroyed
 
-That direction matches AMReX's current ownership model and avoids breaking
-ordering assumptions in `PArena`, `Elixir`, and tile-level stream scheduling.
+The `sync_on_exit` flag is forwarded to AMReX's
+`ExternalStreamSync::{Yes,No}` behavior:
 
-## Proposed Architecture
+- `True` is conservative and synchronizes on teardown
+- `False` avoids an unconditional sync, although AMReX may still synchronize if
+  deferred async frees require it
 
-### 1. Build and feature gating
+### 4. Device borrows expose pointer-and-shape metadata
 
-Keep the current staged path as the default behavior.
+The direct path does not pass `MultiFab` or `FArrayBox` objects into Mojo.
+Instead it borrows:
 
-Add an opt-in build path, for example:
+- tile box metadata
+- valid box metadata
+- `Array4` bounds and strides
+- the raw data pointer for a device-accessible tile
 
-- `AMREX_MOJO_ENABLE_GPU_INTEROP=ON`
+The relevant high-level wrappers are:
 
-and require:
+- `MultiFab.unsafe_device_array(tile_index)`
+- `MultiFab.unsafe_device_array(mfi)`
+- `MultiFabF32.unsafe_device_array(tile_index)`
+- `MultiFabF32.unsafe_device_array(mfi)`
 
-- `AMReX_GPU_BACKEND` to be `CUDA` or `HIP`
-- backend-specific tests to pass before the feature is documented as supported
+Those methods call C accessors that explicitly require
+`arena->isDeviceAccessible()`.
 
-The CPU-only/staged configuration should remain the default until the direct
-path is validated.
-
-### 2. Extend the C ABI for backend and stream queries
-
-Add explicit GPU backend and stream metadata to the `mojo-amrex` C ABI.
-
-Suggested ABI surface:
-
-```c
-typedef enum amrex_mojo_gpu_backend {
-    AMREX_MOJO_GPU_BACKEND_NONE = 0,
-    AMREX_MOJO_GPU_BACKEND_CUDA = 1,
-    AMREX_MOJO_GPU_BACKEND_HIP  = 2
-} amrex_mojo_gpu_backend_t;
-
-typedef enum amrex_mojo_multifab_memory_kind {
-    AMREX_MOJO_MULTIFAB_MEMORY_DEFAULT   = 0,
-    AMREX_MOJO_MULTIFAB_MEMORY_HOST_ONLY = 1,
-    AMREX_MOJO_MULTIFAB_MEMORY_DEVICE    = 2,
-    AMREX_MOJO_MULTIFAB_MEMORY_MANAGED   = 3,
-    AMREX_MOJO_MULTIFAB_MEMORY_PINNED    = 4,
-    AMREX_MOJO_MULTIFAB_MEMORY_ASYNC     = 5
-} amrex_mojo_multifab_memory_kind_t;
-
-typedef struct amrex_mojo_gpu_stream_handle {
-    int32_t backend;
-    void*   handle;
-    int32_t device_id;
-    int32_t stream_index;
-} amrex_mojo_gpu_stream_handle_t;
-```
-
-Suggested functions:
-
-- `amrex_mojo_gpu_backend()`
-- `amrex_mojo_gpu_device_id(amrex_mojo_runtime_t*, int32_t* out_device_id)`
-- `amrex_mojo_gpu_current_stream(amrex_mojo_runtime_t*, amrex_mojo_gpu_stream_handle_t* out_stream)`
-
-The stream handle struct deliberately carries both the native handle and the
-AMReX stream index. The native handle is required for Mojo interop; the stream
-index is useful for diagnostics and test assertions when `MFIter` rotates
-streams.
-
-### 3. Add device-only tile and `Array4` views
-
-The current `Array4F32View`, `Array4F64View`, `TileF32View`, and `TileF64View`
-types are host-indexable borrow types that also happen to be `DevicePassable`.
-They should not be reused unchanged for device-only AMReX memory.
-
-Instead add separate device-view types, for example:
-
-- `Array4F32DeviceView`
-- `Array4F64DeviceView`
-- `TileF32DeviceView`
-- `TileF64DeviceView`
-
-Required properties:
-
-- no host `__getitem__` or `__setitem__`
-- still `DevicePassable`
-- pointer provenance erased for device passage, as in the current staged path
-- lifetime tied to the owning `MultiFab` and iterator state, just like the
-  existing host tile borrows
-
-On the C ABI side, add accessors that require `device_accessible` storage
-rather than `host_accessible` storage.
-
-### 4. Add external-stream import to Mojo stdlib
-
-This proposal depends on a small but critical stdlib addition:
+## Typical Flow
 
 ```mojo
-fn import_stream(self, stream: CUstream) raises -> DeviceStream
-fn import_stream(self, stream: hipStream_t) raises -> DeviceStream
-```
+from amrex.runtime import AmrexRuntime
+from std.gpu.host import DeviceContext
 
-Expected semantics:
+fn main() raises:
+    var runtime = AmrexRuntime()
+    var ctx = DeviceContext()
 
-- the returned `DeviceStream` is a non-owning wrapper around the native stream
-- destroying the wrapper does not destroy the underlying AMReX stream
-- the import is valid only for a matching backend and device
-
-Without this capability, `mojo-amrex` cannot safely enqueue kernels onto the
-AMReX-selected stream through public Mojo APIs.
-
-### 5. Direct launch flow
-
-With the pieces above in place, the direct path becomes:
-
-1. `mojo-amrex` creates or receives an AMReX GPU-backed `MultiFab`
-2. inside an `MFIter` loop, the binding borrows a device tile view
-3. the binding queries the current AMReX stream handle
-4. Mojo constructs or reuses a `DeviceContext` for the matching backend and device
-5. Mojo imports the AMReX stream into a `DeviceStream`
-6. Mojo launches the compiled kernel on that imported stream
-7. control returns without an extra synchronization boundary
-
-The key invariant is that the launch happens on the same stream AMReX is using
-for that tile, so async allocation, deferred free, and tile scheduling remain
-consistent.
-
-### 6. Runtime rules
-
-The direct path should enforce a few non-negotiable rules:
-
-- do not launch Mojo kernels on a separately created Mojo stream when the
-  kernel reads or writes AMReX-owned device memory
-- do not call `ctx.synchronize()` inside tile loops
-- do not reinterpret host tile views as device views
-- prefer AMReX device allocation from `The_Async_Arena()` for the first direct
-  path bring-up
-- keep the staged helper path available as the fallback when direct GPU interop
-  is not enabled
-
-## Suggested Mojo API Shape
-
-One reasonable wrapper-side shape is:
-
-```mojo
-from amrex.space3d import MultiFabF32, MFIter
-from amrex.space3d.gpu import GpuExecutionContext
-
-var gpu = GpuExecutionContext(runtime)
-var kernel = gpu.compile(fill_kernel)
-
-for mfi in MFIter(mf):
-    let tile = mf.device_tile(mfi)
-    gpu.launch_on_current_amrex_stream(
-        kernel,
-        tile.array_view(),
-        value,
-        grid_dim=...,
-        block_dim=...,
+    # Install the current Mojo stream as AMReX's active stream for this scope.
+    var stream_scope = runtime.external_gpu_stream_scope(
+        ctx, sync_on_exit=False
     )
+
+    # Borrow device views from a GPU-backed MultiFab and launch Mojo kernels on
+    # ctx.stream() while AMReX calls in this scope use that same stream.
 ```
 
-`GpuExecutionContext` would own:
+Within that scope:
 
-- backend detection
-- `DeviceContext` creation
-- imported-stream caching keyed by `(device_id, native_handle)`
-- launch-time validation that the tile memory kind is compatible with the
-  direct path
+- AMReX operations such as `setVal`, reductions, `FillBoundary`, or
+  `ParallelCopy` issue work on the exported Mojo stream
+- Mojo kernels launched on `ctx.stream()` see the same ordering
 
-This keeps stream plumbing out of end-user code while still following the
-AMReX-selected stream.
+## Why The API Is Marked `unsafe`
 
-## Testing Plan
+The current device borrow path reuses the same `Array4F32View` and
+`Array4F64View` data structures as the host path.
 
-### Phase 0: prerequisite validation
+That is convenient for device passage, but it means the type still has host
+indexing helpers such as:
 
-- confirm that Mojo stdlib can import external CUDA and HIP streams
-- confirm that compiled kernels can be launched repeatedly on imported streams
+- `__getitem__`
+- `__setitem__`
+- `fill(...)`
 
-### Phase 1: C ABI and single-tile smoke path
+Those are not safe on device-only storage.
 
-- enable a CUDA-only or HIP-only experimental build
-- add C ABI tests for backend detection and current-stream export
-- add one direct-kernel smoke test over a single-tile `MultiFab`
+So the contract is:
 
-### Phase 2: tiled execution and stream rotation
+- use `array(...)` and `tile(...)` for host-accessible storage
+- use `unsafe_device_array(...)` only as device-passable pointer/shape metadata
+- do not dereference the returned pointer from host code
 
-- verify that `MFIter` tile traversal can launch on whichever stream AMReX has
-  selected for that tile
-- add regression coverage that checks stream changes across multiple tiles
+Dedicated device-only view types would be a cleaner long-term surface, but the
+current explicit `unsafe_...` naming is enough to support the direct path
+without hiding the risk.
 
-### Phase 3: async lifetime and MPI coverage
+## Limits and Caveats
 
-- verify that AMReX async allocations remain valid across Mojo launches
-- test `fill_boundary(...)` and `parallel_copy_from(...)` after direct launches
-- add multi-rank coverage where GPU execution occurs before communication
+- CUDA and HIP only for now
+- AMReX's external-stream override is not supported inside OpenMP parallel
+  regions
+- direct interop is only meaningful for device-accessible `MultiFab`
+  allocations
+- the current path is Mojo-stream-to-AMReX, not arbitrary external-stream
+  import into Mojo
+- the current Mojo raw-handle export path depends on internal stdlib modules
 
-### Debugging aid
+## Fallback Path
 
-If bring-up is unstable, temporarily test within AMReX's
-`SingleStreamRegion`. That can simplify diagnosis, but it should not become the
-permanent execution model because it hides stream-rotation behavior that the
-real design must handle.
+When direct AMReX GPU interop is unavailable, the supported fallback remains:
 
-## Fallback if stdlib import is unavailable
+1. borrow a host `Array4`
+2. stage it through a Mojo `DeviceBuffer`
+3. launch the Mojo kernel
+4. copy the result back
 
-If Mojo stdlib does not grow external-stream import support, the only practical
-fallback is a bespoke C++ launcher that invokes `cuLaunchKernel` or
-`hipModuleLaunchKernel` directly on `amrex::Gpu::gpuStream()`.
+That staged path is slower, but it remains useful for:
 
-That is not the preferred path because it:
-
-- duplicates launch machinery that stdlib already owns
-- moves more GPU runtime logic into the C shim
-- depends on lower-level Mojo kernel/module handles that are less clearly
-  exposed than `DeviceStream.enqueue_function(...)`
-
-The recommended sequence is therefore:
-
-1. add stream import to Mojo stdlib
-2. implement the `mojo-amrex` direct path on top of stdlib launches
-3. keep the C++ raw-launch fallback only as a contingency option
-
-## Recommendation
-
-The direct AMReX GPU path should be built around one rule:
-
-- launch Mojo kernels on the current AMReX stream against AMReX-owned memory
-
-That keeps AMReX's ownership and scheduling model intact, minimizes boundary
-synchronization, and gives `mojo-amrex` a coherent long-term path beyond the
-current staged helper design.
+- CPU-only AMReX builds
+- Metal backends
+- bring-up and debugging
+- any environment where the current toolchain does not expose the needed CUDA
+  or HIP stream exports

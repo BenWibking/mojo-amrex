@@ -18,8 +18,10 @@ The current MVP covers:
 1. runtime initialization and shutdown
 2. `BoxArray`, `DistributionMapping`, `Geometry`, and `MultiFab`
 3. tile metadata plus zero-copy `Array4` pointer access for host-accessible storage
-4. reductions for `MultiFab`
-5. a Mojo example that allocates a `MultiFab`, fills all tiles, and validates the sum
+4. opt-in direct CUDA/HIP GPU interop by sharing a Mojo stream with AMReX
+5. device-pointer borrows for GPU-backed `MultiFab` tiles
+6. reductions for `MultiFab`
+7. a Mojo example that allocates a `MultiFab`, fills all tiles, and validates the sum
 
 ## Quickstart
 
@@ -97,26 +99,35 @@ Notes:
 - `pixi run bootstrap` is the one-shot setup path for a fresh checkout. It
   runs `configure`, `build-capi`, and `install-amrex`.
 - By default the CMake build fetches AMReX from
-  `https://github.com/AMReX-Codes/amrex/releases/download/26.03/amrex-26.03.tar.gz`
-  and verifies the pinned SHA-256 before configuring a 3D, double-precision
+  `https://github.com/WeiqunZhang/amrex.git` on the
+  `external_gpu_stream` branch before configuring a 3D, double-precision
   MPI-enabled build suitable for the MVP bindings.
 - `pixi run configure` now uses the pixi-provided OpenMPI wrapper compilers so
   the default `build/` tree and installed C ABI are MPI-capable.
 - `pixi run configure-mpi`, `build-capi-mpi`, and `build-tests-mpi` remain as
   explicit MPI task aliases, but they target the same default `build/` tree.
-- AMReX GPU backends are intentionally disabled in this repo for now. `MultiFab`
-  storage is always host-resident from the AMReX side, and the bindings do not
-  expose an AMReX-managed GPU runtime.
+- The default pixi build still uses `AMREX_MOJO_GPU_BACKEND=NONE`. Direct AMReX
+  GPU interop is opt-in and currently supports CUDA and HIP AMReX builds only.
+  Configure a separate build tree with
+  `-DAMREX_MOJO_GPU_BACKEND=CUDA` or `-DAMREX_MOJO_GPU_BACKEND=HIP` to enable it.
 - `pixi run run-multifab-smoke-mojo-gpu` keeps the smoke-example control flow
   and output behavior, but runs the tile update through Mojo device kernels on
   any Mojo-supported accelerator backend. It stages host-backed `Array4` data
   through `DeviceBuffer`s before launch and uses `Float32` storage for broad
   backend compatibility. That is Mojo-kernel support in user code, not AMReX
   GPU-runtime interop.
-- The proposed long-term direct path is documented in
-  `docs/mojo-amrex-direct-gpu-interop.md`. That design keeps AMReX in charge of
-  device memory and stream selection and has Mojo launch onto the current
-  AMReX stream.
+- The direct AMReX GPU path works by exporting the current Mojo stream handle,
+  installing it as AMReX's active external stream for a scope, and then
+  borrowing device pointers from `MultiFab`. AMReX remains the owner of device
+  memory and stream ordering; Mojo only provides the stream handle and kernels.
+- The current wrapper surface for that path is
+  `AmrexRuntime.external_gpu_stream_scope(ctx, sync_on_exit=...)` plus
+  `MultiFab.unsafe_device_array(...)` / `MultiFabF32.unsafe_device_array(...)`.
+- The current installed Mojo toolchain in this repo exposes raw CUDA/HIP stream
+  export through the internal modules `std.gpu.host._nvidia_cuda` and
+  `std.gpu.host._amdgpu_hip`. Those are unstable implementation details; when a
+  stable stdlib export surface is available, the AMReX-side design does not
+  need to change.
 - To build against a local AMReX checkout instead, configure with
   `-DAMREX_MOJO_AMREX_SOURCE_DIR=/path/to/amrex`.
 - `pixi run build-capi` now also refreshes the C API dylib in the active env's
@@ -137,6 +148,44 @@ Notes:
 - The public Mojo surface now uses move-only wrapper objects such as
   `AmrexRuntime`, `BoxArray`, `Geometry`, and `MultiFab`. The raw handle-level
   bindings remain available under `amrex.ffi`.
+
+## Direct GPU Interop
+
+The direct CUDA/HIP path is intentionally narrow:
+
+1. Create or select a Mojo `DeviceContext`.
+2. Enter `runtime.external_gpu_stream_scope(ctx, sync_on_exit=...)`.
+3. Borrow tile data with `unsafe_device_array(...)` and launch Mojo kernels on
+   `ctx.stream()` while AMReX calls in the same scope use that same stream.
+
+Minimal shape:
+
+```mojo
+from amrex.runtime import AmrexRuntime
+from std.gpu.host import DeviceContext
+
+var runtime = AmrexRuntime()
+var ctx = DeviceContext()
+var stream_scope = runtime.external_gpu_stream_scope(ctx, sync_on_exit=False)
+
+# Borrow device data from a GPU-backed MultiFab and launch Mojo kernels on
+# ctx.stream() while AMReX uses the same external stream.
+```
+
+Important rules:
+
+- This path is currently implemented only for CUDA and HIP AMReX backends.
+- `unsafe_device_array(...)` returns pointer-and-shape metadata for
+  device-accessible storage. Treat it as a device-only borrow. Do not use host
+  indexing, `.fill()`, or any other host-side access on that value.
+- The stream scope is the ordering boundary. Enter it before AMReX async work
+  and before borrowing device pointers that Mojo kernels will touch.
+- `sync_on_exit=False` avoids an unconditional stream synchronize when leaving
+  the scope. Use it when you are deliberately building an async pipeline and
+  synchronize explicitly before host reads or other host-visible effects.
+
+The detailed design and caveats are documented in
+`docs/mojo-amrex-direct-gpu-interop.md`.
 
 ## Testing
 
@@ -167,9 +216,11 @@ The binding model is intentionally strict about ownership:
   Treat those `TileF64View`, `Array4F64View`, `TileF32View`, and
   `Array4F32View` values as non-escaping borrows; they are only valid while the
   owning `MultiFab` or `MultiFabF32` and iterator state remain live.
-- `MultiFab` storage is always host-resident from the AMReX side in this repo.
-  Mojo GPU kernels are still supported in user code, but they run through
-  explicit staging helpers rather than AMReX-managed device allocations.
+- In the default CPU build, `MultiFab` storage remains host-accessible and the
+  staged Mojo GPU helpers are still the portable path.
+- In CUDA/HIP AMReX builds, `unsafe_device_array(...)` can borrow AMReX device
+  storage directly, but only inside the intended GPU interop flow described
+  above.
 - If library discovery fails, the loader now reports the concrete path it tried
   and suggests either `pixi run build-capi`,
   `pixi run install-amrex`, or

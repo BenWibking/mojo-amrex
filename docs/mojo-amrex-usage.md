@@ -1,6 +1,6 @@
 # Mojo AMReX Usage Notes
 
-Last updated: 2026-03-11
+Last updated: 2026-03-13
 
 ## Ownership Model
 
@@ -33,15 +33,46 @@ failure.
 
 ## GPU Allocation Rules
 
-- AMReX GPU backends are intentionally disabled in this repo. `MultiFab`
-  storage is always host-resident from the AMReX side.
-- `MultiFab(..., host_only=True)` is still accepted for compatibility, but it
-  is currently equivalent to the default allocation path.
-- `MultiFab.memory_info()` exposes whether a given allocation is host
+- The default pixi build is still CPU-only from the AMReX side because it
+  configures `AMREX_MOJO_GPU_BACKEND=NONE`.
+- CUDA/HIP AMReX builds are now supported as an opt-in path. In those builds,
+  `MultiFab.memory_info()` tells you whether a given allocation is host
   accessible, device accessible, managed, device-only, or pinned.
+- `MultiFab(..., host_only=True)` still forces host-accessible storage. Use the
+  default allocation path when you want AMReX to choose its normal GPU-capable
+  arena in a CUDA/HIP build.
 - Mojo device kernels in user code are still supported. Use the staged view
   helpers with `std.gpu.host.DeviceContext`, as in the Mojo GPU smoke example.
   That is a Mojo-side execution path, not an AMReX GPU runtime.
+
+## Direct GPU Interop Rules
+
+- The direct path currently supports CUDA and HIP only.
+- `AmrexRuntime.external_gpu_stream_scope(ctx, sync_on_exit=...)` exports the
+  current Mojo stream handle and installs it into AMReX with
+  `setExternalGpuStream` / `ExternalGpuStreamRegion` for the lifetime of the
+  scope.
+- While that scope is active, AMReX GPU work and Mojo kernels launched on
+  `ctx.stream()` share the same backend stream.
+- Borrow AMReX device storage with `MultiFab.unsafe_device_array(...)` or
+  `MultiFabF32.unsafe_device_array(...)`. Those methods are intentionally named
+  `unsafe` because they return raw device pointer metadata.
+- Do not use host indexing, `__getitem__`, `__setitem__`, `.fill()`, or any
+  other host-side accessors on values returned by `unsafe_device_array(...)`.
+  Today they reuse the same `Array4*View` structs as the host path, so the type
+  does not stop you from doing the wrong thing.
+- Enter the stream scope before borrowing device pointers and keep it active
+  across the AMReX calls and Mojo kernel launches that must remain ordered.
+- `sync_on_exit=True` is the conservative setting. `sync_on_exit=False` avoids
+  an unconditional stream synchronize when the scope is destroyed, but you then
+  own the responsibility for explicit synchronization before host-visible uses.
+- AMReX does not permit entering or exiting the external-stream override inside
+  OpenMP parallel regions. Set the stream on the host thread before entering
+  GPU-heavy code.
+- The current Mojo toolchain used by this repo exports raw handles through the
+  internal modules `std.gpu.host._nvidia_cuda` and
+  `std.gpu.host._amdgpu_hip`. That is an implementation detail of the wrapper,
+  not a stable public stdlib commitment.
 
 ## DevicePassable View Notes
 
@@ -52,11 +83,12 @@ failure.
   `MutAnyOrigin`. Keeping the original owner origin in `device_type` causes the
   current Mojo compiler to reject `_to_device_type(...)` during alias/provenance
   checking.
-- Direct use of native AMReX `Array4`/tile views as if they were already wired
-  to an AMReX GPU runtime is not supported. The current workaround is to stage
-  through a `DeviceBuffer` and then pass a rebuilt
-  `Array4F32View[MutAnyOrigin]` to the kernel.
-- The proposed long-term direct path is documented in
+- Direct AMReX GPU interop is now available for CUDA/HIP builds through
+  `external_gpu_stream_scope(...)` plus `unsafe_device_array(...)`.
+- The staged `DeviceBuffer` workaround remains the portable fallback for CPU
+  builds, Metal, and any configuration where direct AMReX GPU interop is not
+  available.
+- Detailed design notes and remaining caveats live in
   `docs/mojo-amrex-direct-gpu-interop.md`.
 
 ## Error Reporting

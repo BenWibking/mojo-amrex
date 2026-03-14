@@ -274,6 +274,51 @@ namespace
     }
 
     template <typename FabT>
+    auto require_device_accessible_typed(
+        const amrex_mojo::detail::tile_descriptor* tile,
+        const char* context
+    ) -> amrex_mojo_status_code_t
+    {
+        if (tile == nullptr || tile->fab == nullptr) {
+            return amrex_mojo::detail::set_last_error(
+                AMREX_MOJO_STATUS_INTERNAL_ERROR,
+                std::string(context) + " could not resolve backing tile storage."
+            );
+        }
+
+        auto* fab = static_cast<FabT*>(tile->fab);
+        const auto* arena = fab->arena();
+        if (arena == nullptr || !arena->isDeviceAccessible()) {
+            return amrex_mojo::detail::set_last_error(
+                AMREX_MOJO_STATUS_INVALID_ARGUMENT,
+                std::string(context) + " requires device-accessible storage."
+            );
+        }
+
+        amrex_mojo::detail::clear_last_error();
+        return AMREX_MOJO_STATUS_OK;
+    }
+
+    auto require_device_accessible(
+        const amrex_mojo_multifab_t* multifab,
+        const amrex_mojo::detail::tile_descriptor* tile,
+        const char* context
+    ) -> amrex_mojo_status_code_t
+    {
+        switch (multifab->datatype) {
+        case AMREX_MOJO_DATATYPE_FLOAT64:
+            return require_device_accessible_typed<amrex::FArrayBox>(tile, context);
+        case AMREX_MOJO_DATATYPE_FLOAT32:
+            return require_device_accessible_typed<amrex::BaseFab<float>>(tile, context);
+        default:
+            return amrex_mojo::detail::set_last_error(
+                AMREX_MOJO_STATUS_INVALID_ARGUMENT,
+                std::string(context) + " received an unknown multifab datatype."
+            );
+        }
+    }
+
+    template <typename FabT>
     void fill_array4_metadata_from_fab(
         FabT* fab,
         int32_t* data_lo,
@@ -346,6 +391,26 @@ namespace
     auto data_ptr_from_tile_typed(const amrex_mojo::detail::tile_descriptor* tile)
     {
         return static_cast<FabT*>(tile->fab)->dataPtr();
+    }
+
+    template <typename ViewT, typename FabT>
+    auto array4_view_from_tile_typed(const amrex_mojo::detail::tile_descriptor* tile) -> ViewT
+    {
+        const auto array = static_cast<FabT*>(tile->fab)->array();
+        ViewT view{};
+        view.data = array.dataPtr();
+        view.lo_x = array.begin[0];
+        view.lo_y = array.begin[1];
+        view.lo_z = array.begin[2];
+        view.hi_x = array.end[0] - 1;
+        view.hi_y = array.end[1] - 1;
+        view.hi_z = array.end[2] - 1;
+        view.stride_i = 1;
+        view.stride_j = array.template get_stride<1>();
+        view.stride_k = array.template get_stride<2>();
+        view.stride_n = array.template get_stride<3>();
+        view.ncomp = array.nComp();
+        return view;
     }
 
     auto require_valid_component(
@@ -924,22 +989,8 @@ amrex_mojo_multifab_array4(const amrex_mojo_multifab_t* multifab, int32_t tile_i
         return amrex_mojo_array4_view_f64{};
     }
 
-    const auto array = static_cast<amrex::FArrayBox*>(tile->fab)->array();
-    amrex_mojo_array4_view_f64 view{};
-    view.data = array.dataPtr();
-    view.lo_x = array.begin[0];
-    view.lo_y = array.begin[1];
-    view.lo_z = array.begin[2];
-    view.hi_x = array.end[0] - 1;
-    view.hi_y = array.end[1] - 1;
-    view.hi_z = array.end[2] - 1;
-    view.stride_i = 1;
-    view.stride_j = array.get_stride<1>();
-    view.stride_k = array.get_stride<2>();
-    view.stride_n = array.get_stride<3>();
-    view.ncomp = array.nComp();
     amrex_mojo::detail::clear_last_error();
-    return view;
+    return array4_view_from_tile_typed<amrex_mojo_array4_view_f64, amrex::FArrayBox>(tile);
 }
 
 extern "C" double* amrex_mojo_multifab_data_ptr(const amrex_mojo_multifab_t* multifab, int32_t tile_index)
@@ -958,6 +1009,33 @@ extern "C" double* amrex_mojo_multifab_data_ptr(const amrex_mojo_multifab_t* mul
     }
 
     if (require_host_accessible(multifab, tile, "multifab_data_ptr") != AMREX_MOJO_STATUS_OK) {
+        return nullptr;
+    }
+
+    amrex_mojo::detail::clear_last_error();
+    return data_ptr_from_tile_typed<amrex::FArrayBox>(tile);
+}
+
+extern "C" double*
+amrex_mojo_multifab_data_ptr_device(const amrex_mojo_multifab_t* multifab, int32_t tile_index)
+{
+    const auto* tile = require_tile(multifab, tile_index);
+    if (tile == nullptr) {
+        return nullptr;
+    }
+
+    if (multifab->datatype != AMREX_MOJO_DATATYPE_FLOAT64) {
+        amrex_mojo::detail::set_last_error(
+            AMREX_MOJO_STATUS_INVALID_ARGUMENT,
+            "multifab_data_ptr_device requires a Float64 multifab."
+        );
+        return nullptr;
+    }
+
+    if (
+        require_device_accessible(multifab, tile, "multifab_data_ptr_device") !=
+        AMREX_MOJO_STATUS_OK
+    ) {
         return nullptr;
     }
 
@@ -985,22 +1063,8 @@ amrex_mojo_multifab_array4_f32(const amrex_mojo_multifab_t* multifab, int32_t ti
         return amrex_mojo_array4_view_f32{};
     }
 
-    const auto array = static_cast<amrex::BaseFab<float>*>(tile->fab)->array();
-    amrex_mojo_array4_view_f32 view{};
-    view.data = array.dataPtr();
-    view.lo_x = array.begin[0];
-    view.lo_y = array.begin[1];
-    view.lo_z = array.begin[2];
-    view.hi_x = array.end[0] - 1;
-    view.hi_y = array.end[1] - 1;
-    view.hi_z = array.end[2] - 1;
-    view.stride_i = 1;
-    view.stride_j = array.get_stride<1>();
-    view.stride_k = array.get_stride<2>();
-    view.stride_n = array.get_stride<3>();
-    view.ncomp = array.nComp();
     amrex_mojo::detail::clear_last_error();
-    return view;
+    return array4_view_from_tile_typed<amrex_mojo_array4_view_f32, amrex::BaseFab<float>>(tile);
 }
 
 extern "C" float*
@@ -1020,6 +1084,33 @@ amrex_mojo_multifab_data_ptr_f32(const amrex_mojo_multifab_t* multifab, int32_t 
     }
 
     if (require_host_accessible(multifab, tile, "multifab_data_ptr_f32") != AMREX_MOJO_STATUS_OK) {
+        return nullptr;
+    }
+
+    amrex_mojo::detail::clear_last_error();
+    return data_ptr_from_tile_typed<amrex::BaseFab<float>>(tile);
+}
+
+extern "C" float*
+amrex_mojo_multifab_data_ptr_device_f32(const amrex_mojo_multifab_t* multifab, int32_t tile_index)
+{
+    const auto* tile = require_tile(multifab, tile_index);
+    if (tile == nullptr) {
+        return nullptr;
+    }
+
+    if (multifab->datatype != AMREX_MOJO_DATATYPE_FLOAT32) {
+        amrex_mojo::detail::set_last_error(
+            AMREX_MOJO_STATUS_INVALID_ARGUMENT,
+            "multifab_data_ptr_device_f32 requires a Float32 multifab."
+        );
+        return nullptr;
+    }
+
+    if (
+        require_device_accessible(multifab, tile, "multifab_data_ptr_device_f32") !=
+        AMREX_MOJO_STATUS_OK
+    ) {
         return nullptr;
     }
 
@@ -1111,6 +1202,36 @@ amrex_mojo_multifab_data_ptr_for_mfiter(
     return data_ptr_from_tile_typed<amrex::FArrayBox>(tile);
 }
 
+extern "C" double*
+amrex_mojo_multifab_data_ptr_for_mfiter_device(
+    const amrex_mojo_multifab_t* multifab,
+    const amrex_mojo_mfiter_t* mfiter
+)
+{
+    const auto* tile = require_multifab_tile_for_mfiter(multifab, mfiter);
+    if (tile == nullptr) {
+        return nullptr;
+    }
+
+    if (multifab->datatype != AMREX_MOJO_DATATYPE_FLOAT64) {
+        amrex_mojo::detail::set_last_error(
+            AMREX_MOJO_STATUS_INVALID_ARGUMENT,
+            "multifab_data_ptr_for_mfiter_device requires a Float64 multifab."
+        );
+        return nullptr;
+    }
+
+    if (
+        require_device_accessible(multifab, tile, "multifab_data_ptr_for_mfiter_device") !=
+        AMREX_MOJO_STATUS_OK
+    ) {
+        return nullptr;
+    }
+
+    amrex_mojo::detail::clear_last_error();
+    return data_ptr_from_tile_typed<amrex::FArrayBox>(tile);
+}
+
 extern "C" float*
 amrex_mojo_multifab_data_ptr_for_mfiter_f32(
     const amrex_mojo_multifab_t* multifab,
@@ -1132,6 +1253,36 @@ amrex_mojo_multifab_data_ptr_for_mfiter_f32(
 
     if (
         require_host_accessible(multifab, tile, "multifab_data_ptr_for_mfiter_f32") !=
+        AMREX_MOJO_STATUS_OK
+    ) {
+        return nullptr;
+    }
+
+    amrex_mojo::detail::clear_last_error();
+    return data_ptr_from_tile_typed<amrex::BaseFab<float>>(tile);
+}
+
+extern "C" float*
+amrex_mojo_multifab_data_ptr_for_mfiter_device_f32(
+    const amrex_mojo_multifab_t* multifab,
+    const amrex_mojo_mfiter_t* mfiter
+)
+{
+    const auto* tile = require_multifab_tile_for_mfiter(multifab, mfiter);
+    if (tile == nullptr) {
+        return nullptr;
+    }
+
+    if (multifab->datatype != AMREX_MOJO_DATATYPE_FLOAT32) {
+        amrex_mojo::detail::set_last_error(
+            AMREX_MOJO_STATUS_INVALID_ARGUMENT,
+            "multifab_data_ptr_for_mfiter_device_f32 requires a Float32 multifab."
+        );
+        return nullptr;
+    }
+
+    if (
+        require_device_accessible(multifab, tile, "multifab_data_ptr_for_mfiter_device_f32") !=
         AMREX_MOJO_STATUS_OK
     ) {
         return nullptr;

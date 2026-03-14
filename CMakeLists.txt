@@ -23,6 +23,17 @@ option(
     OFF
 )
 
+set(
+    AMREX_MOJO_GPU_BACKEND
+    "NONE"
+    CACHE STRING
+    "GPU backend for AMReX (NONE, CUDA, or HIP)."
+)
+set_property(
+    CACHE AMREX_MOJO_GPU_BACKEND
+    PROPERTY STRINGS NONE CUDA HIP
+)
+
 set(AMREX_MOJO_AMREX_SOURCE_DIR_DEFAULT "")
 set(
     AMREX_MOJO_AMREX_SOURCE_DIR
@@ -32,17 +43,17 @@ set(
 )
 
 set(
-    AMREX_MOJO_AMREX_URL
-    "https://github.com/AMReX-Codes/amrex/releases/download/26.03/amrex-26.03.tar.gz"
+    AMREX_MOJO_AMREX_GIT_REPOSITORY
+    "https://github.com/WeiqunZhang/amrex.git"
     CACHE STRING
-    "Source tarball used when fetching AMReX with FetchContent."
+    "Git repository used when fetching AMReX with FetchContent."
 )
 
 set(
-    AMREX_MOJO_AMREX_URL_HASH
-    "SHA256=7139b8bb423a4311e8990bee6cb06b86a81de439363f35a3f29c808a93a003ca"
+    AMREX_MOJO_AMREX_GIT_TAG
+    "external_gpu_stream"
     CACHE STRING
-    "Hash of the AMReX source tarball used with FetchContent."
+    "Git branch, tag, or commit used when fetching AMReX with FetchContent."
 )
 
 set(CMAKE_C_STANDARD 11)
@@ -53,6 +64,14 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+set(AMREX_MOJO_VALID_GPU_BACKENDS NONE CUDA HIP)
+if(NOT AMREX_MOJO_GPU_BACKEND IN_LIST AMREX_MOJO_VALID_GPU_BACKENDS)
+    message(
+        FATAL_ERROR
+        "AMREX_MOJO_GPU_BACKEND='${AMREX_MOJO_GPU_BACKEND}' is invalid. Use NONE, CUDA, or HIP."
+    )
+endif()
+
 if(NOT AMREX_MOJO_ENABLE_AMREX)
     message(FATAL_ERROR "The Mojo bindings MVP requires AMReX. Configure with -DAMREX_MOJO_ENABLE_AMREX=ON.")
 endif()
@@ -62,7 +81,7 @@ if(NOT TARGET AMReX::amrex_3d AND NOT TARGET AMReX::amrex)
     set(AMReX_PRECISION DOUBLE CACHE STRING "Precision of AMReX build" FORCE)
     set(AMReX_MPI ${AMREX_MOJO_ENABLE_MPI} CACHE BOOL "Enable MPI in AMReX" FORCE)
     set(AMReX_OMP OFF CACHE BOOL "Enable OpenMP in AMReX" FORCE)
-    set(AMReX_GPU_BACKEND NONE CACHE STRING "GPU backend for AMReX" FORCE)
+    set(AMReX_GPU_BACKEND ${AMREX_MOJO_GPU_BACKEND} CACHE STRING "GPU backend for AMReX" FORCE)
     set(AMReX_PARTICLES OFF CACHE BOOL "Enable AMReX particle classes" FORCE)
     set(AMReX_EB OFF CACHE BOOL "Enable AMReX embedded boundary support" FORCE)
     set(AMReX_FORTRAN OFF CACHE BOOL "Enable AMReX Fortran interfaces" FORCE)
@@ -82,8 +101,9 @@ if(NOT TARGET AMReX::amrex_3d AND NOT TARGET AMReX::amrex)
     else()
         FetchContent_Declare(
             amrex
-            URL "${AMREX_MOJO_AMREX_URL}"
-            URL_HASH "${AMREX_MOJO_AMREX_URL_HASH}"
+            GIT_REPOSITORY "${AMREX_MOJO_AMREX_GIT_REPOSITORY}"
+            GIT_TAG "${AMREX_MOJO_AMREX_GIT_TAG}"
+            GIT_SHALLOW TRUE
         )
     endif()
 

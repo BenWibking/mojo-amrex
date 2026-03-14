@@ -57,6 +57,12 @@ remaining is:
 - deeper Phase 5 expansion items such as broader MPI coverage, GPU, particles,
   and broader dimensional coverage
 
+Since this plan was written, the repo has also gained an opt-in direct
+CUDA/HIP GPU interop path based on AMReX external streams. Treat
+`docs/mojo-amrex-direct-gpu-interop.md` as the current GPU status document; the
+rest of this file remains useful as background on the original binding
+architecture and scope decisions.
+
 An initial MPI slice is now implemented:
 
 - optional MPI-enabled build and test path through `AMREX_MOJO_ENABLE_MPI`
