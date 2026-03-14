@@ -107,8 +107,13 @@ Notes:
   `https://github.com/WeiqunZhang/amrex.git` on the
   `external_gpu_stream` branch before configuring a 3D, double-precision
   MPI-enabled build suitable for the MVP bindings.
-- `pixi run configure` now uses the pixi-provided OpenMPI wrapper compilers so
-  the default `build/` tree and installed C ABI are MPI-capable.
+- `pixi run configure` now defaults to an MPI-enabled build in the default
+  `build/` tree. On ordinary Pixi setups it uses the bundled OpenMPI wrapper
+  compilers. If `CRAY_MPICH_DIR` is present and `CC` is available, it
+  automatically switches to Cray `cc`/`CC` as the real compilers and points
+  `FindMPI` at `$CRAY_MPICH_DIR/bin/mpicc` and
+  `$CRAY_MPICH_DIR/bin/mpicxx`. That keeps the HIP-capable compiler driver
+  while linking against Cray MPICH.
 - `pixi run configure-mpi`, `build-capi-mpi`, and `build-tests-mpi` remain as
   explicit MPI task aliases, but they target the same default `build/` tree.
 - `pixi run bootstrap` and `pixi run configure` now default

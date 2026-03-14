@@ -65,6 +65,16 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+if(AMREX_MOJO_BUILD_SHARED)
+    set(
+        CMAKE_POSITION_INDEPENDENT_CODE
+        ON
+        CACHE BOOL
+        "Build static libraries with position-independent code for shared linkage."
+        FORCE
+    )
+endif()
+
 set(AMREX_MOJO_VALID_GPU_BACKENDS AUTO NONE CUDA HIP)
 if(NOT AMREX_MOJO_GPU_BACKEND IN_LIST AMREX_MOJO_VALID_GPU_BACKENDS)
     message(
