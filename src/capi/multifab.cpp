@@ -1715,7 +1715,7 @@ amrex_mojo_write_single_level_plotfile(
                         value_ref.DistributionMap(),
                         value_ref.nComp(),
                         value_ref.nGrowVect(),
-                        amrex::MFInfo().SetArena(amrex::The_Cpu_Arena())
+                        amrex::MFInfo().SetArena(amrex::The_Pinned_Arena())
                     );
                     amrex::Copy(
                         plot_multifab,
@@ -1725,6 +1725,7 @@ amrex_mojo_write_single_level_plotfile(
                         value_ref.nComp(),
                         value_ref.nGrowVect()
                     );
+                    amrex::Gpu::streamSynchronize();
                     amrex::WriteSingleLevelPlotfile(
                         std::string(plotfile),
                         plot_multifab,
