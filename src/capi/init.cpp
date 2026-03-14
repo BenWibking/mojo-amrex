@@ -2,11 +2,13 @@
 
 #include <AMReX_GpuDevice.H>
 
+#include <algorithm>
 #include <cerrno>
 #include <cstdlib>
 #include <iostream>
 #include <limits>
 #include <mutex>
+#include <string_view>
 #include <vector>
 
 namespace
@@ -25,13 +27,25 @@ namespace
         std::vector<std::string> args;
         if (argc <= 0) {
             args.emplace_back("mojo-amrex");
-            return args;
+        } else {
+            args.reserve(static_cast<std::size_t>(argc) + 1);
+            for (int32_t i = 0; i < argc; ++i) {
+                args.emplace_back(argv[i] != nullptr ? argv[i] : "");
+            }
         }
 
-        args.reserve(static_cast<std::size_t>(argc));
-        for (int32_t i = 0; i < argc; ++i) {
-            args.emplace_back(argv[i] != nullptr ? argv[i] : "");
+        const auto has_device_arena_init_size = std::any_of(
+            args.begin(),
+            args.end(),
+            [](const std::string& arg) {
+                constexpr std::string_view prefix = "amrex.the_device_arena_init_size=";
+                return arg.compare(0, prefix.size(), prefix) == 0;
+            }
+        );
+        if (!has_device_arena_init_size) {
+            args.emplace_back("amrex.the_device_arena_init_size=0");
         }
+
         return args;
     }
 
