@@ -82,6 +82,55 @@ def launch_update_tile(
     )
 
 
+def print_multifab_memory_info(label: String, ref multifab: MultiFabF32) raises:
+    var info = multifab.memory_info()
+    print(
+        label,
+        ": requested_kind=",
+        info.requested_kind,
+        " host_accessible=",
+        info.host_accessible,
+        " device_accessible=",
+        info.device_accessible,
+        " is_managed=",
+        info.is_managed,
+        " is_device=",
+        info.is_device,
+        " is_pinned=",
+        info.is_pinned,
+    )
+
+
+def print_array4_diagnostics(label: String, array: Array4F32View[MutAnyOrigin]):
+    print(
+        label,
+        ": data=",
+        array.data,
+        " lo=(",
+        array.lo_x,
+        ", ",
+        array.lo_y,
+        ", ",
+        array.lo_z,
+        ") hi=(",
+        array.hi_x,
+        ", ",
+        array.hi_y,
+        ", ",
+        array.hi_z,
+        ") stride=(",
+        array.stride_i,
+        ", ",
+        array.stride_j,
+        ", ",
+        array.stride_k,
+        ", ",
+        array.stride_n,
+        ") ncomp=",
+        array.ncomp,
+    )
+
+
 def require_direct_gpu_interop(
     ref runtime: AmrexRuntime, ref multifab: MultiFabF32
 ) raises:
@@ -102,6 +151,12 @@ def require_direct_gpu_interop(
         raise Error(
             "The example requires a device-accessible MultiFab allocation. Use"
             " the default arena in a CUDA/HIP AMReX build."
+        )
+    if not info.is_device and not info.is_managed:
+        print(
+            "warning: direct GPU interop is borrowing a MultiFab that is"
+            " device-accessible but neither device nor managed according to"
+            " AMReX memory_info()."
         )
 
 
@@ -144,6 +199,9 @@ def main() raises:
     var add_value = Float32(params.query_int("tile_fill_value") - 1)
     var plotfile_path = String("build/multifab_gpu_interop_plotfile")
 
+    print_multifab_memory_info(String("source"), source)
+    print_multifab_memory_info(String("destination"), multifab)
+
     # Keep this scope live while AMReX calls and Mojo kernels share ctx.stream().
     var stream_scope = runtime.external_gpu_stream_scope(
         ctx, sync_on_exit=False
@@ -153,6 +211,7 @@ def main() raises:
     multifab.set_val(Float32(0.0))
 
     var mfi = multifab.mfiter()
+    var printed_pointer_diagnostics = False
     while mfi.is_valid():
         var tile_box = mfi.tilebox()
         _ = mfi.validbox()
@@ -161,10 +220,29 @@ def main() raises:
 
         var src_array = source.unsafe_device_array(mfi)
         var dst_array = multifab.unsafe_device_array(mfi)
+        if not printed_pointer_diagnostics:
+            print(
+                "first tile box: lo=(",
+                tile_box.small_end.x,
+                ", ",
+                tile_box.small_end.y,
+                ", ",
+                tile_box.small_end.z,
+                ") hi=(",
+                tile_box.big_end.x,
+                ", ",
+                tile_box.big_end.y,
+                ", ",
+                tile_box.big_end.z,
+                ")"
+            )
+            print_array4_diagnostics(String("source array"), src_array)
+            print_array4_diagnostics(String("destination array"), dst_array)
+            printed_pointer_diagnostics = True
         launch_update_tile(
             ctx,
-            src_array.device_view(),
-            dst_array.device_view(),
+            src_array,
+            dst_array,
             tile_box,
             add_value,
         )

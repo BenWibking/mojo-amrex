@@ -138,30 +138,22 @@ struct MultiFab(Movable):
     ]:
         return self.tile(mfi).array()
 
-    def unsafe_device_array[
-        owner_origin: Origin[mut=True]
-    ](ref[owner_origin] self, tile_index: Int) raises -> Array4F64View[
-        owner_origin
-    ]:
+    def unsafe_device_array(
+        ref self, tile_index: Int
+    ) raises -> Array4F64View[MutAnyOrigin]:
         self._require_tile_index(tile_index)
         var handle = self._handle()
-        var array_view = device_tile_view[owner_origin](
-            self.runtime[].lib, handle, tile_index
-        ).array()
+        var array_view = device_tile_view(self.runtime[].lib, handle, tile_index).array()
         if not array_view.data:
             raise Error(last_error_message(self.runtime[].lib))
         return array_view.copy()
 
-    def unsafe_device_array[
-        owner_origin: Origin[mut=True]
-    ](ref[owner_origin] self, ref mfi: MFIter) raises -> Array4F64View[
-        owner_origin
-    ]:
+    def unsafe_device_array(
+        ref self, ref mfi: MFIter
+    ) raises -> Array4F64View[MutAnyOrigin]:
         var handle = self._handle()
-        var array_view = device_array4_view_from_mfiter[owner_origin](
-            self.runtime[].lib,
-            handle,
-            mfi._handle(),
+        var array_view = device_array4_view_from_mfiter(
+            self.runtime[].lib, handle, mfi._handle()
         )
         if not array_view.data:
             raise Error(last_error_message(self.runtime[].lib))
@@ -493,30 +485,24 @@ struct MultiFabF32(Movable):
     ]:
         return self.tile(mfi).array()
 
-    def unsafe_device_array[
-        owner_origin: Origin[mut=True]
-    ](ref[owner_origin] self, tile_index: Int) raises -> Array4F32View[
-        owner_origin
-    ]:
+    def unsafe_device_array(
+        ref self, tile_index: Int
+    ) raises -> Array4F32View[MutAnyOrigin]:
         self._require_tile_index(tile_index)
         var handle = self._handle()
-        var array_view = device_tile_view_f32[owner_origin](
+        var array_view = device_tile_view_f32(
             self.runtime[].lib, handle, tile_index
         ).array()
         if not array_view.data:
             raise Error(last_error_message(self.runtime[].lib))
         return array_view.copy()
 
-    def unsafe_device_array[
-        owner_origin: Origin[mut=True]
-    ](ref[owner_origin] self, ref mfi: MFIter) raises -> Array4F32View[
-        owner_origin
-    ]:
+    def unsafe_device_array(
+        ref self, ref mfi: MFIter
+    ) raises -> Array4F32View[MutAnyOrigin]:
         var handle = self._handle()
-        var array_view = device_array4_view_from_mfiter_f32[owner_origin](
-            self.runtime[].lib,
-            handle,
-            mfi._handle(),
+        var array_view = device_array4_view_from_mfiter_f32(
+            self.runtime[].lib, handle, mfi._handle()
         )
         if not array_view.data:
             raise Error(last_error_message(self.runtime[].lib))

@@ -878,11 +878,9 @@ def tile_view[
     )
 
 
-def device_tile_view[
-    owner_origin: Origin[mut=True]
-](
+def device_tile_view(
     ref lib: OwnedDLHandle, multifab: MultiFabHandle, tile_index: Int
-) raises -> TileF64View[owner_origin]:
+) raises -> TileF64View[MutAnyOrigin]:
     var tile_lo = List[c_int](length=3, fill=0)
     var tile_hi = List[c_int](length=3, fill=0)
     var valid_lo = List[c_int](length=3, fill=0)
@@ -905,10 +903,10 @@ def device_tile_view[
         ncomp_raw.unsafe_ptr(),
     )
 
-    var array_view = Array4F64View[owner_origin](
+    var array_view = Array4F64View[MutAnyOrigin](
         data=lib.call[
             "amrex_mojo_multifab_data_ptr_device",
-            UnsafePointer[c_double, owner_origin],
+            UnsafePointer[c_double, MutAnyOrigin],
         ](multifab, c_int(tile_index)),
         lo_x=data_lo[0],
         lo_y=data_lo[1],
@@ -923,7 +921,7 @@ def device_tile_view[
         ncomp=ncomp_raw[0],
     )
 
-    return TileF64View[owner_origin](
+    return TileF64View[MutAnyOrigin](
         tile_box=box_from_bounds(tile_lo, tile_hi),
         valid_box=box_from_bounds(valid_lo, valid_hi),
         array_view=array_view.copy(),
@@ -982,11 +980,9 @@ def tile_view_f32[
     )
 
 
-def device_tile_view_f32[
-    owner_origin: Origin[mut=True]
-](
+def device_tile_view_f32(
     ref lib: OwnedDLHandle, multifab: MultiFabHandle, tile_index: Int
-) raises -> TileF32View[owner_origin]:
+) raises -> TileF32View[MutAnyOrigin]:
     var tile_lo = List[c_int](length=3, fill=0)
     var tile_hi = List[c_int](length=3, fill=0)
     var valid_lo = List[c_int](length=3, fill=0)
@@ -1009,10 +1005,10 @@ def device_tile_view_f32[
         ncomp_raw.unsafe_ptr(),
     )
 
-    var array_view = Array4F32View[owner_origin](
+    var array_view = Array4F32View[MutAnyOrigin](
         data=lib.call[
             "amrex_mojo_multifab_data_ptr_device_f32",
-            UnsafePointer[c_float, owner_origin],
+            UnsafePointer[c_float, MutAnyOrigin],
         ](multifab, c_int(tile_index)),
         lo_x=data_lo[0],
         lo_y=data_lo[1],
@@ -1027,7 +1023,7 @@ def device_tile_view_f32[
         ncomp=ncomp_raw[0],
     )
 
-    return TileF32View[owner_origin](
+    return TileF32View[MutAnyOrigin](
         tile_box=box_from_bounds(tile_lo, tile_hi),
         valid_box=box_from_bounds(valid_lo, valid_hi),
         array_view=array_view.copy(),
@@ -1074,13 +1070,11 @@ def array4_view_from_mfiter[
     )
 
 
-def device_array4_view_from_mfiter[
-    owner_origin: Origin[mut=True]
-](
+def device_array4_view_from_mfiter(
     ref lib: OwnedDLHandle,
     multifab: MultiFabHandle,
     mfiter: MFIterHandle,
-) raises -> Array4F64View[owner_origin]:
+) raises -> Array4F64View[MutAnyOrigin]:
     var data_lo = List[c_int](length=3, fill=0)
     var data_hi = List[c_int](length=3, fill=0)
     var stride = List[Int64](length=4, fill=0)
@@ -1095,10 +1089,10 @@ def device_array4_view_from_mfiter[
         ncomp_raw.unsafe_ptr(),
     )
 
-    return Array4F64View[owner_origin](
+    return Array4F64View[MutAnyOrigin](
         data=lib.call[
             "amrex_mojo_multifab_data_ptr_for_mfiter_device",
-            UnsafePointer[c_double, owner_origin],
+            UnsafePointer[c_double, MutAnyOrigin],
         ](multifab, mfiter),
         lo_x=data_lo[0],
         lo_y=data_lo[1],
@@ -1154,13 +1148,11 @@ def array4_view_from_mfiter_f32[
     )
 
 
-def device_array4_view_from_mfiter_f32[
-    owner_origin: Origin[mut=True]
-](
+def device_array4_view_from_mfiter_f32(
     ref lib: OwnedDLHandle,
     multifab: MultiFabHandle,
     mfiter: MFIterHandle,
-) raises -> Array4F32View[owner_origin]:
+) raises -> Array4F32View[MutAnyOrigin]:
     var data_lo = List[c_int](length=3, fill=0)
     var data_hi = List[c_int](length=3, fill=0)
     var stride = List[Int64](length=4, fill=0)
@@ -1175,10 +1167,10 @@ def device_array4_view_from_mfiter_f32[
         ncomp_raw.unsafe_ptr(),
     )
 
-    return Array4F32View[owner_origin](
+    return Array4F32View[MutAnyOrigin](
         data=lib.call[
             "amrex_mojo_multifab_data_ptr_for_mfiter_device_f32",
-            UnsafePointer[c_float, owner_origin],
+            UnsafePointer[c_float, MutAnyOrigin],
         ](multifab, mfiter),
         lo_x=data_lo[0],
         lo_y=data_lo[1],
