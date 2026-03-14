@@ -157,8 +157,10 @@ Notes:
 The direct CUDA/HIP path is intentionally narrow:
 
 1. Create or select a Mojo `DeviceContext`.
-2. Enter `runtime.external_gpu_stream_scope(ctx, sync_on_exit=...)`.
-3. Borrow tile data with `unsafe_device_array(...)` and launch Mojo kernels on
+2. Create `AmrexRuntime` on that same device, for example
+   `AmrexRuntime(Int(ctx.id()))`.
+3. Enter `runtime.external_gpu_stream_scope(ctx, sync_on_exit=...)`.
+4. Borrow tile data with `unsafe_device_array(...)` and launch Mojo kernels on
    `ctx.stream()` while AMReX calls in the same scope use that same stream.
 
 Minimal shape:
@@ -167,8 +169,8 @@ Minimal shape:
 from amrex.runtime import AmrexRuntime
 from std.gpu.host import DeviceContext
 
-var runtime = AmrexRuntime()
 var ctx = DeviceContext()
+var runtime = AmrexRuntime(Int(ctx.id()))
 var stream_scope = runtime.external_gpu_stream_scope(ctx, sync_on_exit=False)
 
 # Borrow device data from a GPU-backed MultiFab and launch Mojo kernels on
@@ -178,6 +180,9 @@ var stream_scope = runtime.external_gpu_stream_scope(ctx, sync_on_exit=False)
 Important rules:
 
 - This path is currently implemented only for CUDA and HIP AMReX backends.
+- AMReX and Mojo must use the same GPU device. `DeviceContext.set_as_current()`
+  does not retarget an already-initialized AMReX runtime; choose the device
+  when constructing `AmrexRuntime`.
 - `unsafe_device_array(...)` returns pointer-and-shape metadata for
   device-accessible storage. Treat it as a device-only borrow. Do not use host
   indexing, `.fill()`, or any other host-side access on that value.

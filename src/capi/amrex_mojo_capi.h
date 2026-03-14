@@ -132,9 +132,17 @@ amrex_mojo_runtime_t* amrex_mojo_runtime_create(
     int32_t use_parmparse
 );
 amrex_mojo_runtime_t* amrex_mojo_runtime_create_default(void);
+amrex_mojo_runtime_t* amrex_mojo_runtime_create_on_device(
+    int32_t argc,
+    const char* const* argv,
+    int32_t use_parmparse,
+    int32_t device_id
+);
+amrex_mojo_runtime_t* amrex_mojo_runtime_create_default_on_device(int32_t device_id);
 void amrex_mojo_runtime_destroy(amrex_mojo_runtime_t* runtime);
 int32_t amrex_mojo_runtime_initialized(const amrex_mojo_runtime_t* runtime);
 amrex_mojo_gpu_backend_t amrex_mojo_gpu_backend(void);
+int32_t amrex_mojo_gpu_device_id(void);
 amrex_mojo_external_gpu_stream_scope_t* amrex_mojo_external_gpu_stream_scope_create(
     void* stream_handle,
     amrex_mojo_external_stream_sync_t sync_on_exit

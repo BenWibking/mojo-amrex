@@ -24,6 +24,7 @@ This repository now implements an opt-in direct CUDA/HIP path.
 
 The working direction is:
 
+- Mojo and AMReX must agree on the same backend device ordinal
 - Mojo exports a raw handle for its current stream
 - AMReX adopts that stream for a scoped region with
   `setExternalGpuStream` / `ExternalGpuStreamRegion`
@@ -37,6 +38,21 @@ That makes the ownership split:
 
 - AMReX owns `MultiFab` storage, async allocation semantics, and ordering
 - Mojo owns kernel code generation and the stream handle it exports
+
+Device selection is stricter than stream selection:
+
+- Mojo exposes device selection through `DeviceContext(device_id=...)`,
+  `ctx.id()`, `ctx.push_context()`, and `ctx.set_as_current()`
+- AMReX chooses its device at `amrex::Initialize(..., a_device_id)` time and
+  reports it later via `Gpu::Device::deviceId()`
+- changing Mojo's current device after AMReX initialization does not retarget
+  the already-initialized AMReX runtime
+
+So the interoperable path is:
+
+- pick or construct the Mojo `DeviceContext`
+- initialize `AmrexRuntime` on `Int(ctx.id())`
+- only then enter the external-stream scope
 
 ## How It Works
 
@@ -84,6 +100,8 @@ That means:
 - every AMReX GPU launch in that scope uses the Mojo stream handle
 - `resetExternalGpuStream(...)` happens automatically when the scope is
   destroyed
+- AMReX rejects the scope if the active Mojo `DeviceContext` is on a different
+  GPU device than the initialized AMReX runtime
 
 The `sync_on_exit` flag is forwarded to AMReX's
 `ExternalStreamSync::{Yes,No}` behavior:
@@ -119,8 +137,8 @@ from amrex.runtime import AmrexRuntime
 from std.gpu.host import DeviceContext
 
 fn main() raises:
-    var runtime = AmrexRuntime()
     var ctx = DeviceContext()
+    var runtime = AmrexRuntime(Int(ctx.id()))
 
     # Install the current Mojo stream as AMReX's active stream for this scope.
     var stream_scope = runtime.external_gpu_stream_scope(
@@ -136,6 +154,14 @@ Within that scope:
 - AMReX operations such as `setVal`, reductions, `FillBoundary`, or
   `ParallelCopy` issue work on the exported Mojo stream
 - Mojo kernels launched on `ctx.stream()` see the same ordering
+
+What does not work as an interop setter:
+
+- `ctx.set_as_current()` is useful for libraries that consult the current CUDA
+  or HIP context directly, but it does not update AMReX's stored
+  `Gpu::Device::deviceId()`
+- after AMReX is initialized, switching the Mojo current device alone is not a
+  valid way to retarget AMReX allocations or launches
 
 ## Why The API Is Marked `unsafe`
 
@@ -168,6 +194,8 @@ without hiding the risk.
   regions
 - direct interop is only meaningful for device-accessible `MultiFab`
   allocations
+- the current Mojo `DeviceContext` and initialized AMReX runtime must point to
+  the same device ordinal
 - the current path is Mojo-stream-to-AMReX, not arbitrary external-stream
   import into Mojo
 - the current Mojo raw-handle export path depends on internal stdlib modules

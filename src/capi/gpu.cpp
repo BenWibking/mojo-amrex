@@ -49,6 +49,22 @@ extern "C" amrex_mojo_gpu_backend_t amrex_mojo_gpu_backend(void)
 #endif
 }
 
+extern "C" int32_t amrex_mojo_gpu_device_id(void)
+{
+#if defined(AMREX_USE_CUDA) || defined(AMREX_USE_HIP)
+    if (!amrex::Initialized()) {
+        amrex_mojo::detail::clear_last_error();
+        return -1;
+    }
+
+    amrex_mojo::detail::clear_last_error();
+    return amrex::Gpu::Device::deviceId();
+#else
+    amrex_mojo::detail::clear_last_error();
+    return -1;
+#endif
+}
+
 extern "C" amrex_mojo_external_gpu_stream_scope_t*
 amrex_mojo_external_gpu_stream_scope_create(
     void* stream_handle,

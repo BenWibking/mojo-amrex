@@ -151,7 +151,20 @@ auto main() -> int
             gpu_backend <= AMREX_MOJO_GPU_BACKEND_HIP,
         "gpu_backend should return a known enum value."
     );
+    const auto gpu_device_id = amrex_mojo_gpu_device_id();
     if (gpu_backend == AMREX_MOJO_GPU_BACKEND_NONE) {
+        expect(
+            gpu_device_id == -1,
+            "gpu_device_id should report -1 when AMReX has no CUDA/HIP backend."
+        );
+        expect(
+            amrex_mojo_runtime_create_on_device(1, runtime_argv, 0, 0) == nullptr,
+            "runtime_create_on_device should fail when CUDA/HIP interop is unavailable."
+        );
+        expect(
+            std::string(amrex_mojo_last_error_message()).find("CUDA or HIP") != std::string::npos,
+            "runtime_create_on_device should report a GPU-backend diagnostic."
+        );
         expect(
             amrex_mojo_external_gpu_stream_scope_create(
                 reinterpret_cast<void*>(0x1),
@@ -159,6 +172,15 @@ auto main() -> int
             ) == nullptr,
             "external_gpu_stream_scope_create should fail when CUDA/HIP interop is unavailable."
         );
+    } else {
+        expect(gpu_device_id >= 0, "gpu_device_id should be >= 0 for CUDA/HIP builds.");
+        amrex_mojo_runtime_t* same_device_runtime =
+            amrex_mojo_runtime_create_on_device(1, runtime_argv, 0, gpu_device_id);
+        expect(
+            same_device_runtime != nullptr,
+            "runtime_create_on_device should succeed on the active AMReX GPU device."
+        );
+        amrex_mojo_runtime_destroy(same_device_runtime);
     }
     expect(amrex_mojo_parallel_nprocs() >= 1, "parallel_nprocs should be >= 1.");
     expect(amrex_mojo_parallel_myproc() >= 0, "parallel_myproc should be >= 0.");

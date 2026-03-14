@@ -106,7 +106,13 @@ def require_direct_gpu_interop(
 
 
 def main() raises:
-    var runtime = AmrexRuntime()
+    if not has_accelerator():
+        raise Error(
+            "examples/multifab_gpu_interop.mojo requires a Mojo-supported"
+            " accelerator."
+        )
+    var ctx = DeviceContext()
+    var runtime = AmrexRuntime(Int(ctx.id()))
 
     var domain = box3d(
         small_end=intvect3d(0, 0, 0),
@@ -138,7 +144,6 @@ def main() raises:
     var add_value = Float32(params.query_int("tile_fill_value") - 1)
     var plotfile_path = String("build/multifab_gpu_interop_plotfile")
 
-    var ctx = DeviceContext()
     # Keep this scope live while AMReX calls and Mojo kernels share ctx.stream().
     var stream_scope = runtime.external_gpu_stream_scope(
         ctx, sync_on_exit=False

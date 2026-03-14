@@ -390,6 +390,13 @@ def runtime_create(ref lib: OwnedDLHandle) raises -> RuntimeHandle:
     return lib.call["amrex_mojo_runtime_create_default", RuntimeHandle]()
 
 
+def runtime_create(ref lib: OwnedDLHandle, device_id: Int) raises -> RuntimeHandle:
+    return lib.call[
+        "amrex_mojo_runtime_create_default_on_device",
+        RuntimeHandle,
+    ](c_int(device_id))
+
+
 def runtime_create(
     ref lib: OwnedDLHandle,
     argv: List[String],
@@ -419,6 +426,44 @@ def runtime_create(
     )
 
 
+def runtime_create(
+    ref lib: OwnedDLHandle,
+    argv: List[String],
+    use_parmparse: Bool,
+    device_id: Int,
+) raises -> RuntimeHandle:
+    var argc = len(argv)
+    if argc == 0:
+        return lib.call[
+            "amrex_mojo_runtime_create_on_device",
+            RuntimeHandle,
+        ](
+            c_int(0),
+            UnsafePointer[UnsafePointer[c_char, MutAnyOrigin], MutAnyOrigin](),
+            c_int(1 if use_parmparse else 0),
+            c_int(device_id),
+        )
+
+    var argv_storage = List[String](length=argc, fill=String(""))
+    for i in range(argc):
+        argv_storage[i] = argv[i].copy()
+
+    var first_ptr = argv_storage[0].as_c_string_slice().unsafe_ptr()
+    var argv_ptrs = List[type_of(first_ptr)](length=argc, fill=first_ptr)
+    for i in range(1, argc):
+        argv_ptrs[i] = argv_storage[i].as_c_string_slice().unsafe_ptr()
+
+    return lib.call[
+        "amrex_mojo_runtime_create_on_device",
+        RuntimeHandle,
+    ](
+        c_int(argc),
+        argv_ptrs.unsafe_ptr(),
+        c_int(1 if use_parmparse else 0),
+        c_int(device_id),
+    )
+
+
 def runtime_destroy(ref lib: OwnedDLHandle, runtime: RuntimeHandle) raises:
     lib.call["amrex_mojo_runtime_destroy"](runtime)
 
@@ -431,6 +476,10 @@ def runtime_initialized(
 
 def gpu_backend(ref lib: OwnedDLHandle) raises -> Int:
     return Int(lib.call["amrex_mojo_gpu_backend", c_int]())
+
+
+def gpu_device_id(ref lib: OwnedDLHandle) raises -> Int:
+    return Int(lib.call["amrex_mojo_gpu_device_id", c_int]())
 
 
 def external_gpu_stream_scope_create(

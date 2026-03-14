@@ -7,6 +7,7 @@ from amrex.ffi import (
     abi_version,
     external_gpu_stream_scope_create,
     gpu_backend as ffi_gpu_backend,
+    gpu_device_id as ffi_gpu_device_id,
     parallel_ioprocessor,
     parallel_ioprocessor_number,
     parallel_myproc,
@@ -83,6 +84,53 @@ struct AmrexRuntime(Movable):
         self.state = RuntimeLease(_AmrexRuntimeState(lib^, handle, path_owned^))
         self.handle = handle
 
+    def __init__(out self, device_id: Int) raises:
+        var path = default_library_path()
+        var lib = load_library(path)
+        var handle = runtime_create(lib, device_id)
+        if not handle:
+            raise Error(last_error_message(lib))
+        self.state = RuntimeLease(_AmrexRuntimeState(lib^, handle, path^))
+        self.handle = handle
+
+    def __init__(
+        out self,
+        device_id: Int,
+        argv: List[String],
+        use_parmparse: Bool = False,
+    ) raises:
+        var path = default_library_path()
+        var lib = load_library(path)
+        var handle = runtime_create(lib, argv, use_parmparse, device_id)
+        if not handle:
+            raise Error(last_error_message(lib))
+        self.state = RuntimeLease(_AmrexRuntimeState(lib^, handle, path^))
+        self.handle = handle
+
+    def __init__(out self, path: String, device_id: Int) raises:
+        var path_owned = path.copy()
+        var lib = load_library(path_owned)
+        var handle = runtime_create(lib, device_id)
+        if not handle:
+            raise Error(last_error_message(lib))
+        self.state = RuntimeLease(_AmrexRuntimeState(lib^, handle, path_owned^))
+        self.handle = handle
+
+    def __init__(
+        out self,
+        path: String,
+        device_id: Int,
+        argv: List[String],
+        use_parmparse: Bool = False,
+    ) raises:
+        var path_owned = path.copy()
+        var lib = load_library(path_owned)
+        var handle = runtime_create(lib, argv, use_parmparse, device_id)
+        if not handle:
+            raise Error(last_error_message(lib))
+        self.state = RuntimeLease(_AmrexRuntimeState(lib^, handle, path_owned^))
+        self.handle = handle
+
     def abi_version(ref self) raises -> Int:
         var state = self._lease()
         return abi_version(state[].lib)
@@ -122,6 +170,10 @@ struct AmrexRuntime(Movable):
         if backend == GPU_BACKEND_HIP:
             return String("hip")
         return String("none")
+
+    def gpu_device_id(ref self) raises -> Int:
+        var state = self._lease()
+        return ffi_gpu_device_id(state[].lib)
 
     def external_gpu_stream_scope(
         ref self,
@@ -174,6 +226,16 @@ struct ExternalGpuStreamScope(Movable):
                 "AMReX was built for HIP but the active Mojo device context reports '"
                 + mojo_backend
                 + "'."
+            )
+
+        var amrex_device_id = ffi_gpu_device_id(self.runtime[].lib)
+        if amrex_device_id < 0:
+            raise Error("The loaded AMReX runtime does not report an active GPU device.")
+        if Int(ctx.id()) != amrex_device_id:
+            raise Error(
+                "AMReX and the active Mojo device context are using different GPU devices."
+                + " Construct `AmrexRuntime` on the same device as `ctx` before"
+                + " sharing streams."
             )
 
         var stream_handle = _external_stream_handle(ctx, amrex_backend)

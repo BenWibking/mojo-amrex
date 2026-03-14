@@ -32,6 +32,19 @@ def main() raises:
         runtime.ioprocessor_number() >= 0,
         "ioprocessor_number should be >= 0",
     )
+    if runtime.gpu_backend() == "none":
+        expect(
+            runtime.gpu_device_id() == -1,
+            "gpu_device_id should be -1 when AMReX has no GPU backend",
+        )
+    else:
+        var gpu_device_id = runtime.gpu_device_id()
+        expect(gpu_device_id >= 0, "gpu_device_id should be >= 0")
+        var same_device_runtime = AmrexRuntime(gpu_device_id)
+        expect(
+            same_device_runtime.gpu_device_id() == gpu_device_id,
+            "runtime created on explicit GPU device should match",
+        )
 
     var params = ParmParse(runtime, "runtime_geometry_test")
     expect(params.query_int("answer") == 17, "ParmParse query_int mismatch")
