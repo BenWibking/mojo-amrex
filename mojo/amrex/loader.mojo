@@ -3,6 +3,18 @@ from std.os import getenv
 from std.os.path import exists
 
 
+def resolve_library_candidate(ref prefix: String) raises -> String:
+    var so_candidate = prefix + ".so"
+    if exists(so_candidate):
+        return so_candidate
+
+    var dylib_candidate = prefix + ".dylib"
+    if exists(dylib_candidate):
+        return dylib_candidate
+
+    return String("")
+
+
 def installed_library_path() raises -> String:
     var override_path = getenv("AMREX_MOJO_LIBRARY_PATH")
     if override_path:
@@ -10,13 +22,17 @@ def installed_library_path() raises -> String:
 
     var conda_prefix = getenv("CONDA_PREFIX")
     if conda_prefix:
-        var candidate = conda_prefix + "/lib/libamrex_mojo_capi_3d.dylib"
+        var candidate = resolve_library_candidate(
+            conda_prefix + "/lib/libamrex_mojo_capi_3d"
+        )
         if exists(candidate):
             return candidate
 
     var modular_home = getenv("MODULAR_HOME")
     if modular_home:
-        var candidate = modular_home + "/../../lib/libamrex_mojo_capi_3d.dylib"
+        var candidate = resolve_library_candidate(
+            modular_home + "/../../lib/libamrex_mojo_capi_3d"
+        )
         if exists(candidate):
             return candidate
 
@@ -27,7 +43,12 @@ def default_library_path() raises -> String:
     var installed_path = installed_library_path()
     if installed_path:
         return installed_path
-    return String("./build/src/capi/libamrex_mojo_capi_3d.dylib")
+
+    var build_path = resolve_library_candidate("./build/src/capi/libamrex_mojo_capi_3d")
+    if build_path:
+        return build_path
+
+    return String("./build/src/capi/libamrex_mojo_capi_3d.so")
 
 
 def load_library(ref path: String) raises -> OwnedDLHandle:

@@ -97,7 +97,7 @@ namespace
         }
         message +=
             ". Rebuild the default MPI-enabled library with `pixi run bootstrap`, "
-            "or set AMREX_MOJO_LIBRARY_PATH=./build/src/capi/libamrex_mojo_capi_3d.dylib.";
+            "or set AMREX_MOJO_LIBRARY_PATH to the rebuilt AMReX Mojo C API library.";
         return message;
     }
 
