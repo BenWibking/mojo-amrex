@@ -9,9 +9,10 @@ The current repo contains:
 - a Mojo package under `mojo/amrex`
 - automated C++ and Mojo tests under `tests/`
 - an install path that exposes `amrex` as a top-level Mojo package in the active environment
-- a working MultiFab smoke example in `examples/multifab_smoke.mojo`
-- a Mojo GPU variant of the smoke example in `examples/multifab_smoke_mojo_gpu.mojo`
-- an MPI ghost-exchange example in `examples/multifab_mpi_exchange.mojo`
+- a host-side `MultiFab` example in `examples/multifab.mojo`
+- a staged Mojo GPU example in `examples/multifab_gpu.mojo`
+- a direct CUDA/HIP interop example in `examples/multifab_gpu_interop.mojo`
+- an MPI ghost-exchange example in `examples/multifab_mpi.mojo`
 
 The current MVP covers:
 
@@ -21,7 +22,8 @@ The current MVP covers:
 4. opt-in direct CUDA/HIP GPU interop by sharing a Mojo stream with AMReX
 5. device-pointer borrows for GPU-backed `MultiFab` tiles
 6. reductions for `MultiFab`
-7. a Mojo example that allocates a `MultiFab`, fills all tiles, and validates the sum
+7. plotfile output, `fill_boundary`, and `parallel_copy_from`
+8. runnable host, staged-GPU, direct-GPU, and MPI examples under `examples/`
 
 ## Quickstart
 
@@ -31,7 +33,7 @@ From the repo root:
 curl -fsSL https://pixi.sh/install.sh | sh
 pixi run bootstrap
 pixi shell
-mojo examples/multifab_smoke.mojo
+mojo examples/multifab.mojo
 ```
 
 If you just installed `pixi`, restart your shell first so `pixi` is on `PATH`.
@@ -39,8 +41,8 @@ If you just installed `pixi`, restart your shell first so `pixi` is on `PATH`.
 the shared library and `amrex.mojopkg` into the default pixi environment. A
 fresh checkout does not need a preexisting AMReX clone; CMake fetches AMReX
 from GitHub during the initial configure step. The default pixi build now
-enables MPI, so both examples under `examples/` can use the installed library
-without a separate MPI-only build tree.
+enables MPI, so the same default `build/` tree backs both the serial and MPI
+documentation paths.
 
 ## Layout
 
@@ -71,18 +73,12 @@ pixi run configure
 pixi run configure-mpi
 pixi run build-capi
 pixi run build-capi-mpi
+pixi run install-capi
 pixi run build-tests
 pixi run build-tests-mpi
 pixi run install-amrex
 pixi run install-mojo-package
 pixi run package-mojo
-pixi run build-multifab-smoke
-pixi run run-multifab-smoke
-pixi run run-multifab-smoke-script
-pixi run build-multifab-smoke-mojo-gpu
-pixi run run-multifab-smoke-mojo-gpu
-pixi run run-multifab-smoke-mojo-gpu-script
-pixi run run-multifab-mpi-exchange
 pixi run test-capi
 pixi run test-capi-mpi
 pixi run test-mojo-runtime
@@ -92,6 +88,15 @@ pixi run test-mojo-multifab-mpi
 pixi run test
 pixi run test-mpi
 pixi run format-mojo
+```
+
+Example entry points:
+
+```bash
+mojo examples/multifab.mojo
+mojo examples/multifab_gpu.mojo
+mojo examples/multifab_gpu_interop.mojo
+mpiexec --oversubscribe --map-by slot -n 2 mojo examples/multifab_mpi.mojo
 ```
 
 Notes:
@@ -113,12 +118,21 @@ Notes:
   autodetection with `-DAMREX_MOJO_GPU_BACKEND=CUDA`,
   `-DAMREX_MOJO_GPU_BACKEND=HIP`, or `-DAMREX_MOJO_GPU_BACKEND=NONE` when you
   need a specific backend.
-- `pixi run run-multifab-smoke-mojo-gpu` keeps the smoke-example control flow
-  and output behavior, but runs the tile update through Mojo device kernels on
-  any Mojo-supported accelerator backend. It stages host-backed `Array4` data
-  through `DeviceBuffer`s before launch and uses `Float32` storage for broad
-  backend compatibility. That is Mojo-kernel support in user code, not AMReX
-  GPU-runtime interop.
+- `examples/multifab.mojo` is the baseline host-side example. It allocates two
+  `MultiFab`s, fills the source tiles, updates the destination through
+  `ParallelFor`, writes a single-level plotfile, and prints a reduction.
+- `examples/multifab_gpu.mojo` keeps that overall workflow, but runs the tile
+  update through Mojo device kernels on any Mojo-supported accelerator backend.
+  It stages host-backed `Array4` data through `DeviceBuffer`s before launch and
+  uses `Float32` storage for broad backend compatibility. That is Mojo-kernel
+  support in user code, not AMReX GPU-runtime interop.
+- `examples/multifab_gpu_interop.mojo` is the direct AMReX GPU path. It
+  requires a CUDA or HIP AMReX build, shares the current Mojo stream with
+  AMReX, and borrows device-accessible tile views with
+  `unsafe_device_array(...)`.
+- `examples/multifab_mpi.mojo` is the MPI example. It enables `ParmParse` from
+  argv, fills two slabs with rank-dependent values, validates `fill_boundary`,
+  validates `parallel_copy_from`, and prints per-rank diagnostics.
 - The direct AMReX GPU path works by exporting the current Mojo stream handle,
   installing it as AMReX's active external stream for a scope, and then
   borrowing device pointers from `MultiFab`. AMReX remains the owner of device
@@ -135,7 +149,7 @@ Notes:
   `-DAMREX_MOJO_AMREX_SOURCE_DIR=/path/to/amrex`.
 - `pixi run build-capi` now also refreshes the C API dylib in the active env's
   `lib/` directory after each successful build, so bare commands like
-  `mojo examples/multifab_smoke.mojo` do not pick up a stale installed copy.
+  `mojo examples/multifab.mojo` do not pick up a stale installed copy.
 - `pixi run install-amrex` still installs `amrex.mojopkg` into the env's
   `lib/mojo/` directory and runs the full CMake install step for headers and
   other install artifacts.
@@ -143,9 +157,6 @@ Notes:
   functional tests against the current env-installed library. The Mojo test
   tasks rebuild the C API, install `amrex.mojopkg` into the active pixi env,
   and then run without an explicit `AMREX_MOJO_LIBRARY_PATH` override.
-- `pixi run run-multifab-mpi-exchange` packages the current Mojo bindings,
-  rebuilds the C API into the active env, and runs the MPI example with
-  `mpiexec -n 2`.
 - `pixi run test-mpi` runs the two-rank MPI variants of the C++ and Mojo tests
   from the default MPI-enabled `build/` tree.
 - The public Mojo surface now uses move-only wrapper objects such as
