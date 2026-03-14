@@ -3,6 +3,7 @@ cmake_minimum_required(VERSION 3.24)
 project(amrex_mojo LANGUAGES C CXX)
 
 include(FetchContent)
+include(CheckLanguage)
 include(CTest)
 
 option(
@@ -25,13 +26,13 @@ option(
 
 set(
     AMREX_MOJO_GPU_BACKEND
-    "NONE"
+    "AUTO"
     CACHE STRING
-    "GPU backend for AMReX (NONE, CUDA, or HIP)."
+    "GPU backend for AMReX (AUTO, NONE, CUDA, or HIP)."
 )
 set_property(
     CACHE AMREX_MOJO_GPU_BACKEND
-    PROPERTY STRINGS NONE CUDA HIP
+    PROPERTY STRINGS AUTO NONE CUDA HIP
 )
 
 set(AMREX_MOJO_AMREX_SOURCE_DIR_DEFAULT "")
@@ -64,11 +65,11 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-set(AMREX_MOJO_VALID_GPU_BACKENDS NONE CUDA HIP)
+set(AMREX_MOJO_VALID_GPU_BACKENDS AUTO NONE CUDA HIP)
 if(NOT AMREX_MOJO_GPU_BACKEND IN_LIST AMREX_MOJO_VALID_GPU_BACKENDS)
     message(
         FATAL_ERROR
-        "AMREX_MOJO_GPU_BACKEND='${AMREX_MOJO_GPU_BACKEND}' is invalid. Use NONE, CUDA, or HIP."
+        "AMREX_MOJO_GPU_BACKEND='${AMREX_MOJO_GPU_BACKEND}' is invalid. Use AUTO, NONE, CUDA, or HIP."
     )
 endif()
 
@@ -76,12 +77,72 @@ if(NOT AMREX_MOJO_ENABLE_AMREX)
     message(FATAL_ERROR "The Mojo bindings MVP requires AMReX. Configure with -DAMREX_MOJO_ENABLE_AMREX=ON.")
 endif()
 
+set(AMREX_MOJO_RESOLVED_GPU_BACKEND "${AMREX_MOJO_GPU_BACKEND}")
+if(AMREX_MOJO_GPU_BACKEND STREQUAL "AUTO")
+    check_language(CUDA)
+    check_language(HIP)
+
+    if(CMAKE_CUDA_COMPILER)
+        set(AMREX_MOJO_RESOLVED_GPU_BACKEND "CUDA")
+        if(CMAKE_HIP_COMPILER)
+            message(
+                STATUS
+                "Detected CUDA compiler '${CMAKE_CUDA_COMPILER}' and HIP compiler '${CMAKE_HIP_COMPILER}'; selecting CUDA. Override with -DAMREX_MOJO_GPU_BACKEND=HIP or NONE to change this."
+            )
+        else()
+            message(
+                STATUS
+                "Detected CUDA compiler '${CMAKE_CUDA_COMPILER}'; selecting AMReX GPU backend CUDA."
+            )
+        endif()
+    elseif(CMAKE_HIP_COMPILER)
+        set(AMREX_MOJO_RESOLVED_GPU_BACKEND "HIP")
+        message(
+            STATUS
+            "Detected HIP compiler '${CMAKE_HIP_COMPILER}'; selecting AMReX GPU backend HIP."
+        )
+    else()
+        set(AMREX_MOJO_RESOLVED_GPU_BACKEND "NONE")
+        message(
+            STATUS
+            "No CUDA or HIP compiler detected; selecting AMReX GPU backend NONE."
+        )
+    endif()
+elseif(AMREX_MOJO_GPU_BACKEND STREQUAL "CUDA")
+    check_language(CUDA)
+    if(NOT CMAKE_CUDA_COMPILER)
+        message(
+            FATAL_ERROR
+            "AMREX_MOJO_GPU_BACKEND='CUDA' was requested, but no CUDA compiler was detected."
+        )
+    endif()
+elseif(AMREX_MOJO_GPU_BACKEND STREQUAL "HIP")
+    check_language(HIP)
+    if(NOT CMAKE_HIP_COMPILER)
+        message(
+            FATAL_ERROR
+            "AMREX_MOJO_GPU_BACKEND='HIP' was requested, but no HIP compiler was detected."
+        )
+    endif()
+endif()
+
+message(
+    STATUS
+    "AMReX Mojo GPU backend request='${AMREX_MOJO_GPU_BACKEND}', resolved='${AMREX_MOJO_RESOLVED_GPU_BACKEND}'."
+)
+
 if(NOT TARGET AMReX::amrex_3d AND NOT TARGET AMReX::amrex)
     set(AMReX_SPACEDIM 3 CACHE STRING "Dimension of AMReX build" FORCE)
     set(AMReX_PRECISION DOUBLE CACHE STRING "Precision of AMReX build" FORCE)
     set(AMReX_MPI ${AMREX_MOJO_ENABLE_MPI} CACHE BOOL "Enable MPI in AMReX" FORCE)
     set(AMReX_OMP OFF CACHE BOOL "Enable OpenMP in AMReX" FORCE)
-    set(AMReX_GPU_BACKEND ${AMREX_MOJO_GPU_BACKEND} CACHE STRING "GPU backend for AMReX" FORCE)
+    set(
+        AMReX_GPU_BACKEND
+        ${AMREX_MOJO_RESOLVED_GPU_BACKEND}
+        CACHE STRING
+        "GPU backend for AMReX"
+        FORCE
+    )
     set(AMReX_PARTICLES OFF CACHE BOOL "Enable AMReX particle classes" FORCE)
     set(AMReX_EB OFF CACHE BOOL "Enable AMReX embedded boundary support" FORCE)
     set(AMReX_FORTRAN OFF CACHE BOOL "Enable AMReX Fortran interfaces" FORCE)

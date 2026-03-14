@@ -106,10 +106,13 @@ Notes:
   the default `build/` tree and installed C ABI are MPI-capable.
 - `pixi run configure-mpi`, `build-capi-mpi`, and `build-tests-mpi` remain as
   explicit MPI task aliases, but they target the same default `build/` tree.
-- The default pixi build still uses `AMREX_MOJO_GPU_BACKEND=NONE`. Direct AMReX
-  GPU interop is opt-in and currently supports CUDA and HIP AMReX builds only.
-  Configure a separate build tree with
-  `-DAMREX_MOJO_GPU_BACKEND=CUDA` or `-DAMREX_MOJO_GPU_BACKEND=HIP` to enable it.
+- `pixi run bootstrap` and `pixi run configure` now default
+  `AMREX_MOJO_GPU_BACKEND` to `AUTO`. Configure probes for CUDA first, then
+  HIP, and falls back to `NONE` when neither toolchain is available.
+- Direct AMReX GPU interop still requires a CUDA or HIP AMReX build. Override
+  autodetection with `-DAMREX_MOJO_GPU_BACKEND=CUDA`,
+  `-DAMREX_MOJO_GPU_BACKEND=HIP`, or `-DAMREX_MOJO_GPU_BACKEND=NONE` when you
+  need a specific backend.
 - `pixi run run-multifab-smoke-mojo-gpu` keeps the smoke-example control flow
   and output behavior, but runs the tile update through Mojo device kernels on
   any Mojo-supported accelerator backend. It stages host-backed `Array4` data

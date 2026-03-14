@@ -1,6 +1,6 @@
 # Direct GPU Interop for `mojo-amrex`
 
-Last updated: 2026-03-13
+Last updated: 2026-03-14
 
 ## Goal
 
@@ -11,8 +11,9 @@ storage without staging tile data through Mojo `DeviceBuffer`s.
 
 This repository now implements an opt-in direct CUDA/HIP path.
 
-- The default pixi build is still CPU-only from the AMReX side because it uses
-  `AMREX_MOJO_GPU_BACKEND=NONE`.
+- `pixi run bootstrap` / `pixi run configure` now default
+  `AMREX_MOJO_GPU_BACKEND` to `AUTO`, which probes for CUDA first, then HIP,
+  and falls back to `NONE` if neither toolchain is available.
 - Direct interop is available when AMReX is configured with
   `AMREX_MOJO_GPU_BACKEND=CUDA` or `AMREX_MOJO_GPU_BACKEND=HIP`.
 - The portable staged path in `mojo/amrex/space3d/gpu.mojo` remains the
@@ -42,10 +43,12 @@ That makes the ownership split:
 ### 1. Backend-gated build
 
 The CMake option `AMREX_MOJO_GPU_BACKEND` controls whether AMReX is built with
-`NONE`, `CUDA`, or `HIP`.
+`AUTO`, `NONE`, `CUDA`, or `HIP`.
 
 Today:
 
+- `AUTO` selects `CUDA` when a CUDA compiler is detected, otherwise `HIP` when
+  a HIP compiler is detected, otherwise `NONE`
 - `CUDA` works
 - `HIP` works
 
