@@ -141,6 +141,12 @@ message(
     "AMReX Mojo GPU backend request='${AMREX_MOJO_GPU_BACKEND}', resolved='${AMREX_MOJO_RESOLVED_GPU_BACKEND}'."
 )
 
+if(AMREX_MOJO_RESOLVED_GPU_BACKEND STREQUAL "CUDA")
+    enable_language(CUDA)
+elseif(AMREX_MOJO_RESOLVED_GPU_BACKEND STREQUAL "HIP")
+    enable_language(HIP)
+endif()
+
 if(NOT TARGET AMReX::amrex_3d AND NOT TARGET AMReX::amrex)
     set(AMReX_SPACEDIM 3 CACHE STRING "Dimension of AMReX build" FORCE)
     set(AMReX_PRECISION DOUBLE CACHE STRING "Precision of AMReX build" FORCE)
