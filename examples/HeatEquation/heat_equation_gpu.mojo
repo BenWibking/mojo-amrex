@@ -316,6 +316,7 @@ def main() raises:
             update_mfi.next()
 
         time = time + dt
+        ctx.synchronize()   # needed to make sure phi_new is ready before copying back to phi_old
         phi_old.copy_from(phi_new, 0, 0, 1)
 
         if runtime.ioprocessor():
@@ -330,4 +331,4 @@ def main() raises:
                 step,
             )
 
-    ctx.synchronize()
+    ctx.synchronize() # prevents premature cleanup of stream_scope before kernels finish
