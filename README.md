@@ -1,7 +1,7 @@
 # mojo-amrex [proof-of-concept]
-![mojo-amrex logo](docs/logo.png)
+Mojo bindings for AMReX, built as a narrow C ABI plus Mojo wrapper types.
 
-Mojo bindings to AMReX, built as a narrow C ABI plus Mojo wrapper types.
+![mojo-amrex logo](docs/logo.png)
 
 ## What is here
 
