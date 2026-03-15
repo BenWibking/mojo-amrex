@@ -25,12 +25,12 @@ fi
 '"""
 configure-mpi = { depends-on = ["configure"], cmd = "true" }
 configure-cray-mpich = "cmake --fresh -S . -B build-cray-mpich -DAMREX_MOJO_ENABLE_MPI=ON -DCMAKE_C_COMPILER=cc -DCMAKE_CXX_COMPILER=CC -DMPI_C_COMPILER=$CRAY_MPICH_DIR/bin/mpicc -DMPI_CXX_COMPILER=$CRAY_MPICH_DIR/bin/mpicxx -DCMAKE_INSTALL_PREFIX=$PWD/.pixi/envs/default"
-build-capi = "env OMPI_CC=cc OMPI_CXX=c++ cmake --build build --parallel --target amrex_mojo_capi_3d"
-build-capi-mpi = "env OMPI_CC=cc OMPI_CXX=c++ cmake --build build --parallel --target amrex_mojo_capi_3d"
-build-capi-cray-mpich = "cmake --build build-cray-mpich --parallel --target amrex_mojo_capi_3d"
-build-tests = { depends-on = ["configure"], cmd = "env OMPI_CC=cc OMPI_CXX=c++ cmake --build build --parallel" }
-build-tests-mpi = { depends-on = ["configure-mpi"], cmd = "env OMPI_CC=cc OMPI_CXX=c++ cmake --build build --parallel" }
-build-tests-cray-mpich = { depends-on = ["configure-cray-mpich"], cmd = "cmake --build build-cray-mpich --parallel" }
+build-capi = "env OMPI_CC=cc OMPI_CXX=c++ cmake --build build --parallel 8 --target amrex_mojo_capi_3d"
+build-capi-mpi = "env OMPI_CC=cc OMPI_CXX=c++ cmake --build build --parallel 8 --target amrex_mojo_capi_3d"
+build-capi-cray-mpich = "cmake --build build-cray-mpich --parallel 8 --target amrex_mojo_capi_3d"
+build-tests = { depends-on = ["configure"], cmd = "env OMPI_CC=cc OMPI_CXX=c++ cmake --build build --parallel 8" }
+build-tests-mpi = { depends-on = ["configure-mpi"], cmd = "env OMPI_CC=cc OMPI_CXX=c++ cmake --build build --parallel 8" }
+build-tests-cray-mpich = { depends-on = ["configure-cray-mpich"], cmd = "cmake --build build-cray-mpich --parallel 8" }
 install-capi = "env OMPI_CC=cc OMPI_CXX=c++ cmake --install build"
 package-mojo = "mojo package mojo/amrex -o amrex.mojopkg"
 install-mojo-package = "mkdir -p .pixi/envs/default/lib/mojo && mojo package mojo/amrex -o .pixi/envs/default/lib/mojo/amrex.mojopkg"
