@@ -1,0 +1,5 @@
+n_cell = 128
+max_grid_size = 32
+nsteps = 500
+plot_int = 10
+dt = 1.0e-5

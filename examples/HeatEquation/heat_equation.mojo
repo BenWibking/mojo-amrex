@@ -54,8 +54,8 @@ def plotfile_name(step: Int) -> String:
 
 def main() raises:
     var argv = List[String](length=2, fill=String(""))
-    argv[0] = String("heat_equation_simple")
-    argv[1] = String("examples/HeatEquation/heat_equation_simple.inputs")
+    argv[0] = String("heat_equation")
+    argv[1] = String("examples/HeatEquation/heat_equation.inputs")
     var runtime = AmrexRuntime(argv, use_parmparse=True)
 
     # **********************************
