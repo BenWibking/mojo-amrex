@@ -1,6 +1,6 @@
 # Mojo AMReX Usage Notes
 
-Last updated: 2026-03-14
+Last updated: 2026-03-15
 
 ## Ownership Model
 
@@ -42,9 +42,10 @@ failure.
 - `MultiFab(..., host_only=True)` still forces host-accessible storage. Use the
   default allocation path when you want AMReX to choose its normal GPU-capable
   arena in a CUDA/HIP build.
-- Mojo device kernels in user code are still supported. Use the staged view
-  helpers with `std.gpu.host.DeviceContext`, as in the Mojo GPU smoke example.
-  That is a Mojo-side execution path, not an AMReX GPU runtime.
+- Mojo device kernels in user code are still supported. Use the staged helper
+  types in `amrex.space3d.gpu` (`StagedArray4F32` / `StagedTileF32`) with
+  `std.gpu.host.DeviceContext` when you want the portable host-to-device
+  staging path. That is a Mojo-side execution path, not an AMReX GPU runtime.
 
 ## Direct GPU Interop Rules
 

@@ -1,6 +1,6 @@
 # Mojo Bindings Plan for AMReX
 
-Last updated: 2026-03-10
+Last updated: 2026-03-15
 
 ## Goal
 
@@ -71,7 +71,8 @@ An initial MPI slice is now implemented:
   the C ABI and Mojo wrappers
 - `MultiFab.fill_boundary(...)` and `MultiFab.parallel_copy_from(...)`
 - two-rank C ABI and Mojo regression coverage
-- a runnable MPI ghost-exchange example under `examples/`
+- a runnable MPI ghost-exchange example at
+  `examples/Multifab/multifab_mpi.mojo`
 
 ## Key Findings
 

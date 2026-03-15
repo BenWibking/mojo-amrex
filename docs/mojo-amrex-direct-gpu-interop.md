@@ -1,6 +1,6 @@
 # Direct GPU Interop for `mojo-amrex`
 
-Last updated: 2026-03-14
+Last updated: 2026-03-15
 
 ## Goal
 
@@ -16,6 +16,9 @@ This repository now implements an opt-in direct CUDA/HIP path.
   and falls back to `NONE` if neither toolchain is available.
 - Direct interop is available when AMReX is configured with
   `AMREX_MOJO_GPU_BACKEND=CUDA` or `AMREX_MOJO_GPU_BACKEND=HIP`.
+- Repository examples for this path live at
+  `examples/Multifab/multifab_gpu.mojo` and
+  `examples/HeatEquation/heat_equation_gpu.mojo`.
 - The portable staged path in `mojo/amrex/space3d/gpu.mojo` remains the
   fallback for CPU builds and for backends that do not support direct AMReX
   interop.

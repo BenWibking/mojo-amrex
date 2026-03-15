@@ -1,6 +1,6 @@
 # mojo-amrex Implementation Notes
 
-Last updated: 2026-03-14
+Last updated: 2026-03-15
 
 ## Overview
 
@@ -19,7 +19,7 @@ checks.
 
 - `src/capi/`: exported C ABI and CMake targets
 - `mojo/amrex/`: loader, raw FFI, runtime, and 3D wrapper surface
-- `examples/`: runnable examples for host, staged GPU, direct GPU interop, and MPI
+- `examples/`: runnable `Multifab` and `HeatEquation` examples for host, direct GPU interop, and MPI workflows
 - `tests/capi/`: ABI-level regression tests
 - `tests/mojo/`: wrapper-level regression tests
 
@@ -55,8 +55,9 @@ rebuilding or setting `AMREX_MOJO_LIBRARY_PATH`.
 
 There are two GPU-related workflows in this repository:
 
-- staged Mojo GPU execution, which copies host-backed tile data through Mojo
-  buffers and works as the portable fallback
+- staged Mojo GPU execution helpers in `mojo/amrex/space3d/gpu.mojo`, which
+  copy host-backed tile data through Mojo buffers and remain the portable
+  fallback
 - direct CUDA/HIP interop, which shares a Mojo stream with AMReX and borrows
   device-accessible tile metadata from `MultiFab`
 

@@ -1,7 +1,7 @@
 # Tests
 
 The repository now has both automated tests and runnable examples under
-`examples/`.
+`examples/Multifab/` and `examples/HeatEquation/`.
 
 Automated test entry points:
 
@@ -18,14 +18,15 @@ Coverage summary:
 - `tests/mojo/multifab_functional_test.mojo` validates tile iteration, borrowed
   `Array4` access, reductions, arithmetic, `ParmParse`, and plotfile output.
 
-The Mojo tests rebuild the C API before execution, which now refreshes the
-active pixi env's `lib/libamrex_mojo_capi_3d.dylib` automatically. They still
-exercise the current in-repo bindings rather than a stale installed dylib.
+The Mojo tests rebuild the C API before execution, which refreshes the active
+pixi env copy of `libamrex_mojo_capi_3d` under `.pixi/envs/default/lib/`
+automatically. They still exercise the current in-repo bindings rather than a
+stale installed shared library.
 
 Useful manual entry points:
 
-- `mojo examples/multifab.mojo`
-- `mojo examples/multifab_gpu.mojo`
-- `mojo examples/multifab_gpu_interop.mojo`
-- `mojo examples/heat_equation_simple.mojo`
-- `mpiexec --oversubscribe --map-by slot -n 2 mojo examples/multifab_mpi.mojo`
+- `mojo examples/Multifab/multifab.mojo`
+- `mojo examples/Multifab/multifab_gpu.mojo`
+- `mojo examples/HeatEquation/heat_equation.mojo`
+- `mojo examples/HeatEquation/heat_equation_gpu.mojo`
+- `mpiexec --oversubscribe --map-by slot -n 2 mojo examples/Multifab/multifab_mpi.mojo`
