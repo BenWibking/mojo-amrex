@@ -17,12 +17,6 @@ if(AMREX_MOJO_RESOLVED_GPU_BACKEND STREQUAL "CUDA")
         PROPERTIES
             LANGUAGE CUDA
     )
-elseif(AMREX_MOJO_RESOLVED_GPU_BACKEND STREQUAL "HIP")
-    set_source_files_properties(
-        ${AMREX_MOJO_CAPI_SOURCES}
-        PROPERTIES
-            LANGUAGE HIP
-    )
 endif()
 
 if(AMREX_MOJO_BUILD_SHARED)
@@ -48,13 +42,6 @@ if(AMREX_MOJO_RESOLVED_GPU_BACKEND STREQUAL "CUDA")
             CUDA_STANDARD_REQUIRED ON
             CUDA_SEPARABLE_COMPILATION ON
             CUDA_RESOLVE_DEVICE_SYMBOLS ON
-    )
-elseif(AMREX_MOJO_RESOLVED_GPU_BACKEND STREQUAL "HIP")
-    set_target_properties(
-        amrex_mojo_capi_3d
-        PROPERTIES
-            HIP_STANDARD 17
-            HIP_STANDARD_REQUIRED ON
     )
 endif()
 
