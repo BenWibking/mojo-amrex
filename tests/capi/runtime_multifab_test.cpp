@@ -498,6 +498,44 @@ auto main() -> int
         "parmparse_query_int failed."
     );
     expect(out_found == 1 && out_value == 7, "parmparse query should return the inserted value.");
+    double out_real_value = 0.0;
+    out_found = 0;
+    expect(
+        amrex_mojo_parmparse_query_real(parmparse, "missing_real", &out_real_value, &out_found) ==
+            AMREX_MOJO_STATUS_OK,
+        "parmparse_query_real should succeed for missing values."
+    );
+    expect(out_found == 0, "parmparse_query_real should report missing values.");
+
+    amrex_mojo_geometry_t* periodic_geometry =
+        amrex_mojo_geometry_create_with_real_box_and_periodicity(
+            runtime,
+            amrex_mojo_box_3d{
+                amrex_mojo_intvect_3d{0, 0, 0},
+                amrex_mojo_intvect_3d{kDomainExtent - 1, kDomainExtent - 1, kDomainExtent - 1},
+                amrex_mojo_intvect_3d{0, 0, 0}
+            },
+            amrex_mojo_realbox_3d{0.0, 0.0, 0.0, 1.0, 2.0, 3.0},
+            amrex_mojo_intvect_3d{1, 0, 1}
+        );
+    expect(periodic_geometry != nullptr, "periodic geometry creation returned null.");
+    const auto periodic_geometry_periodicity =
+        amrex_mojo_geometry_periodicity(periodic_geometry);
+    expect(
+        periodic_geometry_periodicity.x == 1 &&
+            periodic_geometry_periodicity.y == 0 &&
+            periodic_geometry_periodicity.z == 1,
+        "custom geometry periodicity mismatch."
+    );
+    const auto periodic_geometry_cell_size =
+        amrex_mojo_geometry_cell_size(periodic_geometry);
+    expect(
+        close_enough(periodic_geometry_cell_size.x, 1.0 / kDomainExtent) &&
+            close_enough(periodic_geometry_cell_size.y, 2.0 / kDomainExtent) &&
+            close_enough(periodic_geometry_cell_size.z, 3.0 / kDomainExtent),
+        "custom geometry cell size mismatch."
+    );
+    amrex_mojo_geometry_destroy(periodic_geometry);
 
     const std::filesystem::path plotfile = "build/capi_test_plotfile";
     expect(

@@ -87,6 +87,14 @@ namespace amrex_mojo::detail
         return amrex::RealBox(AMREX_D_DECL(0.0, 0.0, 0.0), AMREX_D_DECL(1.0, 1.0, 1.0));
     }
 
+    inline amrex::RealBox to_realbox(amrex_mojo_realbox_3d value) noexcept
+    {
+        return amrex::RealBox(
+            AMREX_D_DECL(value.lo_x, value.lo_y, value.lo_z),
+            AMREX_D_DECL(value.hi_x, value.hi_y, value.hi_z)
+        );
+    }
+
     inline amrex_mojo_realbox_3d from_realbox(const amrex::RealBox& value) noexcept
     {
         return amrex_mojo_realbox_3d{
@@ -106,6 +114,12 @@ namespace amrex_mojo::detail
             geometry.CellSize(1),
             geometry.CellSize(2)
         };
+    }
+
+    inline amrex::Array<int, AMREX_SPACEDIM>
+    to_periodicity(amrex_mojo_intvect_3d value) noexcept
+    {
+        return {AMREX_D_DECL(value.x, value.y, value.z)};
     }
 
     inline int32_t to_scalar_ngrow(amrex_mojo_intvect_3d ngrow)

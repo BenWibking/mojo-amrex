@@ -100,3 +100,35 @@ amrex_mojo_parmparse_query_int(
         );
     }
 }
+
+extern "C" amrex_mojo_status_code_t
+amrex_mojo_parmparse_query_real(
+    amrex_mojo_parmparse_t* parmparse,
+    const char* name,
+    double* out_value,
+    int32_t* out_found
+)
+{
+    if (parmparse == nullptr || parmparse->value == nullptr || name == nullptr || out_value == nullptr ||
+        out_found == nullptr) {
+        return amrex_mojo::detail::set_last_error(
+            AMREX_MOJO_STATUS_INVALID_ARGUMENT,
+            "parmparse_query_real requires non-null pointers."
+        );
+    }
+
+    try {
+        amrex::Real value = 0.0;
+        *out_found = parmparse->value->query(name, value) ? 1 : 0;
+        *out_value = static_cast<double>(value);
+        amrex_mojo::detail::clear_last_error();
+        return AMREX_MOJO_STATUS_OK;
+    } catch (const std::exception& ex) {
+        return amrex_mojo::detail::set_last_error(AMREX_MOJO_STATUS_INTERNAL_ERROR, ex.what());
+    } catch (...) {
+        return amrex_mojo::detail::set_last_error(
+            AMREX_MOJO_STATUS_INTERNAL_ERROR,
+            "parmparse_query_real failed with an unknown exception."
+        );
+    }
+}

@@ -29,6 +29,24 @@ struct Geometry(Movable):
         if not self.handle:
             raise Error(last_error_message(self.runtime[].lib))
 
+    def __init__(
+        out self,
+        ref runtime: AmrexRuntime,
+        domain: Box3D,
+        real_box: RealBox3D,
+        is_periodic: IntVect3D,
+    ) raises:
+        self.runtime = runtime._lease()
+        self.handle = geometry_create(
+            self.runtime[].lib,
+            self.runtime[].handle,
+            domain,
+            real_box,
+            is_periodic,
+        )
+        if not self.handle:
+            raise Error(last_error_message(self.runtime[].lib))
+
     def __del__(deinit self):
         if self.handle:
             self.runtime[].lib.call["amrex_mojo_geometry_destroy"](self.handle)

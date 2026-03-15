@@ -6,6 +6,7 @@ from amrex.space3d import (
     ParmParse,
     box3d,
     intvect3d,
+    realbox3d,
     zero_intvect3d,
 )
 from std.collections import List
@@ -20,9 +21,10 @@ def expect(condition: Bool, message: StringLiteral) raises:
 
 
 def main() raises:
-    var argv = List[String](length=2, fill=String(""))
+    var argv = List[String](length=3, fill=String(""))
     argv[0] = String("runtime_geometry_test")
     argv[1] = String("runtime_geometry_test.answer=17")
+    argv[2] = String("runtime_geometry_test.dt=0.125")
     var runtime = AmrexRuntime(argv, use_parmparse=True)
     expect(runtime.abi_version() == 4, "unexpected ABI version")
     expect(runtime.initialized(), "runtime should be initialized")
@@ -47,7 +49,12 @@ def main() raises:
         )
 
     var params = ParmParse(runtime, "runtime_geometry_test")
-    expect(params.query_int("answer") == 17, "ParmParse query_int mismatch")
+    expect(params.get_int("answer") == 17, "ParmParse get_int mismatch")
+    expect(params.get_real("dt") == 0.125, "ParmParse get_real mismatch")
+    expect(
+        params.query_real_or("missing_dt", 0.5) == 0.5,
+        "ParmParse query_real_or mismatch",
+    )
 
     var zero = zero_intvect3d()
     expect(
@@ -76,6 +83,37 @@ def main() raises:
         and Int(periodicity.y) == 0
         and Int(periodicity.z) == 0,
         "geometry periodicity mismatch",
+    )
+
+    var periodic_geometry = Geometry(
+        runtime,
+        domain,
+        realbox3d(0.0, 0.0, 0.0, 1.0, 2.0, 3.0),
+        intvect3d(1, 0, 1),
+    )
+    periodicity = periodic_geometry.periodicity()
+    expect(
+        Int(periodicity.x) == 1
+        and Int(periodicity.y) == 0
+        and Int(periodicity.z) == 1,
+        "custom geometry periodicity mismatch",
+    )
+    var prob_domain = periodic_geometry.prob_domain()
+    expect(
+        prob_domain.lo_x == 0.0
+        and prob_domain.lo_y == 0.0
+        and prob_domain.lo_z == 0.0
+        and prob_domain.hi_x == 1.0
+        and prob_domain.hi_y == 2.0
+        and prob_domain.hi_z == 3.0,
+        "custom geometry prob_domain mismatch",
+    )
+    var cell_size = periodic_geometry.cell_size()
+    expect(
+        cell_size.x == 1.0 / Float64(DOMAIN_EXTENT)
+        and cell_size.y == 2.0 / Float64(DOMAIN_EXTENT)
+        and cell_size.z == 3.0 / Float64(DOMAIN_EXTENT),
+        "custom geometry cell_size mismatch",
     )
 
     print("runtime_geometry_test: ok")

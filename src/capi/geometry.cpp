@@ -3,6 +3,21 @@
 extern "C" amrex_mojo_geometry_t*
 amrex_mojo_geometry_create(amrex_mojo_runtime_t* runtime, amrex_mojo_box_3d domain)
 {
+    return amrex_mojo_geometry_create_with_real_box_and_periodicity(
+        runtime,
+        domain,
+        amrex_mojo::detail::from_realbox(amrex_mojo::detail::unit_realbox()),
+        amrex_mojo_intvect_3d{0, 0, 0}
+    );
+}
+
+extern "C" amrex_mojo_geometry_t* amrex_mojo_geometry_create_with_real_box_and_periodicity(
+    amrex_mojo_runtime_t* runtime,
+    amrex_mojo_box_3d domain,
+    amrex_mojo_realbox_3d real_box,
+    amrex_mojo_intvect_3d is_periodic
+)
+{
     if (runtime == nullptr || runtime->state == nullptr) {
         amrex_mojo::detail::set_last_error(
             AMREX_MOJO_STATUS_INVALID_ARGUMENT,
@@ -17,9 +32,9 @@ amrex_mojo_geometry_create(amrex_mojo_runtime_t* runtime, amrex_mojo_box_3d doma
             state,
             amrex::Geometry(
                 amrex_mojo::detail::to_box(domain),
-                amrex_mojo::detail::unit_realbox(),
+                amrex_mojo::detail::to_realbox(real_box),
                 0,
-                {AMREX_D_DECL(0, 0, 0)}
+                amrex_mojo::detail::to_periodicity(is_periodic)
             )
         };
         amrex_mojo::detail::clear_last_error();
@@ -59,6 +74,48 @@ amrex_mojo_geometry_create_from_bounds(
             amrex_mojo_intvect_3d{hi_x, hi_y, hi_z},
             amrex_mojo_intvect_3d{nodal_x, nodal_y, nodal_z}
         }
+    );
+}
+
+extern "C" amrex_mojo_geometry_t*
+amrex_mojo_geometry_create_from_bounds_with_real_box_and_periodicity(
+    amrex_mojo_runtime_t* runtime,
+    int32_t lo_x,
+    int32_t lo_y,
+    int32_t lo_z,
+    int32_t hi_x,
+    int32_t hi_y,
+    int32_t hi_z,
+    int32_t nodal_x,
+    int32_t nodal_y,
+    int32_t nodal_z,
+    double real_lo_x,
+    double real_lo_y,
+    double real_lo_z,
+    double real_hi_x,
+    double real_hi_y,
+    double real_hi_z,
+    int32_t periodic_x,
+    int32_t periodic_y,
+    int32_t periodic_z
+)
+{
+    return amrex_mojo_geometry_create_with_real_box_and_periodicity(
+        runtime,
+        amrex_mojo_box_3d{
+            amrex_mojo_intvect_3d{lo_x, lo_y, lo_z},
+            amrex_mojo_intvect_3d{hi_x, hi_y, hi_z},
+            amrex_mojo_intvect_3d{nodal_x, nodal_y, nodal_z}
+        },
+        amrex_mojo_realbox_3d{
+            real_lo_x,
+            real_lo_y,
+            real_lo_z,
+            real_hi_x,
+            real_hi_y,
+            real_hi_z
+        },
+        amrex_mojo_intvect_3d{periodic_x, periodic_y, periodic_z}
     );
 }
 

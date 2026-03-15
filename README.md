@@ -69,6 +69,7 @@ Examples:
 mojo examples/multifab.mojo
 mojo examples/multifab_gpu.mojo
 mojo examples/multifab_gpu_interop.mojo
+mojo examples/heat_equation_simple.mojo
 mpiexec --oversubscribe --map-by slot -n 2 mojo examples/multifab_mpi.mojo
 ```
 

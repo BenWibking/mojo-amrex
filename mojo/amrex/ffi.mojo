@@ -99,6 +99,13 @@ struct ParmParseIntQueryResult(Copyable):
 
 
 @fieldwise_init
+struct ParmParseRealQueryResult(Copyable):
+    var status: Int
+    var found: Bool
+    var value: Float64
+
+
+@fieldwise_init
 struct Box3DResult(Copyable):
     var status: Int
     var value: Box3D
@@ -360,6 +367,24 @@ def zero_intvect3d() raises -> IntVect3D:
     return intvect3d(0, 0, 0)
 
 
+def realbox3d(
+    lo_x: Float64,
+    lo_y: Float64,
+    lo_z: Float64,
+    hi_x: Float64,
+    hi_y: Float64,
+    hi_z: Float64,
+) -> RealBox3D:
+    return RealBox3D(
+        lo_x=lo_x,
+        lo_y=lo_y,
+        lo_z=lo_z,
+        hi_x=hi_x,
+        hi_y=hi_y,
+        hi_z=hi_z,
+    )
+
+
 def box3d(
     small_end: IntVect3D,
     big_end: IntVect3D,
@@ -589,6 +614,39 @@ def geometry_create(
         domain.nodal.x,
         domain.nodal.y,
         domain.nodal.z,
+    )
+
+
+def geometry_create(
+    ref lib: OwnedDLHandle,
+    runtime: RuntimeHandle,
+    domain: Box3D,
+    real_box: RealBox3D,
+    is_periodic: IntVect3D,
+) raises -> GeometryHandle:
+    return lib.call[
+        "amrex_mojo_geometry_create_from_bounds_with_real_box_and_periodicity",
+        GeometryHandle,
+    ](
+        runtime,
+        domain.small_end.x,
+        domain.small_end.y,
+        domain.small_end.z,
+        domain.big_end.x,
+        domain.big_end.y,
+        domain.big_end.z,
+        domain.nodal.x,
+        domain.nodal.y,
+        domain.nodal.z,
+        c_double(real_box.lo_x),
+        c_double(real_box.lo_y),
+        c_double(real_box.lo_z),
+        c_double(real_box.hi_x),
+        c_double(real_box.hi_y),
+        c_double(real_box.hi_z),
+        is_periodic.x,
+        is_periodic.y,
+        is_periodic.z,
     )
 
 
@@ -1568,4 +1626,45 @@ def parmparse_query_int(
         status=status,
         found=out_found[0] != 0,
         value=Int(out_value[0]),
+    )
+
+
+def parmparse_query_real(
+    ref lib: OwnedDLHandle, parmparse: ParmParseHandle, name: String
+) raises -> ParmParseRealQueryResult:
+    var name_owned = name
+    var out_value = List[c_double](length=1, fill=0.0)
+    var out_found = List[c_int](length=1, fill=0)
+    var status = Int(
+        lib.call["amrex_mojo_parmparse_query_real", c_int](
+            parmparse,
+            name_owned.as_c_string_slice().unsafe_ptr(),
+            out_value.unsafe_ptr(),
+            out_found.unsafe_ptr(),
+        )
+    )
+    return ParmParseRealQueryResult(
+        status=status,
+        found=out_found[0] != 0,
+        value=Float64(out_value[0]),
+    )
+
+
+def parmparse_query_real(
+    ref lib: OwnedDLHandle, parmparse: ParmParseHandle, name: StringLiteral
+) raises -> ParmParseRealQueryResult:
+    var out_value = List[c_double](length=1, fill=0.0)
+    var out_found = List[c_int](length=1, fill=0)
+    var status = Int(
+        lib.call["amrex_mojo_parmparse_query_real", c_int](
+            parmparse,
+            name.as_c_string_slice().unsafe_ptr(),
+            out_value.unsafe_ptr(),
+            out_found.unsafe_ptr(),
+        )
+    )
+    return ParmParseRealQueryResult(
+        status=status,
+        found=out_found[0] != 0,
+        value=Float64(out_value[0]),
     )
