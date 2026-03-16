@@ -45,14 +45,14 @@ set(
 
 set(
     AMREX_MOJO_AMREX_GIT_REPOSITORY
-    "https://github.com/WeiqunZhang/amrex.git"
+    "https://github.com/AMReX-Codes/amrex.git"
     CACHE STRING
     "Git repository used when fetching AMReX with FetchContent."
 )
 
 set(
     AMREX_MOJO_AMREX_GIT_TAG
-    "external_gpu_stream"
+    "4039a8e99f94e6fa0639372fb82e365856cf07b3"
     CACHE STRING
     "Git branch, tag, or commit used when fetching AMReX with FetchContent."
 )
@@ -180,7 +180,6 @@ if(NOT TARGET AMReX::amrex_3d AND NOT TARGET AMReX::amrex)
             amrex
             GIT_REPOSITORY "${AMREX_MOJO_AMREX_GIT_REPOSITORY}"
             GIT_TAG "${AMREX_MOJO_AMREX_GIT_TAG}"
-            GIT_SHALLOW TRUE
         )
     endif()
 
