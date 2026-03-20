@@ -33,7 +33,7 @@ def init_device_passable_value[
 
 
 @fieldwise_init
-struct IntVect3D(TrivialRegisterPassable, DevicePassable):
+struct IntVect3D(DevicePassable, TrivialRegisterPassable):
     comptime device_type = Self
 
     var x: c_int
@@ -42,10 +42,7 @@ struct IntVect3D(TrivialRegisterPassable, DevicePassable):
 
     def _to_device_type[
         mut_origin: Origin[mut=True]
-    ](
-        self,
-        target: UnsafePointer[NoneType, mut_origin],
-    ):
+    ](self, target: UnsafePointer[NoneType, mut_origin],):
         init_device_passable_value(self, target)
 
     @staticmethod
@@ -54,7 +51,7 @@ struct IntVect3D(TrivialRegisterPassable, DevicePassable):
 
 
 @fieldwise_init
-struct Box3D(TrivialRegisterPassable, DevicePassable):
+struct Box3D(DevicePassable, TrivialRegisterPassable):
     comptime device_type = Self
 
     var small_end: IntVect3D
@@ -63,10 +60,7 @@ struct Box3D(TrivialRegisterPassable, DevicePassable):
 
     def _to_device_type[
         mut_origin: Origin[mut=True]
-    ](
-        self,
-        target: UnsafePointer[NoneType, mut_origin],
-    ):
+    ](self, target: UnsafePointer[NoneType, mut_origin],):
         init_device_passable_value(self, target)
 
     @staticmethod
@@ -141,7 +135,7 @@ struct MultiFabMemoryInfo(Copyable):
 
 @fieldwise_init
 struct Array4F64View[origin: Origin[mut=True]](
-    TrivialRegisterPassable, DevicePassable
+    DevicePassable, TrivialRegisterPassable
 ):
     comptime device_type = Array4F64View[MutAnyOrigin]
 
@@ -176,10 +170,7 @@ struct Array4F64View[origin: Origin[mut=True]](
 
     def _to_device_type[
         mut_origin: Origin[mut=True]
-    ](
-        self,
-        target: UnsafePointer[NoneType, mut_origin],
-    ):
+    ](self, target: UnsafePointer[NoneType, mut_origin],):
         init_device_passable_value(self.device_view(), target)
 
     @staticmethod
@@ -215,7 +206,7 @@ struct Array4F64View[origin: Origin[mut=True]](
 
 @fieldwise_init
 struct Array4F32View[origin: Origin[mut=True]](
-    TrivialRegisterPassable, DevicePassable
+    DevicePassable, TrivialRegisterPassable
 ):
     comptime device_type = Array4F32View[MutAnyOrigin]
 
@@ -250,10 +241,7 @@ struct Array4F32View[origin: Origin[mut=True]](
 
     def _to_device_type[
         mut_origin: Origin[mut=True]
-    ](
-        self,
-        target: UnsafePointer[NoneType, mut_origin],
-    ):
+    ](self, target: UnsafePointer[NoneType, mut_origin],):
         init_device_passable_value(self.device_view(), target)
 
     @staticmethod
@@ -289,7 +277,7 @@ struct Array4F32View[origin: Origin[mut=True]](
 
 @fieldwise_init
 struct TileF64View[origin: Origin[mut=True]](
-    TrivialRegisterPassable, DevicePassable
+    DevicePassable, TrivialRegisterPassable
 ):
     comptime device_type = TileF64View[MutAnyOrigin]
 
@@ -306,10 +294,7 @@ struct TileF64View[origin: Origin[mut=True]](
 
     def _to_device_type[
         mut_origin: Origin[mut=True]
-    ](
-        self,
-        target: UnsafePointer[NoneType, mut_origin],
-    ):
+    ](self, target: UnsafePointer[NoneType, mut_origin],):
         init_device_passable_value(self.device_view(), target)
 
     @staticmethod
@@ -325,7 +310,7 @@ struct TileF64View[origin: Origin[mut=True]](
 
 @fieldwise_init
 struct TileF32View[origin: Origin[mut=True]](
-    TrivialRegisterPassable, DevicePassable
+    DevicePassable, TrivialRegisterPassable
 ):
     comptime device_type = TileF32View[MutAnyOrigin]
 
@@ -342,10 +327,7 @@ struct TileF32View[origin: Origin[mut=True]](
 
     def _to_device_type[
         mut_origin: Origin[mut=True]
-    ](
-        self,
-        target: UnsafePointer[NoneType, mut_origin],
-    ):
+    ](self, target: UnsafePointer[NoneType, mut_origin],):
         init_device_passable_value(self.device_view(), target)
 
     @staticmethod
@@ -415,7 +397,9 @@ def runtime_create(ref lib: OwnedDLHandle) raises -> RuntimeHandle:
     return lib.call["amrex_mojo_runtime_create_default", RuntimeHandle]()
 
 
-def runtime_create(ref lib: OwnedDLHandle, device_id: Int) raises -> RuntimeHandle:
+def runtime_create(
+    ref lib: OwnedDLHandle, device_id: Int
+) raises -> RuntimeHandle:
     return lib.call[
         "amrex_mojo_runtime_create_default_on_device",
         RuntimeHandle,
@@ -518,9 +502,7 @@ def external_gpu_stream_scope_create(
     ](
         stream_handle,
         c_int(
-            EXTERNAL_STREAM_SYNC_YES
-            if sync_on_exit
-            else EXTERNAL_STREAM_SYNC_NO
+            EXTERNAL_STREAM_SYNC_YES if sync_on_exit else EXTERNAL_STREAM_SYNC_NO
         ),
     )
 

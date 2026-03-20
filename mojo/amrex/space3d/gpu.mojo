@@ -73,8 +73,16 @@ struct StagedTileF32(Movable):
     def cell_count(self) -> Int:
         return (
             (Int(self.tile_box.big_end.x) - Int(self.tile_box.small_end.x) + 1)
-            * (Int(self.tile_box.big_end.y) - Int(self.tile_box.small_end.y) + 1)
-            * (Int(self.tile_box.big_end.z) - Int(self.tile_box.small_end.z) + 1)
+            * (
+                Int(self.tile_box.big_end.y)
+                - Int(self.tile_box.small_end.y)
+                + 1
+            )
+            * (
+                Int(self.tile_box.big_end.z)
+                - Int(self.tile_box.small_end.z)
+                + 1
+            )
         )
 
     def device_view(self) -> Array4F32View[MutAnyOrigin]:

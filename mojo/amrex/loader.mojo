@@ -44,7 +44,9 @@ def default_library_path() raises -> String:
     if installed_path:
         return installed_path
 
-    var build_path = resolve_library_candidate("./build/src/capi/libamrex_mojo_capi_3d")
+    var build_path = resolve_library_candidate(
+        "./build/src/capi/libamrex_mojo_capi_3d"
+    )
     if build_path:
         return build_path
 

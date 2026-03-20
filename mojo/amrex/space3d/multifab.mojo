@@ -143,7 +143,9 @@ struct MultiFab(Movable):
     ) raises -> Array4F64View[MutAnyOrigin]:
         self._require_tile_index(tile_index)
         var handle = self._handle()
-        var array_view = device_tile_view(self.runtime[].lib, handle, tile_index).array()
+        var array_view = device_tile_view(
+            self.runtime[].lib, handle, tile_index
+        ).array()
         if not array_view.data:
             raise Error(last_error_message(self.runtime[].lib))
         return array_view.copy()
@@ -166,7 +168,9 @@ struct MultiFab(Movable):
     ]:
         self._require_tile_index(tile_index)
         var handle = self._handle()
-        var tile = tile_view[owner_origin](self.runtime[].lib, handle, tile_index)
+        var tile = tile_view[owner_origin](
+            self.runtime[].lib, handle, tile_index
+        )
         if not tile.array_view.data:
             raise Error(last_error_message(self.runtime[].lib))
         return tile.copy()

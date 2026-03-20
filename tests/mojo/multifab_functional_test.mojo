@@ -259,8 +259,8 @@ def main() raises:
                     Int(tile_box_f32.small_end.x),
                     Int(tile_box_f32.big_end.x) + 1,
                 ):
-                    dst_array_f32[i, j, k] = (
-                        src_array_f32[i, j, k] + Float32(0.5)
+                    dst_array_f32[i, j, k] = src_array_f32[i, j, k] + Float32(
+                        0.5
                     )
         mfi_f32.next()
 
@@ -275,7 +275,9 @@ def main() raises:
         2.0,
         "destination_f32.max after plus mismatch",
     )
-    var plotfile_path_f32 = String("build/multifab_functional_test_plotfile_f32")
+    var plotfile_path_f32 = String(
+        "build/multifab_functional_test_plotfile_f32"
+    )
     destination_f32.write_single_level_plotfile(plotfile_path_f32, geometry)
     expect(
         exists(plotfile_path_f32 + "/Header"),
