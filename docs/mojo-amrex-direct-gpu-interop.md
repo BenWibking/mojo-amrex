@@ -1,6 +1,6 @@
 # Direct GPU Interop for `mojo-amrex`
 
-Last updated: 2026-03-15
+Last updated: 2026-03-22
 
 ## Goal
 
@@ -25,7 +25,7 @@ This repository now implements an opt-in direct CUDA/HIP path.
 
 ## Design
 
-The working direction is:
+The primary working direction used in this repo is:
 
 - Mojo and AMReX must agree on the same backend device ordinal
 - Mojo exports a raw handle for its current stream
@@ -33,9 +33,31 @@ The working direction is:
   `setExternalGpuStream` / `ExternalGpuStreamRegion`
 - Mojo and AMReX both issue work onto that same backend stream
 
-The inverse direction is not currently used here. AsyncRT still does not expose
-a working external-stream import path that would let `mojo-amrex` wrap an
-arbitrary AMReX-owned stream as a Mojo `DeviceStream`.
+The inverse direction now exists in Mojo stdlib, but this repo does not
+currently use it.
+
+Recent Mojo toolchains expose:
+
+- `DeviceContext.create_external_stream(external_stream) -> DeviceStream`
+- `DeviceStream.enqueue_function(compiled_kernel, ...)`
+
+That lets Mojo wrap an arbitrary externally owned CUDA or HIP stream handle as a
+non-owning `DeviceStream`. The important constraints are:
+
+- the external stream handle must belong to the same device as the active Mojo
+  `DeviceContext`
+- the returned `DeviceStream` does not own the underlying stream lifetime
+- `DeviceStream` does not provide the `DeviceContext.enqueue_function[...]`
+  convenience overload that compiles at launch time, so kernels must be
+  compiled first with `ctx.compile_function(...)`
+
+In other words, AMReX-owned-stream to Mojo launch order is now expressible as:
+
+- obtain the AMReX stream handle as `void*`
+- construct or select the matching Mojo `DeviceContext`
+- call `ctx.create_external_stream(handle)`
+- compile the kernel with `ctx.compile_function(...)`
+- enqueue the compiled kernel on the wrapped `DeviceStream`
 
 That makes the ownership split:
 
@@ -199,8 +221,9 @@ without hiding the risk.
   allocations
 - the current Mojo `DeviceContext` and initialized AMReX runtime must point to
   the same device ordinal
-- the current path is Mojo-stream-to-AMReX, not arbitrary external-stream
-  import into Mojo
+- this repo currently uses the Mojo-stream-to-AMReX path, although current Mojo
+  stdlib also supports arbitrary external-stream import into Mojo through
+  `DeviceContext.create_external_stream(...)`
 - the current Mojo raw-handle export path depends on internal stdlib modules
 
 ## Fallback Path
