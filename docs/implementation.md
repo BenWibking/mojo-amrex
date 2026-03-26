@@ -58,8 +58,8 @@ There are two GPU-related workflows in this repository:
 - staged Mojo GPU execution helpers in `mojo/amrex/space3d/gpu.mojo`, which
   copy host-backed tile data through Mojo buffers and remain the portable
   fallback
-- direct CUDA/HIP interop, which shares a Mojo stream with AMReX and borrows
-  device-accessible tile metadata from `MultiFab`
+- direct CUDA/HIP interop, which wraps the current AMReX stream in Mojo and
+  borrows device-accessible tile metadata from `MultiFab`
 
 The direct path is intentionally narrow and documented in
 `docs/mojo-amrex-direct-gpu-interop.md`.

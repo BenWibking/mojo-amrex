@@ -13,7 +13,7 @@ from amrex.space3d import (
     intvect3d,
 )
 from std.gpu import global_idx
-from std.gpu.host import DeviceContext
+from std.gpu.host import DeviceContext, DeviceStream
 from std.math import ceildiv
 from std.sys import has_accelerator
 
@@ -52,21 +52,10 @@ def update_tile_gpu(
         dst[i, j, k] = src[i, j, k] + add_value
 
 
-def launch_update_tile(
-    ref ctx: DeviceContext,
-    src: Array4F32View[MutAnyOrigin],
-    dst: Array4F32View[MutAnyOrigin],
-    tile_box: Box3D,
-    add_value: Float32,
-) raises:
-    ctx.enqueue_function[update_tile_gpu, update_tile_gpu](
-        src,
-        dst,
-        tile_box,
-        add_value,
-        grid_dim=ceildiv(cell_count(tile_box), KERNEL_BLOCK_SIZE),
-        block_dim=KERNEL_BLOCK_SIZE,
-    )
+def current_amrex_stream(
+    ref runtime: AmrexRuntime, ref ctx: DeviceContext
+) raises -> DeviceStream:
+    return ctx.create_external_stream(runtime.gpu_stream_handle())
 
 
 def require_direct_gpu_interop(
@@ -130,25 +119,33 @@ def main() raises:
     var add_value = Float32(params.query_int("tile_fill_value") - 1)
     var plotfile_path = String("build/multifab_gpu_interop_plotfile")
 
-    # Keep this scope live while AMReX calls and Mojo kernels share ctx.stream().
-    var stream_scope = runtime.external_gpu_stream_scope(
-        ctx, sync_on_exit=False
-    )
+    var update_tile_kernel = ctx.compile_function[
+        update_tile_gpu, update_tile_gpu
+    ]()
+    var amrex_stream = current_amrex_stream(runtime, ctx)
 
     # runs on device
     source.set_val(Float32(1.0))
     destination.set_val(Float32(0.0))
 
-    # loop over tiles on the device and launch a kernel for each
+    # Loop over tiles and enqueue Mojo kernels on AMReX's current stream.
     var mfi = destination.mfiter()
     while mfi.is_valid():
         var tile_box = mfi.tilebox()
         var src_array = source.unsafe_device_array(mfi)
         var dst_array = destination.unsafe_device_array(mfi)
-        launch_update_tile(ctx, src_array, dst_array, tile_box, add_value)
+        amrex_stream.enqueue_function(
+            update_tile_kernel,
+            src_array,
+            dst_array,
+            tile_box,
+            add_value,
+            grid_dim=ceildiv(cell_count(tile_box), KERNEL_BLOCK_SIZE),
+            block_dim=KERNEL_BLOCK_SIZE,
+        )
         mfi.next()
 
-    ctx.synchronize()
+    amrex_stream.synchronize()
 
     # write plotfile
     destination.write_single_level_plotfile(plotfile_path, geometry)

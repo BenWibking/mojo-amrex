@@ -65,6 +65,28 @@ extern "C" int32_t amrex_mojo_gpu_device_id(void)
 #endif
 }
 
+extern "C" void* amrex_mojo_gpu_stream(void)
+{
+#if defined(AMREX_USE_CUDA) || defined(AMREX_USE_HIP)
+    if (!amrex::Initialized()) {
+        amrex_mojo::detail::set_last_error(
+            AMREX_MOJO_STATUS_INVALID_ARGUMENT,
+            "gpu_stream requires an initialized AMReX runtime."
+        );
+        return nullptr;
+    }
+
+    amrex_mojo::detail::clear_last_error();
+    return reinterpret_cast<void*>(amrex::Gpu::gpuStream());
+#else
+    amrex_mojo::detail::set_last_error(
+        AMREX_MOJO_STATUS_UNIMPLEMENTED,
+        "gpu_stream requires an AMReX build with CUDA or HIP enabled."
+    );
+    return nullptr;
+#endif
+}
+
 extern "C" amrex_mojo_external_gpu_stream_scope_t*
 amrex_mojo_external_gpu_stream_scope_create(
     void* stream_handle,

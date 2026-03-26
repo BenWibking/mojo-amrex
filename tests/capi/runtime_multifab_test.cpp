@@ -152,10 +152,19 @@ auto main() -> int
         "gpu_backend should return a known enum value."
     );
     const auto gpu_device_id = amrex_mojo_gpu_device_id();
+    const auto gpu_stream = amrex_mojo_gpu_stream();
     if (gpu_backend == AMREX_MOJO_GPU_BACKEND_NONE) {
         expect(
             gpu_device_id == -1,
             "gpu_device_id should report -1 when AMReX has no CUDA/HIP backend."
+        );
+        expect(
+            gpu_stream == nullptr,
+            "gpu_stream should report null when AMReX has no CUDA/HIP backend."
+        );
+        expect(
+            std::string(amrex_mojo_last_error_message()).find("CUDA or HIP") != std::string::npos,
+            "gpu_stream should report a GPU-backend diagnostic."
         );
         expect(
             amrex_mojo_runtime_create_on_device(1, runtime_argv, 0, 0) == nullptr,
@@ -174,6 +183,7 @@ auto main() -> int
         );
     } else {
         expect(gpu_device_id >= 0, "gpu_device_id should be >= 0 for CUDA/HIP builds.");
+        expect(gpu_stream != nullptr, "gpu_stream should be non-null for CUDA/HIP builds.");
         amrex_mojo_runtime_t* same_device_runtime =
             amrex_mojo_runtime_create_on_device(1, runtime_argv, 0, gpu_device_id);
         expect(

@@ -8,6 +8,7 @@ from amrex.ffi import (
     external_gpu_stream_scope_create,
     gpu_backend as ffi_gpu_backend,
     gpu_device_id as ffi_gpu_device_id,
+    gpu_stream as ffi_gpu_stream,
     parallel_ioprocessor,
     parallel_ioprocessor_number,
     parallel_myproc,
@@ -174,6 +175,15 @@ struct AmrexRuntime(Movable):
     def gpu_device_id(ref self) raises -> Int:
         var state = self._lease()
         return ffi_gpu_device_id(state[].lib)
+
+    def gpu_stream_handle(
+        ref self,
+    ) raises -> UnsafePointer[NoneType, MutExternalOrigin]:
+        var state = self._lease()
+        var handle = ffi_gpu_stream(state[].lib)
+        if not handle:
+            raise Error(last_error_message(state[].lib))
+        return handle
 
     def external_gpu_stream_scope(
         ref self,

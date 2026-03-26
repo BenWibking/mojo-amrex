@@ -1,6 +1,6 @@
 # Mojo AMReX Usage Notes
 
-Last updated: 2026-03-15
+Last updated: 2026-03-25
 
 ## Ownership Model
 
@@ -50,12 +50,14 @@ failure.
 ## Direct GPU Interop Rules
 
 - The direct path currently supports CUDA and HIP only.
-- `AmrexRuntime.external_gpu_stream_scope(ctx, sync_on_exit=...)` exports the
-  current Mojo stream handle and installs it into AMReX with
-  `setExternalGpuStream` / `ExternalGpuStreamRegion` for the lifetime of the
-  scope.
-- While that scope is active, AMReX GPU work and Mojo kernels launched on
-  `ctx.stream()` share the same backend stream.
+- `AmrexRuntime.gpu_stream_handle()` returns the current AMReX GPU stream handle
+  as a raw pointer-sized value through the C ABI.
+- Wrap that handle with
+  `ctx.create_external_stream(runtime.gpu_stream_handle())` and enqueue Mojo
+  kernels on the returned `DeviceStream`.
+- Compile kernels first with `ctx.compile_function(...)`; the wrapped
+  `DeviceStream` does not provide the `ctx.enqueue_function[...]` convenience
+  form.
 - Borrow AMReX device storage with `MultiFab.unsafe_device_array(...)` or
   `MultiFabF32.unsafe_device_array(...)`. Those methods are intentionally named
   `unsafe` because they return raw device pointer metadata.
@@ -63,18 +65,13 @@ failure.
   other host-side accessors on values returned by `unsafe_device_array(...)`.
   Today they reuse the same `Array4*View` structs as the host path, so the type
   does not stop you from doing the wrong thing.
-- Enter the stream scope before borrowing device pointers and keep it active
-  across the AMReX calls and Mojo kernel launches that must remain ordered.
-- `sync_on_exit=True` is the conservative setting. `sync_on_exit=False` avoids
-  an unconditional stream synchronize when the scope is destroyed, but you then
-  own the responsibility for explicit synchronization before host-visible uses.
-- AMReX does not permit entering or exiting the external-stream override inside
-  OpenMP parallel regions. Set the stream on the host thread before entering
-  GPU-heavy code.
-- The current Mojo toolchain used by this repo exports raw handles through the
-  internal modules `std.gpu.host._nvidia_cuda` and
-  `std.gpu.host._amdgpu_hip`. That is an implementation detail of the wrapper,
-  not a stable public stdlib commitment.
+- Refresh the wrapped `DeviceStream` after AMReX operations that may change the
+  current stream selection if you need to keep following AMReX's active stream.
+- Synchronize the wrapped `DeviceStream` before host-visible uses such as
+  plotfile output or cleanup that depends on completed kernel work.
+- AMReX still does not permit entering or exiting its own external-stream
+  override inside OpenMP parallel regions, but the current repo path does not
+  rely on that override for Mojo launches.
 
 ## DevicePassable View Notes
 
@@ -86,7 +83,7 @@ failure.
   current Mojo compiler to reject `_to_device_type(...)` during alias/provenance
   checking.
 - Direct AMReX GPU interop is now available for CUDA/HIP builds through
-  `external_gpu_stream_scope(...)` plus `unsafe_device_array(...)`.
+  `gpu_stream_handle()` plus `unsafe_device_array(...)`.
 - The staged `DeviceBuffer` workaround remains the portable fallback for CPU
   builds, Metal, and any configuration where direct AMReX GPU interop is not
   available.

@@ -143,6 +143,7 @@ void amrex_mojo_runtime_destroy(amrex_mojo_runtime_t* runtime);
 int32_t amrex_mojo_runtime_initialized(const amrex_mojo_runtime_t* runtime);
 amrex_mojo_gpu_backend_t amrex_mojo_gpu_backend(void);
 int32_t amrex_mojo_gpu_device_id(void);
+void* amrex_mojo_gpu_stream(void);
 amrex_mojo_external_gpu_stream_scope_t* amrex_mojo_external_gpu_stream_scope_create(
     void* stream_handle,
     amrex_mojo_external_stream_sync_t sync_on_exit

@@ -491,6 +491,15 @@ def gpu_device_id(ref lib: OwnedDLHandle) raises -> Int:
     return Int(lib.call["amrex_mojo_gpu_device_id", c_int]())
 
 
+def gpu_stream(
+    ref lib: OwnedDLHandle,
+) raises -> UnsafePointer[NoneType, MutExternalOrigin]:
+    return lib.call[
+        "amrex_mojo_gpu_stream",
+        UnsafePointer[NoneType, MutExternalOrigin],
+    ]()
+
+
 def external_gpu_stream_scope_create(
     ref lib: OwnedDLHandle,
     stream_handle: UnsafePointer[NoneType, MutExternalOrigin],

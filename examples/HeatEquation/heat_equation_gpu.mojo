@@ -24,7 +24,7 @@ from amrex.space3d import (
 )
 from std.collections import List
 from std.gpu import global_idx
-from std.gpu.host import DeviceContext
+from std.gpu.host import DeviceContext, DeviceStream
 from std.math import ceildiv, exp
 from std.sys import has_accelerator
 
@@ -119,46 +119,10 @@ def advance_tile_gpu(
         )
 
 
-def launch_initialize_tile(
-    ref ctx: DeviceContext,
-    phi_old: Array4F64View[MutAnyOrigin],
-    tile_box: Box3D,
-    dx_x: Float64,
-    dx_y: Float64,
-    dx_z: Float64,
-) raises:
-    ctx.enqueue_function[initialize_tile_gpu, initialize_tile_gpu](
-        phi_old,
-        tile_box,
-        dx_x,
-        dx_y,
-        dx_z,
-        grid_dim=ceildiv(cell_count(tile_box), KERNEL_BLOCK_SIZE),
-        block_dim=KERNEL_BLOCK_SIZE,
-    )
-
-
-def launch_advance_tile(
-    ref ctx: DeviceContext,
-    phi_new: Array4F64View[MutAnyOrigin],
-    phi_old: Array4F64View[MutAnyOrigin],
-    tile_box: Box3D,
-    dx_x: Float64,
-    dx_y: Float64,
-    dx_z: Float64,
-    dt: Float64,
-) raises:
-    ctx.enqueue_function[advance_tile_gpu, advance_tile_gpu](
-        phi_new,
-        phi_old,
-        tile_box,
-        dx_x,
-        dx_y,
-        dx_z,
-        dt,
-        grid_dim=ceildiv(cell_count(tile_box), KERNEL_BLOCK_SIZE),
-        block_dim=KERNEL_BLOCK_SIZE,
-    )
+def current_amrex_stream(
+    ref runtime: AmrexRuntime, ref ctx: DeviceContext
+) raises -> DeviceStream:
+    return ctx.create_external_stream(runtime.gpu_stream_handle())
 
 
 def require_direct_gpu_interop(
@@ -262,10 +226,13 @@ def main() raises:
 
     var time = 0.0
 
-    # Keep this scope live while AMReX calls and Mojo kernels share ctx.stream().
-    var stream_scope = runtime.external_gpu_stream_scope(
-        ctx, sync_on_exit=False
-    )
+    var initialize_tile_kernel = ctx.compile_function[
+        initialize_tile_gpu, initialize_tile_gpu
+    ]()
+    var advance_tile_kernel = ctx.compile_function[
+        advance_tile_gpu, advance_tile_gpu
+    ]()
+    var amrex_stream = current_amrex_stream(runtime, ctx)
 
     # **********************************
     # INITIALIZE DATA LOOP
@@ -275,7 +242,16 @@ def main() raises:
     while mfi.is_valid():
         var bx = mfi.validbox()
         var phi_old_array = phi_old.unsafe_device_array(mfi)
-        launch_initialize_tile(ctx, phi_old_array, bx, dx.x, dx.y, dx.z)
+        amrex_stream.enqueue_function(
+            initialize_tile_kernel,
+            phi_old_array,
+            bx,
+            dx.x,
+            dx.y,
+            dx.z,
+            grid_dim=ceildiv(cell_count(bx), KERNEL_BLOCK_SIZE),
+            block_dim=KERNEL_BLOCK_SIZE,
+        )
         mfi.next()
 
     # **********************************
@@ -283,7 +259,7 @@ def main() raises:
     # **********************************
 
     if plot_int > 0:
-        ctx.synchronize()
+        amrex_stream.synchronize()
         phi_old.write_single_level_plotfile(
             plotfile_name(0),
             geometry,
@@ -297,14 +273,15 @@ def main() raises:
 
     for step in range(1, nsteps + 1):
         phi_old.fill_boundary(geometry)
+        amrex_stream = current_amrex_stream(runtime, ctx)
 
         var update_mfi = phi_old.mfiter()
         while update_mfi.is_valid():
             var bx = update_mfi.validbox()
             var phi_old_array = phi_old.unsafe_device_array(update_mfi)
             var phi_new_array = phi_new.unsafe_device_array(update_mfi)
-            launch_advance_tile(
-                ctx,
+            amrex_stream.enqueue_function(
+                advance_tile_kernel,
                 phi_new_array,
                 phi_old_array,
                 bx,
@@ -312,18 +289,20 @@ def main() raises:
                 dx.y,
                 dx.z,
                 dt,
+                grid_dim=ceildiv(cell_count(bx), KERNEL_BLOCK_SIZE),
+                block_dim=KERNEL_BLOCK_SIZE,
             )
             update_mfi.next()
 
         time = time + dt
-        ctx.synchronize()  # needed to make sure phi_new is ready before copying back to phi_old
+        amrex_stream.synchronize()  # needed to make sure phi_new is ready before copying back to phi_old
         phi_old.copy_from(phi_new, 0, 0, 1)
 
         if runtime.ioprocessor():
             print("Advanced step ", step)
 
         if plot_int > 0 and step % plot_int == 0:
-            ctx.synchronize()
+            amrex_stream.synchronize()
             phi_new.write_single_level_plotfile(
                 plotfile_name(step),
                 geometry,
@@ -331,4 +310,4 @@ def main() raises:
                 step,
             )
 
-    ctx.synchronize()  # prevents premature cleanup of stream_scope before kernels finish
+    amrex_stream.synchronize()  # prevents host-visible teardown before kernels finish
