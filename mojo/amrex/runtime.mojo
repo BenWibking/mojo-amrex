@@ -33,14 +33,11 @@ struct _AmrexRuntimeState(Movable):
     var handle: RuntimeHandle
     var path: String
 
-    def __del__(deinit self):
-        if self.handle:
-            self.lib.call["amrex_mojo_runtime_destroy"](self.handle)
-
 
 comptime RuntimeLease = ArcPointer[_AmrexRuntimeState]
 
 
+@explicit_destroy("Must call close() on AmrexRuntime")
 struct AmrexRuntime(Movable):
     var state: RuntimeLease
     var handle: RuntimeHandle
@@ -205,6 +202,10 @@ struct AmrexRuntime(Movable):
     def _handle(ref self) raises -> RuntimeHandle:
         _ = self._lease()
         return self.handle
+
+    def close(deinit self):
+        if self.handle:
+            self.state[].lib.call["amrex_mojo_runtime_destroy"](self.handle)
 
 
 struct ExternalGpuStreamScope(Movable):

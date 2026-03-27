@@ -55,56 +55,62 @@ struct HeatEquationRunner(Movable, Writable):
         argv[0] = String("heat_equation_vis")
         argv[1] = String("heat_equation.inputs")
         var runtime = AmrexRuntime(argv, use_parmparse=True)
+        try:
+            var params = ParmParse(runtime)
+            var n_cell = params.get_int("n_cell")
+            var max_grid_size = params.get_int("max_grid_size")
+            var nsteps = params.query_int_or("nsteps", 10)
+            var dt = params.get_real("dt")
 
-        var params = ParmParse(runtime)
-        var n_cell = params.get_int("n_cell")
-        var max_grid_size = params.get_int("max_grid_size")
-        var nsteps = params.query_int_or("nsteps", 10)
-        var dt = params.get_real("dt")
+            var dom_lo = intvect3d(0, 0, 0)
+            var dom_hi = intvect3d(n_cell - 1, n_cell - 1, n_cell - 1)
+            var domain = box3d(dom_lo, dom_hi)
 
-        var dom_lo = intvect3d(0, 0, 0)
-        var dom_hi = intvect3d(n_cell - 1, n_cell - 1, n_cell - 1)
-        var domain = box3d(dom_lo, dom_hi)
+            var boxarray = BoxArray(runtime, domain)
+            boxarray.max_size(max_grid_size)
 
-        var boxarray = BoxArray(runtime, domain)
-        boxarray.max_size(max_grid_size)
+            var real_box = realbox3d(0.0, 0.0, 0.0, 1.0, 1.0, 1.0)
+            var is_periodic = intvect3d(1, 1, 1)
+            var geometry = Geometry(runtime, domain, real_box, is_periodic)
+            var dx = geometry.cell_size()
 
-        var real_box = realbox3d(0.0, 0.0, 0.0, 1.0, 1.0, 1.0)
-        var is_periodic = intvect3d(1, 1, 1)
-        var geometry = Geometry(runtime, domain, real_box, is_periodic)
-        var dx = geometry.cell_size()
+            var nghost = 1
+            var ncomp = 1
 
-        var nghost = 1
-        var ncomp = 1
+            var distmap = DistributionMapping(runtime, boxarray)
+            var phi_old = MultiFab(
+                runtime,
+                boxarray,
+                distmap,
+                ncomp,
+                intvect3d(nghost, nghost, nghost),
+            )
+            var phi_new = MultiFab(
+                runtime,
+                boxarray,
+                distmap,
+                ncomp,
+                intvect3d(nghost, nghost, nghost),
+            )
 
-        var distmap = DistributionMapping(runtime, boxarray)
-        var phi_old = MultiFab(
-            runtime,
-            boxarray,
-            distmap,
-            ncomp,
-            intvect3d(nghost, nghost, nghost),
-        )
-        var phi_new = MultiFab(
-            runtime,
-            boxarray,
-            distmap,
-            ncomp,
-            intvect3d(nghost, nghost, nghost),
-        )
+            self.runtime = runtime^
+            self.geometry = geometry^
+            self.phi_old = phi_old^
+            self.phi_new = phi_new^
+            self.dx = dx.copy()
+            self.dt = dt
+            self.nsteps = nsteps
+            self.current_step = 0
+            self.n_cell = n_cell
+            self.mid_plane = n_cell // 2
 
-        self.runtime = runtime^
-        self.geometry = geometry^
-        self.phi_old = phi_old^
-        self.phi_new = phi_new^
-        self.dx = dx.copy()
-        self.dt = dt
-        self.nsteps = nsteps
-        self.current_step = 0
-        self.n_cell = n_cell
-        self.mid_plane = n_cell // 2
+            self.initialize()
+        except e:
+            runtime^.close()
+            raise e^
 
-        self.initialize()
+    def __del__(deinit self):
+        self.runtime^.close()
 
     def initialize(mut self) raises:
         var mfi = self.phi_old.mfiter()

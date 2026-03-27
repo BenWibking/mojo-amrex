@@ -90,69 +90,75 @@ def require_direct_gpu_interop(
 def main() raises:
     var ctx = DeviceContext()
     var runtime = AmrexRuntime(Int(ctx.id()))
-
-    comptime DOMAIN_EXTENT = 64
-    var domain = box3d(
-        small_end=intvect3d(0, 0, 0),
-        big_end=intvect3d(
-            DOMAIN_EXTENT - 1, DOMAIN_EXTENT - 1, DOMAIN_EXTENT - 1
-        ),
-    )
-
-    var boxarray = BoxArray(runtime, domain)
-    comptime TILE_EXTENT = 32
-    boxarray.max_size(TILE_EXTENT)
-
-    var distmap = DistributionMapping(runtime, boxarray)
-    var geometry = Geometry(runtime, domain)
-    var destination = MultiFabF32(
-        runtime, boxarray, distmap, 1, intvect3d(1, 1, 1)
-    )
-    var source = MultiFabF32(runtime, boxarray, distmap, 1, intvect3d(1, 1, 1))
-
-    require_direct_gpu_interop(runtime, source)
-    require_direct_gpu_interop(runtime, destination)
-
-    var params = ParmParse(runtime, "multifab_gpu_interop")
-    params.add_int("tile_fill_value", 42)
-
-    var add_value = Float32(params.query_int("tile_fill_value") - 1)
-    var plotfile_path = String("build/multifab_gpu_interop_plotfile")
-
-    var update_tile_kernel = ctx.compile_function[
-        update_tile_gpu, update_tile_gpu
-    ]()
-    var amrex_stream = current_amrex_stream(runtime, ctx)
-
-    # runs on device
-    source.set_val(Float32(1.0))
-    destination.set_val(Float32(0.0))
-
-    # Loop over tiles and enqueue Mojo kernels on AMReX's current stream.
-    var mfi = destination.mfiter()
-    while mfi.is_valid():
-        var tile_box = mfi.tilebox()
-        var src_array = source.unsafe_device_array(mfi)
-        var dst_array = destination.unsafe_device_array(mfi)
-        amrex_stream.enqueue_function(
-            update_tile_kernel,
-            src_array,
-            dst_array,
-            tile_box,
-            add_value,
-            grid_dim=ceildiv(cell_count(tile_box), KERNEL_BLOCK_SIZE),
-            block_dim=KERNEL_BLOCK_SIZE,
+    try:
+        comptime DOMAIN_EXTENT = 64
+        var domain = box3d(
+            small_end=intvect3d(0, 0, 0),
+            big_end=intvect3d(
+                DOMAIN_EXTENT - 1, DOMAIN_EXTENT - 1, DOMAIN_EXTENT - 1
+            ),
         )
-        mfi.next()
 
-    amrex_stream.synchronize()
+        var boxarray = BoxArray(runtime, domain)
+        comptime TILE_EXTENT = 32
+        boxarray.max_size(TILE_EXTENT)
 
-    # write plotfile
-    destination.write_single_level_plotfile(plotfile_path, geometry)
+        var distmap = DistributionMapping(runtime, boxarray)
+        var geometry = Geometry(runtime, domain)
+        var destination = MultiFabF32(
+            runtime, boxarray, distmap, 1, intvect3d(1, 1, 1)
+        )
+        var source = MultiFabF32(
+            runtime, boxarray, distmap, 1, intvect3d(1, 1, 1)
+        )
 
-    # print diagnostics
-    print("backend=", runtime.gpu_backend())
-    print("boxes=", boxarray.size())
-    print("nprocs=", runtime.nprocs())
-    print("tiles=", destination.tile_count())
-    print("sum=", destination.sum(0))
+        require_direct_gpu_interop(runtime, source)
+        require_direct_gpu_interop(runtime, destination)
+
+        var params = ParmParse(runtime, "multifab_gpu_interop")
+        params.add_int("tile_fill_value", 42)
+
+        var add_value = Float32(params.query_int("tile_fill_value") - 1)
+        var plotfile_path = String("build/multifab_gpu_interop_plotfile")
+
+        var update_tile_kernel = ctx.compile_function[
+            update_tile_gpu, update_tile_gpu
+        ]()
+        var amrex_stream = current_amrex_stream(runtime, ctx)
+
+        # runs on device
+        source.set_val(Float32(1.0))
+        destination.set_val(Float32(0.0))
+
+        # Loop over tiles and enqueue Mojo kernels on AMReX's current stream.
+        var mfi = destination.mfiter()
+        while mfi.is_valid():
+            var tile_box = mfi.tilebox()
+            var src_array = source.unsafe_device_array(mfi)
+            var dst_array = destination.unsafe_device_array(mfi)
+            amrex_stream.enqueue_function(
+                update_tile_kernel,
+                src_array,
+                dst_array,
+                tile_box,
+                add_value,
+                grid_dim=ceildiv(cell_count(tile_box), KERNEL_BLOCK_SIZE),
+                block_dim=KERNEL_BLOCK_SIZE,
+            )
+            mfi.next()
+
+        amrex_stream.synchronize()
+
+        # write plotfile
+        destination.write_single_level_plotfile(plotfile_path, geometry)
+
+        # print diagnostics
+        print("backend=", runtime.gpu_backend())
+        print("boxes=", boxarray.size())
+        print("nprocs=", runtime.nprocs())
+        print("tiles=", destination.tile_count())
+        print("sum=", destination.sum(0))
+        runtime^.close()
+    except e:
+        runtime^.close()
+        raise e^
