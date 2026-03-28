@@ -9,7 +9,7 @@ manual example paths in `examples/Multifab/multifab.mojo`,
 end-to-end run.
 
 `examples/Multifab/multifab_gpu.mojo` is the smaller direct CUDA/HIP interop
-example. It shares the active Mojo stream with AMReX and launches Mojo kernels
+example. It wraps the current AMReX stream in Mojo and launches Mojo kernels
 directly over AMReX-managed device-accessible `MultiFabF32` storage.
 
 `examples/HeatEquation/heat_equation_gpu.mojo` is the larger direct interop

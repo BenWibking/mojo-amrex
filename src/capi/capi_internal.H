@@ -176,8 +176,3 @@ struct amrex_mojo_parmparse
     amrex_mojo::detail::runtime_state* state = nullptr;
     std::unique_ptr<amrex::ParmParse> value;
 };
-
-struct amrex_mojo_external_gpu_stream_scope
-{
-    void* impl = nullptr;
-};

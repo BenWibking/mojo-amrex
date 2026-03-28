@@ -10,16 +10,10 @@ comptime GeometryHandle = UnsafePointer[NoneType, MutExternalOrigin]
 comptime MultiFabHandle = UnsafePointer[NoneType, MutExternalOrigin]
 comptime MFIterHandle = UnsafePointer[NoneType, MutExternalOrigin]
 comptime ParmParseHandle = UnsafePointer[NoneType, MutExternalOrigin]
-comptime ExternalGpuStreamScopeHandle = UnsafePointer[
-    NoneType, MutExternalOrigin
-]
 
 comptime GPU_BACKEND_NONE = 0
 comptime GPU_BACKEND_CUDA = 1
 comptime GPU_BACKEND_HIP = 2
-
-comptime EXTERNAL_STREAM_SYNC_YES = 0
-comptime EXTERNAL_STREAM_SYNC_NO = 1
 
 comptime MULTIFAB_DATATYPE_FLOAT64 = 0
 comptime MULTIFAB_DATATYPE_FLOAT32 = 1
@@ -491,26 +485,33 @@ def gpu_device_id(ref lib: OwnedDLHandle) raises -> Int:
     return Int(lib.call["amrex_mojo_gpu_device_id", c_int]())
 
 
-def external_gpu_stream_scope_create(
-    ref lib: OwnedDLHandle,
-    stream_handle: UnsafePointer[NoneType, MutExternalOrigin],
-    sync_on_exit: Bool = True,
-) raises -> ExternalGpuStreamScopeHandle:
-    return lib.call[
-        "amrex_mojo_external_gpu_stream_scope_create",
-        ExternalGpuStreamScopeHandle,
-    ](
-        stream_handle,
-        c_int(
-            EXTERNAL_STREAM_SYNC_YES if sync_on_exit else EXTERNAL_STREAM_SYNC_NO
-        ),
+def gpu_num_streams(ref lib: OwnedDLHandle) raises -> Int:
+    return Int(lib.call["amrex_mojo_gpu_num_streams", c_int]())
+
+
+def gpu_set_stream_index(
+    ref lib: OwnedDLHandle, stream_index: Int
+) raises -> Int:
+    return Int(
+        lib.call["amrex_mojo_gpu_set_stream_index", c_int](c_int(stream_index))
     )
 
 
-def external_gpu_stream_scope_destroy(
-    ref lib: OwnedDLHandle, scope: ExternalGpuStreamScopeHandle
-) raises:
-    lib.call["amrex_mojo_external_gpu_stream_scope_destroy"](scope)
+def gpu_reset_stream(ref lib: OwnedDLHandle) raises:
+    lib.call["amrex_mojo_gpu_reset_stream"]()
+
+
+def gpu_stream(
+    ref lib: OwnedDLHandle,
+) raises -> UnsafePointer[NoneType, MutExternalOrigin]:
+    return lib.call[
+        "amrex_mojo_gpu_stream",
+        UnsafePointer[NoneType, MutExternalOrigin],
+    ]()
+
+
+def gpu_stream_synchronize_active(ref lib: OwnedDLHandle) raises -> Int:
+    return Int(lib.call["amrex_mojo_gpu_stream_synchronize_active", c_int]())
 
 
 def parallel_nprocs(ref lib: OwnedDLHandle) raises -> Int:

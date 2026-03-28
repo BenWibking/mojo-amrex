@@ -58,7 +58,7 @@ remaining is:
   and broader dimensional coverage
 
 Since this plan was written, the repo has also gained an opt-in direct
-CUDA/HIP GPU interop path based on AMReX external streams. Treat
+CUDA/HIP GPU interop path. Treat
 `docs/mojo-amrex-direct-gpu-interop.md` as the current GPU status document; the
 rest of this file remains useful as background on the original binding
 architecture and scope decisions.
