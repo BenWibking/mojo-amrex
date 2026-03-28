@@ -225,9 +225,10 @@ struct AmrexRuntime(Movable):
         ffi_gpu_reset_stream(state[].lib)
 
     def gpu_stream_handle(
-        ref self,
+        ref self, ref ctx: DeviceContext
     ) raises -> UnsafePointer[NoneType, MutExternalOrigin]:
         var state = self._lease()
+        _ = require_matching_gpu_context(state, ctx)
         var handle = ffi_gpu_stream(state[].lib)
         if not handle:
             raise Error(last_error_message(state[].lib))

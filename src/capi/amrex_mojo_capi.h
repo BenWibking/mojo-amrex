@@ -6,7 +6,7 @@
 extern "C" {
 #endif
 
-#define AMREX_MOJO_ABI_VERSION 4
+#define AMREX_MOJO_ABI_VERSION 5
 
 typedef struct amrex_mojo_runtime amrex_mojo_runtime_t;
 typedef struct amrex_mojo_boxarray amrex_mojo_boxarray_t;

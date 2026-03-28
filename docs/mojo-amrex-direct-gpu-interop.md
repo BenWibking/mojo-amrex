@@ -95,16 +95,18 @@ Today:
 
 At the C ABI layer, `amrex_mojo_gpu_stream()` returns the current
 `amrex::Gpu::gpuStream()` value as `void*`. The Mojo wrapper exposes that as
-`AmrexRuntime.gpu_stream_handle()`.
+`AmrexRuntime.gpu_stream_handle(ctx)`.
 
 That means:
 
 - Mojo sees the actual stream AMReX will use for GPU work
 - AMReX stream selection remains the source of truth
+- the Mojo wrapper rejects mismatched backend or device contexts before
+  exposing the raw handle
 
 ### 3. Mojo wraps that stream as a `DeviceStream`
 
-At the Mojo layer, `ctx.create_external_stream(runtime.gpu_stream_handle())`
+At the Mojo layer, `ctx.create_external_stream(runtime.gpu_stream_handle(ctx))`
 constructs a non-owning `DeviceStream` for the current AMReX stream.
 
 That means:
@@ -145,7 +147,9 @@ from std.gpu.host import DeviceContext
 fn main() raises:
     var ctx = DeviceContext()
     var runtime = AmrexRuntime(Int(ctx.id()))
-    var amrex_stream = ctx.create_external_stream(runtime.gpu_stream_handle())
+    var amrex_stream = ctx.create_external_stream(
+        runtime.gpu_stream_handle(ctx)
+    )
     var kernel = ctx.compile_function[my_kernel, my_kernel]()
 
     # Borrow device views from a GPU-backed MultiFab and enqueue Mojo kernels on

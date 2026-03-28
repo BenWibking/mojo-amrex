@@ -50,10 +50,11 @@ failure.
 ## Direct GPU Interop Rules
 
 - The direct path currently supports CUDA and HIP only.
-- `AmrexRuntime.gpu_stream_handle()` returns the current AMReX GPU stream handle
-  as a raw pointer-sized value through the C ABI.
+- `AmrexRuntime.gpu_stream_handle(ctx)` returns the current AMReX GPU stream
+  handle as a raw pointer-sized value through the C ABI after checking that
+  `ctx` matches the AMReX backend and device.
 - Wrap that handle with
-  `ctx.create_external_stream(runtime.gpu_stream_handle())` and enqueue Mojo
+  `ctx.create_external_stream(runtime.gpu_stream_handle(ctx))` and enqueue Mojo
   kernels on the returned `DeviceStream`.
 - Compile kernels first with `ctx.compile_function(...)`; the wrapped
   `DeviceStream` does not provide the `ctx.enqueue_function[...]` convenience
@@ -80,7 +81,7 @@ failure.
   current Mojo compiler to reject `_to_device_type(...)` during alias/provenance
   checking.
 - Direct AMReX GPU interop is now available for CUDA/HIP builds through
-  `gpu_stream_handle()` plus `unsafe_device_array(...)`.
+  `gpu_stream_handle(ctx)` plus `unsafe_device_array(...)`.
 - The staged `DeviceBuffer` workaround remains the portable fallback for CPU
   builds, Metal, and any configuration where direct AMReX GPU interop is not
   available.
