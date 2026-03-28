@@ -219,6 +219,10 @@ struct GpuMFIter(Movable):
     def _finalize(mut self) raises:
         if self.finalized:
             return
+        # On iterator teardown, fence the AMReX GPU streams used for tile work
+        # before restoring the default stream index. AMReX implements
+        # `stream_synchronize_active` as an all-stream sync unless it is already
+        # in a single-stream region.
         if gpu_stream_synchronize_active(self.runtime[].lib) != 0:
             raise Error(last_error_message(self.runtime[].lib))
         gpu_reset_stream(self.runtime[].lib)

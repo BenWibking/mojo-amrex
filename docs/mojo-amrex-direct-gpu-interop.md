@@ -100,7 +100,6 @@ At the C ABI layer, `amrex_mojo_gpu_stream()` returns the current
 That means:
 
 - Mojo sees the actual stream AMReX will use for GPU work
-- no external-stream override is required on the AMReX side
 - AMReX stream selection remains the source of truth
 
 ### 3. Mojo wraps that stream as a `DeviceStream`
@@ -194,8 +193,6 @@ without hiding the risk.
 ## Limits and Caveats
 
 - CUDA and HIP only for now
-- AMReX's external-stream override is not supported inside OpenMP parallel
-  regions
 - direct interop is only meaningful for device-accessible `MultiFab`
   allocations
 - the current Mojo `DeviceContext` and initialized AMReX runtime must point to

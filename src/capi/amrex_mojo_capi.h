@@ -15,7 +15,6 @@ typedef struct amrex_mojo_geometry amrex_mojo_geometry_t;
 typedef struct amrex_mojo_multifab amrex_mojo_multifab_t;
 typedef struct amrex_mojo_mfiter amrex_mojo_mfiter_t;
 typedef struct amrex_mojo_parmparse amrex_mojo_parmparse_t;
-typedef struct amrex_mojo_external_gpu_stream_scope amrex_mojo_external_gpu_stream_scope_t;
 
 typedef enum amrex_mojo_status_code
 {
@@ -37,12 +36,6 @@ typedef enum amrex_mojo_gpu_backend
     AMREX_MOJO_GPU_BACKEND_CUDA = 1,
     AMREX_MOJO_GPU_BACKEND_HIP = 2
 } amrex_mojo_gpu_backend_t;
-
-typedef enum amrex_mojo_external_stream_sync
-{
-    AMREX_MOJO_EXTERNAL_STREAM_SYNC_YES = 0,
-    AMREX_MOJO_EXTERNAL_STREAM_SYNC_NO = 1
-} amrex_mojo_external_stream_sync_t;
 
 typedef enum amrex_mojo_datatype
 {
@@ -148,13 +141,6 @@ amrex_mojo_status_code_t amrex_mojo_gpu_set_stream_index(int32_t stream_index);
 void amrex_mojo_gpu_reset_stream(void);
 void* amrex_mojo_gpu_stream(void);
 amrex_mojo_status_code_t amrex_mojo_gpu_stream_synchronize_active(void);
-amrex_mojo_external_gpu_stream_scope_t* amrex_mojo_external_gpu_stream_scope_create(
-    void* stream_handle,
-    amrex_mojo_external_stream_sync_t sync_on_exit
-);
-void amrex_mojo_external_gpu_stream_scope_destroy(
-    amrex_mojo_external_gpu_stream_scope_t* scope
-);
 
 int32_t amrex_mojo_parallel_nprocs(void);
 int32_t amrex_mojo_parallel_myproc(void);

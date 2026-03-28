@@ -1,11 +1,9 @@
 from amrex.ffi import (
-    ExternalGpuStreamScopeHandle,
     GPU_BACKEND_CUDA,
     GPU_BACKEND_HIP,
     GPU_BACKEND_NONE,
     RuntimeHandle,
     abi_version,
-    external_gpu_stream_scope_create,
     gpu_backend as ffi_gpu_backend,
     gpu_device_id as ffi_gpu_device_id,
     gpu_num_streams as ffi_gpu_num_streams,
@@ -26,8 +24,6 @@ from amrex.ownership import require_live_handle
 from std.collections import List
 from std.ffi import OwnedDLHandle
 from std.gpu.host import DeviceContext
-from std.gpu.host._amdgpu_hip import HIP
-from std.gpu.host._nvidia_cuda import CUDA
 from std.memory import ArcPointer
 
 
@@ -242,13 +238,6 @@ struct AmrexRuntime(Movable):
         if ffi_gpu_stream_synchronize_active(state[].lib) != 0:
             raise Error(last_error_message(state[].lib))
 
-    def external_gpu_stream_scope(
-        ref self,
-        ref ctx: DeviceContext,
-        sync_on_exit: Bool = True,
-    ) raises -> ExternalGpuStreamScope:
-        return ExternalGpuStreamScope(self, ctx, sync_on_exit)
-
     def _lease(ref self) raises -> RuntimeLease:
         require_live_handle(
             self.handle,
@@ -266,43 +255,3 @@ struct AmrexRuntime(Movable):
     def close(deinit self):
         if self.handle:
             self.state[].lib.call["amrex_mojo_runtime_destroy"](self.handle)
-
-
-struct ExternalGpuStreamScope(Movable):
-    var runtime: RuntimeLease
-    var handle: ExternalGpuStreamScopeHandle
-
-    def __init__(
-        out self,
-        ref runtime: AmrexRuntime,
-        ref ctx: DeviceContext,
-        sync_on_exit: Bool = True,
-    ) raises:
-        self.runtime = runtime._lease()
-
-        var amrex_backend = require_matching_gpu_context(self.runtime, ctx)
-
-        var stream_handle = _external_stream_handle(ctx, amrex_backend)
-        self.handle = external_gpu_stream_scope_create(
-            self.runtime[].lib,
-            stream_handle,
-            sync_on_exit,
-        )
-        if not self.handle:
-            raise Error(last_error_message(self.runtime[].lib))
-
-    def __del__(deinit self):
-        if self.handle:
-            self.runtime[].lib.call[
-                "amrex_mojo_external_gpu_stream_scope_destroy"
-            ](self.handle)
-
-
-def _external_stream_handle(
-    ref ctx: DeviceContext, backend: Int
-) raises -> UnsafePointer[NoneType, MutExternalOrigin]:
-    if backend == GPU_BACKEND_CUDA:
-        return CUDA(ctx.stream()).bitcast[NoneType]()
-    if backend == GPU_BACKEND_HIP:
-        return HIP(ctx.stream()).bitcast[NoneType]()
-    raise Error("Unsupported AMReX GPU backend for external stream interop.")

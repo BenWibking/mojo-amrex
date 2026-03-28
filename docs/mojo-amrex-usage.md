@@ -69,9 +69,6 @@ failure.
   current stream selection if you need to keep following AMReX's active stream.
 - Synchronize the wrapped `DeviceStream` before host-visible uses such as
   plotfile output or cleanup that depends on completed kernel work.
-- AMReX still does not permit entering or exiting its own external-stream
-  override inside OpenMP parallel regions, but the current repo path does not
-  rely on that override for Mojo launches.
 
 ## DevicePassable View Notes
 

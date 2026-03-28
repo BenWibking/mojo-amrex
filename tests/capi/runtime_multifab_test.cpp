@@ -193,13 +193,6 @@ auto main() -> int
             std::string(amrex_mojo_last_error_message()).find("CUDA or HIP") != std::string::npos,
             "runtime_create_on_device should report a GPU-backend diagnostic."
         );
-        expect(
-            amrex_mojo_external_gpu_stream_scope_create(
-                reinterpret_cast<void*>(0x1),
-                AMREX_MOJO_EXTERNAL_STREAM_SYNC_NO
-            ) == nullptr,
-            "external_gpu_stream_scope_create should fail when CUDA/HIP interop is unavailable."
-        );
     } else {
         expect(gpu_device_id >= 0, "gpu_device_id should be >= 0 for CUDA/HIP builds.");
         expect(gpu_stream != nullptr, "gpu_stream should be non-null for CUDA/HIP builds.");
