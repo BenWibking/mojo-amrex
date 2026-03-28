@@ -22,7 +22,7 @@ from amrex.ffi import (
     mfiter_valid_box,
 )
 from amrex.ownership import require_live_handle
-from amrex.runtime import RuntimeLease
+from amrex.runtime import RuntimeLease, require_matching_gpu_context
 from std.ffi import c_int
 from std.gpu.host import DeviceContext, DeviceStream
 
@@ -203,6 +203,7 @@ struct GpuMFIter(Movable):
         return handle
 
     def stream(ref self, ref ctx: DeviceContext) raises -> DeviceStream:
+        _ = require_matching_gpu_context(self.runtime, ctx)
         return ctx.create_external_stream(self.stream_handle())
 
     def synchronize(mut self) raises:

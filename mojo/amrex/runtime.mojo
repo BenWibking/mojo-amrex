@@ -41,6 +41,44 @@ struct _AmrexRuntimeState(Movable):
 comptime RuntimeLease = ArcPointer[_AmrexRuntimeState]
 
 
+def require_matching_gpu_context(
+    runtime: RuntimeLease,
+    ref ctx: DeviceContext,
+) raises -> Int:
+    var amrex_backend = ffi_gpu_backend(runtime[].lib)
+    var mojo_backend = ctx.api()
+    if amrex_backend == GPU_BACKEND_NONE:
+        raise Error("The loaded AMReX library was built without GPU support.")
+    if amrex_backend == GPU_BACKEND_CUDA and mojo_backend != "cuda":
+        raise Error(
+            "AMReX was built for CUDA but the active Mojo device context"
+            " reports '"
+            + mojo_backend
+            + "'."
+        )
+    if amrex_backend == GPU_BACKEND_HIP and mojo_backend != "hip":
+        raise Error(
+            "AMReX was built for HIP but the active Mojo device context"
+            " reports '"
+            + mojo_backend
+            + "'."
+        )
+
+    var amrex_device_id = ffi_gpu_device_id(runtime[].lib)
+    if amrex_device_id < 0:
+        raise Error(
+            "The loaded AMReX runtime does not report an active GPU device."
+        )
+    if Int(ctx.id()) != amrex_device_id:
+        raise Error(
+            "AMReX and the active Mojo device context are using different"
+            " GPU devices."
+            + " Construct `AmrexRuntime` on the same device as `ctx` before"
+            + " sharing streams."
+        )
+    return amrex_backend
+
+
 @explicit_destroy("Must call close() on AmrexRuntime")
 struct AmrexRuntime(Movable):
     var state: RuntimeLease
@@ -242,39 +280,7 @@ struct ExternalGpuStreamScope(Movable):
     ) raises:
         self.runtime = runtime._lease()
 
-        var amrex_backend = ffi_gpu_backend(self.runtime[].lib)
-        var mojo_backend = ctx.api()
-        if amrex_backend == GPU_BACKEND_NONE:
-            raise Error(
-                "The loaded AMReX library was built without GPU support."
-            )
-        if amrex_backend == GPU_BACKEND_CUDA and mojo_backend != "cuda":
-            raise Error(
-                "AMReX was built for CUDA but the active Mojo device context"
-                " reports '"
-                + mojo_backend
-                + "'."
-            )
-        if amrex_backend == GPU_BACKEND_HIP and mojo_backend != "hip":
-            raise Error(
-                "AMReX was built for HIP but the active Mojo device context"
-                " reports '"
-                + mojo_backend
-                + "'."
-            )
-
-        var amrex_device_id = ffi_gpu_device_id(self.runtime[].lib)
-        if amrex_device_id < 0:
-            raise Error(
-                "The loaded AMReX runtime does not report an active GPU device."
-            )
-        if Int(ctx.id()) != amrex_device_id:
-            raise Error(
-                "AMReX and the active Mojo device context are using different"
-                " GPU devices."
-                + " Construct `AmrexRuntime` on the same device as `ctx` before"
-                + " sharing streams."
-            )
+        var amrex_backend = require_matching_gpu_context(self.runtime, ctx)
 
         var stream_handle = _external_stream_handle(ctx, amrex_backend)
         self.handle = external_gpu_stream_scope_create(

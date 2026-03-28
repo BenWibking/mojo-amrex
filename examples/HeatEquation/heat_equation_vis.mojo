@@ -38,6 +38,34 @@ struct AdvanceContext[
     var dt: Float64
 
 
+def initialize_phi(mut phi_old: MultiFab, dx: RealVect3D) raises:
+    var mfi = phi_old.mfiter()
+    while mfi.is_valid():
+        var bx = mfi.validbox()
+        var phi_old_array = phi_old.array(mfi)
+        var init_ctx = InitializeContext(
+            phi_old=phi_old_array.copy(),
+            dx=dx.copy(),
+        )
+
+        @parameter
+        def initialize_cell(
+            ctx: type_of(init_ctx), i: Int, j: Int, k: Int
+        ) raises:
+            var x = (Float64(i) + 0.5) * ctx.dx.x
+            var y = (Float64(j) + 0.5) * ctx.dx.y
+            var z = (Float64(k) + 0.5) * ctx.dx.z
+            var rsquared = (
+                (x - 0.5) * (x - 0.5)
+                + (y - 0.5) * (y - 0.5)
+                + (z - 0.5) * (z - 0.5)
+            ) / 0.01
+            ctx.phi_old[i, j, k] = 1.0 + exp(-rsquared)
+
+        ParallelFor[body=initialize_cell](bx, init_ctx)
+        mfi.next()
+
+
 struct HeatEquationRunner(Movable, Writable):
     var runtime: AmrexRuntime
     var geometry: Geometry
@@ -93,6 +121,8 @@ struct HeatEquationRunner(Movable, Writable):
                 intvect3d(nghost, nghost, nghost),
             )
 
+            initialize_phi(phi_old, dx)
+
             self.runtime = runtime^
             self.geometry = geometry^
             self.phi_old = phi_old^
@@ -103,41 +133,12 @@ struct HeatEquationRunner(Movable, Writable):
             self.current_step = 0
             self.n_cell = n_cell
             self.mid_plane = n_cell // 2
-
-            self.initialize()
         except e:
             runtime^.close()
             raise e^
 
     def __del__(deinit self):
         self.runtime^.close()
-
-    def initialize(mut self) raises:
-        var mfi = self.phi_old.mfiter()
-        while mfi.is_valid():
-            var bx = mfi.validbox()
-            var phi_old_array = self.phi_old.array(mfi)
-            var init_ctx = InitializeContext(
-                phi_old=phi_old_array.copy(),
-                dx=self.dx.copy(),
-            )
-
-            @parameter
-            def initialize_cell(
-                ctx: type_of(init_ctx), i: Int, j: Int, k: Int
-            ) raises:
-                var x = (Float64(i) + 0.5) * ctx.dx.x
-                var y = (Float64(j) + 0.5) * ctx.dx.y
-                var z = (Float64(k) + 0.5) * ctx.dx.z
-                var rsquared = (
-                    (x - 0.5) * (x - 0.5)
-                    + (y - 0.5) * (y - 0.5)
-                    + (z - 0.5) * (z - 0.5)
-                ) / 0.01
-                ctx.phi_old[i, j, k] = 1.0 + exp(-rsquared)
-
-            ParallelFor[body=initialize_cell](bx, init_ctx)
-            mfi.next()
 
     def slice_array(mut self) raises -> PythonObject:
         var np = Python.import_module("numpy")
