@@ -13,7 +13,7 @@ from amrex.space3d import (
     intvect3d,
 )
 from std.gpu import global_idx
-from std.gpu.host import DeviceContext, DeviceStream
+from std.gpu.host import DeviceContext
 from std.math import ceildiv
 from std.sys import has_accelerator
 
@@ -50,12 +50,6 @@ def update_tile_gpu(
         var j = lo_y + plane_index // nx
         var i = lo_x + plane_index % nx
         dst[i, j, k] = src[i, j, k] + add_value
-
-
-def current_amrex_stream(
-    ref runtime: AmrexRuntime, ref ctx: DeviceContext
-) raises -> DeviceStream:
-    return ctx.create_external_stream(runtime.gpu_stream_handle())
 
 
 def require_direct_gpu_interop(
@@ -124,19 +118,19 @@ def main() raises:
         var update_tile_kernel = ctx.compile_function[
             update_tile_gpu, update_tile_gpu
         ]()
-        var amrex_stream = current_amrex_stream(runtime, ctx)
 
         # runs on device
         source.set_val(Float32(1.0))
         destination.set_val(Float32(0.0))
 
-        # Loop over tiles and enqueue Mojo kernels on AMReX's current stream.
-        var mfi = destination.mfiter()
+        # Loop over tiles and enqueue Mojo kernels on AMReX's round-robin stream set.
+        var mfi = destination.gpu_mfiter()
         while mfi.is_valid():
             var tile_box = mfi.tilebox()
             var src_array = source.unsafe_device_array(mfi)
             var dst_array = destination.unsafe_device_array(mfi)
-            amrex_stream.enqueue_function(
+            var stream = mfi.stream(ctx)
+            stream.enqueue_function(
                 update_tile_kernel,
                 src_array,
                 dst_array,
@@ -146,8 +140,6 @@ def main() raises:
                 block_dim=KERNEL_BLOCK_SIZE,
             )
             mfi.next()
-
-        amrex_stream.synchronize()
 
         # write plotfile
         destination.write_single_level_plotfile(plotfile_path, geometry)

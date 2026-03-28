@@ -24,7 +24,7 @@ from amrex.space3d import (
 )
 from std.collections import List
 from std.gpu import global_idx
-from std.gpu.host import DeviceContext, DeviceStream
+from std.gpu.host import DeviceContext
 from std.math import ceildiv, exp
 from std.sys import has_accelerator
 
@@ -117,12 +117,6 @@ def advance_tile_gpu(
             )
             / (dx_z * dx_z)
         )
-
-
-def current_amrex_stream(
-    ref runtime: AmrexRuntime, ref ctx: DeviceContext
-) raises -> DeviceStream:
-    return ctx.create_external_stream(runtime.gpu_stream_handle())
 
 
 def require_direct_gpu_interop(
@@ -232,17 +226,17 @@ def main() raises:
         var advance_tile_kernel = ctx.compile_function[
             advance_tile_gpu, advance_tile_gpu
         ]()
-        var amrex_stream = current_amrex_stream(runtime, ctx)
 
         # **********************************
         # INITIALIZE DATA LOOP
         # **********************************
 
-        var mfi = phi_old.mfiter()
+        var mfi = phi_old.gpu_mfiter()
         while mfi.is_valid():
             var bx = mfi.validbox()
             var phi_old_array = phi_old.unsafe_device_array(mfi)
-            amrex_stream.enqueue_function(
+            var stream = mfi.stream(ctx)
+            stream.enqueue_function(
                 initialize_tile_kernel,
                 phi_old_array,
                 bx,
@@ -259,7 +253,6 @@ def main() raises:
         # **********************************
 
         if plot_int > 0:
-            amrex_stream.synchronize()
             phi_old.write_single_level_plotfile(
                 plotfile_name(0),
                 geometry,
@@ -273,14 +266,14 @@ def main() raises:
 
         for step in range(1, nsteps + 1):
             phi_old.fill_boundary(geometry)
-            amrex_stream = current_amrex_stream(runtime, ctx)
 
-            var update_mfi = phi_old.mfiter()
+            var update_mfi = phi_old.gpu_mfiter()
             while update_mfi.is_valid():
                 var bx = update_mfi.validbox()
                 var phi_old_array = phi_old.unsafe_device_array(update_mfi)
                 var phi_new_array = phi_new.unsafe_device_array(update_mfi)
-                amrex_stream.enqueue_function(
+                var stream = update_mfi.stream(ctx)
+                stream.enqueue_function(
                     advance_tile_kernel,
                     phi_new_array,
                     phi_old_array,
@@ -295,14 +288,12 @@ def main() raises:
                 update_mfi.next()
 
             time = time + dt
-            amrex_stream.synchronize()  # needed to make sure phi_new is ready before copying back to phi_old
             phi_old.copy_from(phi_new, 0, 0, 1)
 
             if runtime.ioprocessor():
                 print("Advanced step ", step)
 
             if plot_int > 0 and step % plot_int == 0:
-                amrex_stream.synchronize()
                 phi_new.write_single_level_plotfile(
                     plotfile_name(step),
                     geometry,
@@ -310,7 +301,6 @@ def main() raises:
                     step,
                 )
 
-        amrex_stream.synchronize()  # prevents host-visible teardown before kernels finish
         runtime^.close()
     except e:
         runtime^.close()

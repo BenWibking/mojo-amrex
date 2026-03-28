@@ -5,6 +5,11 @@ from amrex.ffi import (
     IntVect3D,
     MFIterHandle,
     MultiFabHandle,
+    gpu_num_streams,
+    gpu_reset_stream,
+    gpu_set_stream_index,
+    gpu_stream,
+    gpu_stream_synchronize_active,
     intvect3d,
     last_error_message,
     mfiter_create,
@@ -18,6 +23,8 @@ from amrex.ffi import (
 )
 from amrex.ownership import require_live_handle
 from amrex.runtime import RuntimeLease
+from std.ffi import c_int
+from std.gpu.host import DeviceContext, DeviceStream
 
 
 struct MFIter(Movable):
@@ -122,6 +129,105 @@ struct MFIter(Movable):
         return self.handle
 
 
+struct GpuMFIter(Movable):
+    var runtime: RuntimeLease
+    var mfiter: MFIter
+    var num_streams: Int
+    var tile_ordinal: Int
+    var finalized: Bool
+
+    def __init__(out self, var mfiter: MFIter) raises:
+        self.runtime = mfiter.runtime
+        self.mfiter = mfiter^
+        self.num_streams = gpu_num_streams(self.runtime[].lib)
+        self.tile_ordinal = 0
+        self.finalized = False
+        if self.mfiter.is_valid():
+            self._activate_current_stream()
+
+    def __del__(deinit self):
+        if self.finalized:
+            return
+        _ = self.runtime[].lib.call[
+            "amrex_mojo_gpu_stream_synchronize_active",
+            c_int,
+        ]()
+        self.runtime[].lib.call["amrex_mojo_gpu_reset_stream"]()
+
+    def is_valid(ref self) raises -> Bool:
+        return self.mfiter.is_valid()
+
+    def next(mut self) raises:
+        self.mfiter.next()
+        self.tile_ordinal += 1
+        if self.mfiter.is_valid():
+            self._activate_current_stream()
+        else:
+            self._finalize()
+
+    def index(ref self) raises -> Int:
+        return self.mfiter.index()
+
+    def local_tile_index(ref self) raises -> Int:
+        return self.mfiter.local_tile_index()
+
+    def tilebox(ref self) raises -> Box3D:
+        return self.mfiter.tilebox()
+
+    def validbox(ref self) raises -> Box3D:
+        return self.mfiter.validbox()
+
+    def fabbox(ref self) raises -> Box3D:
+        return self.mfiter.fabbox()
+
+    def growntilebox(ref self, ngrow: IntVect3D) raises -> Box3D:
+        return self.mfiter.growntilebox(ngrow)
+
+    def growntilebox(ref self, ngrow: Int) raises -> Box3D:
+        return self.mfiter.growntilebox(ngrow)
+
+    def growntilebox(ref self) raises -> Box3D:
+        return self.mfiter.growntilebox()
+
+    def stream_index(ref self) raises -> Int:
+        self._require_valid()
+        return self.tile_ordinal % self.num_streams
+
+    def stream_handle(
+        ref self,
+    ) raises -> UnsafePointer[NoneType, MutExternalOrigin]:
+        self._require_valid()
+        var handle = gpu_stream(self.runtime[].lib)
+        if not handle:
+            raise Error(last_error_message(self.runtime[].lib))
+        return handle
+
+    def stream(ref self, ref ctx: DeviceContext) raises -> DeviceStream:
+        return ctx.create_external_stream(self.stream_handle())
+
+    def synchronize(mut self) raises:
+        self._finalize()
+
+    def _handle(ref self) raises -> MFIterHandle:
+        return self.mfiter._handle()
+
+    def _activate_current_stream(mut self) raises:
+        if gpu_set_stream_index(self.runtime[].lib, self.stream_index()) != 0:
+            raise Error(last_error_message(self.runtime[].lib))
+
+    def _finalize(mut self) raises:
+        if self.finalized:
+            return
+        if gpu_stream_synchronize_active(self.runtime[].lib) != 0:
+            raise Error(last_error_message(self.runtime[].lib))
+        gpu_reset_stream(self.runtime[].lib)
+        self.finalized = True
+
+    def _require_valid(ref self) raises:
+        if not self.is_valid():
+            raise Error("GpuMFIter is not positioned on a valid tile.")
+
+
 def create_mfiter(
     runtime: RuntimeLease,
     multifab: MultiFabHandle,
@@ -131,3 +237,11 @@ def create_mfiter(
     if not handle:
         raise Error(last_error_message(runtime[].lib))
     return MFIter(runtime, handle, default_ngrow)
+
+
+def create_gpu_mfiter(
+    runtime: RuntimeLease,
+    multifab: MultiFabHandle,
+    default_ngrow: IntVect3D,
+) raises -> GpuMFIter:
+    return GpuMFIter(create_mfiter(runtime, multifab, default_ngrow))

@@ -148,7 +148,9 @@ def main() raises:
 
         var params = ParmParse(runtime, "multifab_functional_test")
         params.add_int("tile_add", 3)
-        expect(params.query_int("tile_add") == 3, "ParmParse query_int mismatch")
+        expect(
+            params.query_int("tile_add") == 3, "ParmParse query_int mismatch"
+        )
         expect(
             params.query_int_or("missing_value", 11) == 11,
             "ParmParse query_int_or mismatch",
@@ -186,6 +188,31 @@ def main() raises:
         expect(
             iterated_tiles == destination.tile_count(),
             "MFIter should visit every tile",
+        )
+
+        var gpu_mfi = destination.gpu_mfiter()
+        var gpu_iterated_tiles = 0
+        var num_gpu_streams = runtime.gpu_num_streams()
+        while gpu_mfi.is_valid():
+            expect(
+                gpu_mfi.stream_index() == gpu_iterated_tiles % num_gpu_streams,
+                (
+                    "GpuMFIter stream index should round-robin over the active"
+                    " stream set"
+                ),
+            )
+            _ = gpu_mfi.tilebox()
+            _ = gpu_mfi.validbox()
+            _ = gpu_mfi.fabbox()
+            _ = gpu_mfi.growntilebox()
+            _ = gpu_mfi.index()
+            _ = gpu_mfi.local_tile_index()
+            gpu_iterated_tiles += 1
+            gpu_mfi.next()
+
+        expect(
+            gpu_iterated_tiles == destination.tile_count(),
+            "GpuMFIter should visit every tile",
         )
 
         expect_equal(
@@ -258,7 +285,8 @@ def main() raises:
                 Int(tile_box_f32.small_end.z), Int(tile_box_f32.big_end.z) + 1
             ):
                 for j in range(
-                    Int(tile_box_f32.small_end.y), Int(tile_box_f32.big_end.y) + 1
+                    Int(tile_box_f32.small_end.y),
+                    Int(tile_box_f32.big_end.y) + 1,
                 ):
                     for i in range(
                         Int(tile_box_f32.small_end.x),

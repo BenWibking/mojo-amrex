@@ -8,7 +8,11 @@ from amrex.ffi import (
     external_gpu_stream_scope_create,
     gpu_backend as ffi_gpu_backend,
     gpu_device_id as ffi_gpu_device_id,
+    gpu_num_streams as ffi_gpu_num_streams,
+    gpu_reset_stream as ffi_gpu_reset_stream,
+    gpu_set_stream_index as ffi_gpu_set_stream_index,
     gpu_stream as ffi_gpu_stream,
+    gpu_stream_synchronize_active as ffi_gpu_stream_synchronize_active,
     parallel_ioprocessor,
     parallel_ioprocessor_number,
     parallel_myproc,
@@ -173,6 +177,19 @@ struct AmrexRuntime(Movable):
         var state = self._lease()
         return ffi_gpu_device_id(state[].lib)
 
+    def gpu_num_streams(ref self) raises -> Int:
+        var state = self._lease()
+        return ffi_gpu_num_streams(state[].lib)
+
+    def gpu_set_stream_index(ref self, stream_index: Int) raises:
+        var state = self._lease()
+        if ffi_gpu_set_stream_index(state[].lib, stream_index) != 0:
+            raise Error(last_error_message(state[].lib))
+
+    def gpu_reset_stream(ref self) raises:
+        var state = self._lease()
+        ffi_gpu_reset_stream(state[].lib)
+
     def gpu_stream_handle(
         ref self,
     ) raises -> UnsafePointer[NoneType, MutExternalOrigin]:
@@ -181,6 +198,11 @@ struct AmrexRuntime(Movable):
         if not handle:
             raise Error(last_error_message(state[].lib))
         return handle
+
+    def gpu_synchronize_active_streams(ref self) raises:
+        var state = self._lease()
+        if ffi_gpu_stream_synchronize_active(state[].lib) != 0:
+            raise Error(last_error_message(state[].lib))
 
     def external_gpu_stream_scope(
         ref self,

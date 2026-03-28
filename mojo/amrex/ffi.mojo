@@ -491,6 +491,22 @@ def gpu_device_id(ref lib: OwnedDLHandle) raises -> Int:
     return Int(lib.call["amrex_mojo_gpu_device_id", c_int]())
 
 
+def gpu_num_streams(ref lib: OwnedDLHandle) raises -> Int:
+    return Int(lib.call["amrex_mojo_gpu_num_streams", c_int]())
+
+
+def gpu_set_stream_index(
+    ref lib: OwnedDLHandle, stream_index: Int
+) raises -> Int:
+    return Int(
+        lib.call["amrex_mojo_gpu_set_stream_index", c_int](c_int(stream_index))
+    )
+
+
+def gpu_reset_stream(ref lib: OwnedDLHandle) raises:
+    lib.call["amrex_mojo_gpu_reset_stream"]()
+
+
 def gpu_stream(
     ref lib: OwnedDLHandle,
 ) raises -> UnsafePointer[NoneType, MutExternalOrigin]:
@@ -498,6 +514,10 @@ def gpu_stream(
         "amrex_mojo_gpu_stream",
         UnsafePointer[NoneType, MutExternalOrigin],
     ]()
+
+
+def gpu_stream_synchronize_active(ref lib: OwnedDLHandle) raises -> Int:
+    return Int(lib.call["amrex_mojo_gpu_stream_synchronize_active", c_int]())
 
 
 def external_gpu_stream_scope_create(

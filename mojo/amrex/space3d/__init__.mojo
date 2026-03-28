@@ -19,7 +19,7 @@ from amrex.runtime import AmrexRuntime, ExternalGpuStreamScope
 from amrex.space3d.boxarray import BoxArray, DistributionMapping
 from amrex.space3d.geometry import Geometry
 from amrex.space3d.gpu import StagedArray4F32, StagedTileF32
-from amrex.space3d.mfiter import MFIter
+from amrex.space3d.mfiter import GpuMFIter, MFIter
 from amrex.space3d.multifab import MultiFab, MultiFabF32
 from amrex.space3d.parallelfor import ParallelFor
 from amrex.space3d.parmparse import ParmParse

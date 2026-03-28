@@ -152,7 +152,9 @@ auto main() -> int
         "gpu_backend should return a known enum value."
     );
     const auto gpu_device_id = amrex_mojo_gpu_device_id();
+    const auto gpu_num_streams = amrex_mojo_gpu_num_streams();
     const auto gpu_stream = amrex_mojo_gpu_stream();
+    expect(gpu_num_streams >= 1, "gpu_num_streams should be >= 1.");
     if (gpu_backend == AMREX_MOJO_GPU_BACKEND_NONE) {
         expect(
             gpu_device_id == -1,
@@ -166,6 +168,23 @@ auto main() -> int
             std::string(amrex_mojo_last_error_message()).find("CUDA or HIP") != std::string::npos,
             "gpu_stream should report a GPU-backend diagnostic."
         );
+        expect(
+            amrex_mojo_gpu_set_stream_index(-1) == AMREX_MOJO_STATUS_INVALID_ARGUMENT,
+            "gpu_set_stream_index should reject negative indices."
+        );
+        expect(
+            amrex_mojo_gpu_set_stream_index(gpu_num_streams) == AMREX_MOJO_STATUS_INVALID_ARGUMENT,
+            "gpu_set_stream_index should reject out-of-range indices."
+        );
+        expect(
+            amrex_mojo_gpu_set_stream_index(0) == AMREX_MOJO_STATUS_OK,
+            "gpu_set_stream_index should accept stream 0."
+        );
+        expect(
+            amrex_mojo_gpu_stream_synchronize_active() == AMREX_MOJO_STATUS_OK,
+            "gpu_stream_synchronize_active should succeed."
+        );
+        amrex_mojo_gpu_reset_stream();
         expect(
             amrex_mojo_runtime_create_on_device(1, runtime_argv, 0, 0) == nullptr,
             "runtime_create_on_device should fail when CUDA/HIP interop is unavailable."
@@ -184,6 +203,23 @@ auto main() -> int
     } else {
         expect(gpu_device_id >= 0, "gpu_device_id should be >= 0 for CUDA/HIP builds.");
         expect(gpu_stream != nullptr, "gpu_stream should be non-null for CUDA/HIP builds.");
+        expect(
+            amrex_mojo_gpu_set_stream_index(-1) == AMREX_MOJO_STATUS_INVALID_ARGUMENT,
+            "gpu_set_stream_index should reject negative indices."
+        );
+        expect(
+            amrex_mojo_gpu_set_stream_index(gpu_num_streams) == AMREX_MOJO_STATUS_INVALID_ARGUMENT,
+            "gpu_set_stream_index should reject out-of-range indices."
+        );
+        expect(
+            amrex_mojo_gpu_set_stream_index(0) == AMREX_MOJO_STATUS_OK,
+            "gpu_set_stream_index should accept stream 0."
+        );
+        expect(
+            amrex_mojo_gpu_stream_synchronize_active() == AMREX_MOJO_STATUS_OK,
+            "gpu_stream_synchronize_active should succeed."
+        );
+        amrex_mojo_gpu_reset_stream();
         amrex_mojo_runtime_t* same_device_runtime =
             amrex_mojo_runtime_create_on_device(1, runtime_argv, 0, gpu_device_id);
         expect(

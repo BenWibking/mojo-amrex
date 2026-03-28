@@ -32,6 +32,13 @@ def main() raises:
         expect(runtime.nprocs() >= 1, "nprocs should be >= 1")
         expect(runtime.myproc() >= 0, "myproc should be >= 0")
         expect(
+            runtime.gpu_num_streams() >= 1,
+            "gpu_num_streams should be >= 1",
+        )
+        runtime.gpu_set_stream_index(0)
+        runtime.gpu_synchronize_active_streams()
+        runtime.gpu_reset_stream()
+        expect(
             runtime.ioprocessor_number() >= 0,
             "ioprocessor_number should be >= 0",
         )
