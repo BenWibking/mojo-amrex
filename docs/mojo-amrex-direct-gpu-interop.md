@@ -87,9 +87,12 @@ The CMake option `AMREX_MOJO_GPU_BACKEND` controls whether AMReX is built with
 Today:
 
 - `AUTO` selects `CUDA` when a CUDA compiler is detected, otherwise `HIP` when
-  a HIP compiler is detected, otherwise `NONE`
+  a HIP compiler is detected and `AMReX_AMD_ARCH` is available, otherwise
+  `NONE`
+- `AUTO` fills `AMReX_AMD_ARCH` from `rocminfo` when possible
 - `CUDA` works
-- `HIP` works
+- `HIP` works when configured with `-DAMReX_AMD_ARCH=<gfx*>` or when that value
+  can be autodetected
 
 ### 2. AMReX exports the native stream handle
 

@@ -35,7 +35,9 @@ failure.
 
 - The default `pixi run bootstrap` / `pixi run configure` path now sets
   `AMREX_MOJO_GPU_BACKEND=AUTO`, which probes for a CUDA compiler first, then a
-  HIP compiler, and falls back to `NONE` if neither toolchain is available.
+  HIP compiler after filling `AMReX_AMD_ARCH` from `rocminfo` when possible,
+  and falls back to `NONE` otherwise. This avoids accidental HIP selection on
+  systems that merely have a ROCm toolchain visible on `PATH`.
 - CUDA/HIP AMReX builds are now supported as an opt-in path. In those builds,
   `MultiFab.memory_info()` tells you whether a given allocation is host
   accessible, device accessible, managed, device-only, or pinned.
