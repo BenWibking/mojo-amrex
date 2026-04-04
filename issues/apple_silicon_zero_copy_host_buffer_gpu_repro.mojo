@@ -69,7 +69,7 @@ def sum_buffer(view: BufferViewF32) -> Float64:
 
 def fill_buffer_gpu(dst: BufferViewF32, value: Float32):
     var tid = global_idx.x
-    if tid < UInt(dst.size):
+    if tid < Int(dst.size):
         dst[Int(tid)] = value
 
 

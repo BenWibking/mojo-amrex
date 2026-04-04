@@ -42,7 +42,7 @@ def update_tile_gpu(
     var nx = Int(tile_box.big_end.x) - lo_x + 1
     var ny = Int(tile_box.big_end.y) - lo_y + 1
     var active_cells = cell_count(tile_box)
-    if tid < UInt(active_cells):
+    if tid < active_cells:
         var linear_index = Int(tid)
         var cells_per_plane = nx * ny
         var k = lo_z + linear_index // cells_per_plane
