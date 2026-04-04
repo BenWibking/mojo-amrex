@@ -5,10 +5,8 @@ name = "mojo-amrex"
 platforms = ["osx-arm64", "linux-64", "linux-aarch64"]
 version = "0.1.0"
 
-[target.linux.activation]
-scripts = ["scripts/pixi/activate-linux.sh"]
-
 [tasks]
+mojo = "mojo"
 configure = """sh -lc '
 if [ -n "${CRAY_MPICH_DIR:-}" ] && command -v CC >/dev/null 2>&1; then
   cmake --fresh -S . -B build \
@@ -82,7 +80,7 @@ test = { depends-on = ["test-capi", "test-mojo"] }
 format-mojo = "mojo format mojo/amrex examples tests/mojo"
 
 [dependencies]
-mojo = ">=0.26.3.0.dev2026040105,<0.27"
+mojo = ">=0.26.3.0.dev2026040320,<0.27"
 openmpi = ">=5.0.10,<6"
 jupyterlab = ">=4.5.6,<5"
 ipykernel = ">=7.1.0,<8"
