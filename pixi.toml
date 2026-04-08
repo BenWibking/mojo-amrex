@@ -5,10 +5,8 @@ name = "mojo-amrex"
 platforms = ["osx-arm64", "linux-64", "linux-aarch64"]
 version = "0.1.0"
 
-[target.linux.activation]
-scripts = ["scripts/pixi/activate-linux.sh"]
-
 [tasks]
+mojo = "mojo"
 configure = """sh -lc '
 if [ -n "${CRAY_MPICH_DIR:-}" ] && command -v CC >/dev/null 2>&1; then
   cmake --fresh -S . -B build \
