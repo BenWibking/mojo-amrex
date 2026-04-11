@@ -43,7 +43,12 @@ from amrex.ownership import require_live_handle
 from amrex.runtime import AmrexRuntime, RuntimeLease
 from amrex.space3d.boxarray import BoxArray, DistributionMapping
 from amrex.space3d.geometry import Geometry
-from amrex.space3d.mfiter import MFIter, create_mfiter
+from amrex.space3d.mfiter import (
+    GpuMFIter,
+    MFIter,
+    create_gpu_mfiter,
+    create_mfiter,
+)
 
 
 struct MultiFab(Movable):
@@ -124,6 +129,14 @@ struct MultiFab(Movable):
             self.ngrow_vect,
         )
 
+    def gpu_mfiter(ref self) raises -> GpuMFIter:
+        var handle = self._handle()
+        return create_gpu_mfiter(
+            self.runtime,
+            handle,
+            self.ngrow_vect,
+        )
+
     def array[
         owner_origin: Origin[mut=True]
     ](ref[owner_origin] self, tile_index: Int) raises -> Array4F64View[
@@ -134,6 +147,13 @@ struct MultiFab(Movable):
     def array[
         owner_origin: Origin[mut=True]
     ](ref[owner_origin] self, ref mfi: MFIter) raises -> Array4F64View[
+        owner_origin
+    ]:
+        return self.tile(mfi).array()
+
+    def array[
+        owner_origin: Origin[mut=True]
+    ](ref[owner_origin] self, ref mfi: GpuMFIter) raises -> Array4F64View[
         owner_origin
     ]:
         return self.tile(mfi).array()
@@ -161,6 +181,17 @@ struct MultiFab(Movable):
             raise Error(last_error_message(self.runtime[].lib))
         return array_view.copy()
 
+    def unsafe_device_array(
+        ref self, ref mfi: GpuMFIter
+    ) raises -> Array4F64View[MutAnyOrigin]:
+        var handle = self._handle()
+        var array_view = device_array4_view_from_mfiter(
+            self.runtime[].lib, handle, mfi._handle()
+        )
+        if not array_view.data:
+            raise Error(last_error_message(self.runtime[].lib))
+        return array_view.copy()
+
     def tile[
         owner_origin: Origin[mut=True]
     ](ref[owner_origin] self, tile_index: Int) raises -> TileF64View[
@@ -178,6 +209,27 @@ struct MultiFab(Movable):
     def tile[
         owner_origin: Origin[mut=True]
     ](ref[owner_origin] self, ref mfi: MFIter) raises -> TileF64View[
+        owner_origin
+    ]:
+        var handle = self._handle()
+        var tile_box = mfi.tilebox()
+        var valid_box = mfi.validbox()
+        var array_view = array4_view_from_mfiter[owner_origin](
+            self.runtime[].lib,
+            handle,
+            mfi._handle(),
+        )
+        if not array_view.data:
+            raise Error(last_error_message(self.runtime[].lib))
+        return TileF64View[owner_origin](
+            tile_box=tile_box,
+            valid_box=valid_box,
+            array_view=array_view.copy(),
+        )
+
+    def tile[
+        owner_origin: Origin[mut=True]
+    ](ref[owner_origin] self, ref mfi: GpuMFIter) raises -> TileF64View[
         owner_origin
     ]:
         var handle = self._handle()
@@ -475,6 +527,14 @@ struct MultiFabF32(Movable):
             self.ngrow_vect,
         )
 
+    def gpu_mfiter(ref self) raises -> GpuMFIter:
+        var handle = self._handle()
+        return create_gpu_mfiter(
+            self.runtime,
+            handle,
+            self.ngrow_vect,
+        )
+
     def array[
         owner_origin: Origin[mut=True]
     ](ref[owner_origin] self, tile_index: Int) raises -> Array4F32View[
@@ -485,6 +545,13 @@ struct MultiFabF32(Movable):
     def array[
         owner_origin: Origin[mut=True]
     ](ref[owner_origin] self, ref mfi: MFIter) raises -> Array4F32View[
+        owner_origin
+    ]:
+        return self.tile(mfi).array()
+
+    def array[
+        owner_origin: Origin[mut=True]
+    ](ref[owner_origin] self, ref mfi: GpuMFIter) raises -> Array4F32View[
         owner_origin
     ]:
         return self.tile(mfi).array()
@@ -512,6 +579,17 @@ struct MultiFabF32(Movable):
             raise Error(last_error_message(self.runtime[].lib))
         return array_view.copy()
 
+    def unsafe_device_array(
+        ref self, ref mfi: GpuMFIter
+    ) raises -> Array4F32View[MutAnyOrigin]:
+        var handle = self._handle()
+        var array_view = device_array4_view_from_mfiter_f32(
+            self.runtime[].lib, handle, mfi._handle()
+        )
+        if not array_view.data:
+            raise Error(last_error_message(self.runtime[].lib))
+        return array_view.copy()
+
     def tile[
         owner_origin: Origin[mut=True]
     ](ref[owner_origin] self, tile_index: Int) raises -> TileF32View[
@@ -529,6 +607,27 @@ struct MultiFabF32(Movable):
     def tile[
         owner_origin: Origin[mut=True]
     ](ref[owner_origin] self, ref mfi: MFIter) raises -> TileF32View[
+        owner_origin
+    ]:
+        var handle = self._handle()
+        var tile_box = mfi.tilebox()
+        var valid_box = mfi.validbox()
+        var array_view = array4_view_from_mfiter_f32[owner_origin](
+            self.runtime[].lib,
+            handle,
+            mfi._handle(),
+        )
+        if not array_view.data:
+            raise Error(last_error_message(self.runtime[].lib))
+        return TileF32View[owner_origin](
+            tile_box=tile_box,
+            valid_box=valid_box,
+            array_view=array_view.copy(),
+        )
+
+    def tile[
+        owner_origin: Origin[mut=True]
+    ](ref[owner_origin] self, ref mfi: GpuMFIter) raises -> TileF32View[
         owner_origin
     ]:
         var handle = self._handle()

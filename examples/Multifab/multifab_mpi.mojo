@@ -133,93 +133,108 @@ def main() raises:
     argv[1] = String("multifab_mpi_exchange.left_value=7")
     argv[2] = String("multifab_mpi_exchange.right_value=11")
     var runtime = AmrexRuntime(argv, use_parmparse=True)
-    expect(runtime.nprocs() >= 2, "run this example with at least 2 MPI ranks")
-
-    var params = ParmParse(runtime, "multifab_mpi_exchange")
-    var left_value = params.query_int("left_value")
-    var right_value = params.query_int("right_value")
-
-    var domain = box3d(
-        small_end=intvect3d(0, 0, 0),
-        big_end=intvect3d(
-            DOMAIN_EXTENT - 1, DOMAIN_EXTENT - 1, DOMAIN_EXTENT - 1
-        ),
-    )
-
-    var boxarray = BoxArray(runtime, domain)
-    # Force two x-slabs so the shared face is exchanged in the 2-rank example run.
-    boxarray.max_size(intvect3d(SLAB_EXTENT, DOMAIN_EXTENT, DOMAIN_EXTENT))
-    expect(boxarray.size() == 2, "expected a two-slab BoxArray decomposition")
-
-    var distmap = DistributionMapping(runtime, boxarray)
-    var geometry = Geometry(runtime, domain)
-    var source = MultiFab(runtime, boxarray, distmap, 1, intvect3d(1, 1, 1))
-    var destination = MultiFab(
-        runtime, boxarray, distmap, 1, intvect3d(1, 1, 1)
-    )
-
-    source.set_val(0.0)
-    destination.set_val(0.0)
-    expect(source.tile_count() > 0, "each rank should own at least one tile")
-
-    var mfi = source.mfiter()
-    while mfi.is_valid():
-        var valid_box = mfi.validbox()
-        fill_box_value(
-            source.array(mfi),
-            valid_box,
-            slab_fill_value(valid_box, left_value, right_value),
+    try:
+        expect(
+            runtime.nprocs() >= 2,
+            "run this example with at least 2 MPI ranks",
         )
-        mfi.next()
 
-    source.fill_boundary(geometry)
-    var expected_ghost = interface_expected_value(
-        source, left_value, right_value
-    )
-    var source_ghost = interface_ghost_sample(source)
-    expect_close(
-        source_ghost,
-        expected_ghost,
-        1.0e-12,
-        "fill_boundary should exchange the slab interface ghost cells",
-    )
-    expect(
-        has_nonzero_ghost_cells(source),
-        "fill_boundary should populate source ghost cells",
-    )
+        var params = ParmParse(runtime, "multifab_mpi_exchange")
+        var left_value = params.query_int("left_value")
+        var right_value = params.query_int("right_value")
 
-    destination.parallel_copy_from(
-        source,
-        geometry,
-        0,
-        0,
-        1,
-        intvect3d(1, 1, 1),
-        intvect3d(1, 1, 1),
-    )
-    expect(
-        has_nonzero_ghost_cells(destination),
-        "parallel_copy_from should populate destination ghost cells",
-    )
+        var domain = box3d(
+            small_end=intvect3d(0, 0, 0),
+            big_end=intvect3d(
+                DOMAIN_EXTENT - 1, DOMAIN_EXTENT - 1, DOMAIN_EXTENT - 1
+            ),
+        )
 
-    var expected_sum = Float64(CELLS_PER_SLAB * (left_value + right_value))
-    expect_close(source.sum(0), expected_sum, 1.0e-12, "source.sum mismatch")
-    expect_close(
-        destination.sum(0),
-        expected_sum,
-        1.0e-12,
-        "destination.sum mismatch",
-    )
+        var boxarray = BoxArray(runtime, domain)
+        # Force two x-slabs so the shared face is exchanged in the 2-rank example run.
+        boxarray.max_size(intvect3d(SLAB_EXTENT, DOMAIN_EXTENT, DOMAIN_EXTENT))
+        expect(
+            boxarray.size() == 2,
+            "expected a two-slab BoxArray decomposition",
+        )
 
-    print(
-        "rank=",
-        runtime.myproc(),
-        " local_tiles=",
-        source.tile_count(),
-        " source_ghost=",
-        source_ghost,
-        " copied_sum=",
-        destination.sum(0),
-    )
-    if runtime.ioprocessor():
-        print("multifab_mpi_exchange: ok")
+        var distmap = DistributionMapping(runtime, boxarray)
+        var geometry = Geometry(runtime, domain)
+        var source = MultiFab(
+            runtime, boxarray, distmap, 1, intvect3d(1, 1, 1)
+        )
+        var destination = MultiFab(
+            runtime, boxarray, distmap, 1, intvect3d(1, 1, 1)
+        )
+
+        source.set_val(0.0)
+        destination.set_val(0.0)
+        expect(source.tile_count() > 0, "each rank should own at least one tile")
+
+        var mfi = source.mfiter()
+        while mfi.is_valid():
+            var valid_box = mfi.validbox()
+            fill_box_value(
+                source.array(mfi),
+                valid_box,
+                slab_fill_value(valid_box, left_value, right_value),
+            )
+            mfi.next()
+
+        source.fill_boundary(geometry)
+        var expected_ghost = interface_expected_value(
+            source, left_value, right_value
+        )
+        var source_ghost = interface_ghost_sample(source)
+        expect_close(
+            source_ghost,
+            expected_ghost,
+            1.0e-12,
+            "fill_boundary should exchange the slab interface ghost cells",
+        )
+        expect(
+            has_nonzero_ghost_cells(source),
+            "fill_boundary should populate source ghost cells",
+        )
+
+        destination.parallel_copy_from(
+            source,
+            geometry,
+            0,
+            0,
+            1,
+            intvect3d(1, 1, 1),
+            intvect3d(1, 1, 1),
+        )
+        expect(
+            has_nonzero_ghost_cells(destination),
+            "parallel_copy_from should populate destination ghost cells",
+        )
+
+        var expected_sum = Float64(CELLS_PER_SLAB * (left_value + right_value))
+        expect_close(
+            source.sum(0), expected_sum, 1.0e-12, "source.sum mismatch"
+        )
+        expect_close(
+            destination.sum(0),
+            expected_sum,
+            1.0e-12,
+            "destination.sum mismatch",
+        )
+
+        print(
+            "rank=",
+            runtime.myproc(),
+            " local_tiles=",
+            source.tile_count(),
+            " source_ghost=",
+            source_ghost,
+            " copied_sum=",
+            destination.sum(0),
+        )
+        if runtime.ioprocessor():
+            print("multifab_mpi_exchange: ok")
+        runtime^.close()
+    except e:
+        runtime^.close()
+        raise e^

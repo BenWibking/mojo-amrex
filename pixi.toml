@@ -6,6 +6,7 @@ platforms = ["osx-arm64", "linux-64", "linux-aarch64"]
 version = "0.1.0"
 
 [tasks]
+mojo = "mojo"
 configure = """sh -lc '
 if [ -n "${CRAY_MPICH_DIR:-}" ] && command -v CC >/dev/null 2>&1; then
   cmake --fresh -S . -B build \
@@ -16,11 +17,33 @@ if [ -n "${CRAY_MPICH_DIR:-}" ] && command -v CC >/dev/null 2>&1; then
     -DMPI_CXX_COMPILER="$CRAY_MPICH_DIR/bin/mpicxx" \
     -DCMAKE_INSTALL_PREFIX="$PWD/.pixi/envs/default"
 else
-  env OMPI_CC=cc OMPI_CXX=c++ cmake --fresh -S . -B build \
+  hip_cxx=""
+  if command -v amdclang++ >/dev/null 2>&1; then
+    hip_cxx="$(command -v amdclang++)"
+  elif [ -x /usr/lib64/rocm/llvm/bin/clang++ ]; then
+    hip_cxx=/usr/lib64/rocm/llvm/bin/clang++
+  elif [ -x /opt/rocm/llvm/bin/clang++ ]; then
+    hip_cxx=/opt/rocm/llvm/bin/clang++
+  fi
+
+  if command -v rocminfo >/dev/null 2>&1 \
+    && rocminfo 2>/dev/null | grep -q "gfx" \
+    && [ -n "$hip_cxx" ]; then
+    env OMPI_CC=cc OMPI_CXX="$hip_cxx" cmake --fresh -S . -B build \
+    -DAMREX_MOJO_ENABLE_MPI=ON \
+    -DCMAKE_C_COMPILER=mpicc \
+    -DCMAKE_CXX_COMPILER="$hip_cxx" \
+    -DMPI_C_COMPILER=mpicc \
+    -DMPI_CXX_COMPILER=mpicxx \
+    -DCMAKE_HIP_COMPILER="$hip_cxx" \
+    -DCMAKE_INSTALL_PREFIX="$PWD/.pixi/envs/default"
+  else
+    env OMPI_CC=cc OMPI_CXX=c++ cmake --fresh -S . -B build \
     -DAMREX_MOJO_ENABLE_MPI=ON \
     -DCMAKE_C_COMPILER=mpicc \
     -DCMAKE_CXX_COMPILER=mpicxx \
     -DCMAKE_INSTALL_PREFIX="$PWD/.pixi/envs/default"
+  fi
 fi
 '"""
 configure-mpi = { depends-on = ["configure"], cmd = "true" }
@@ -57,7 +80,7 @@ test = { depends-on = ["test-capi", "test-mojo"] }
 format-mojo = "mojo format mojo/amrex examples tests/mojo"
 
 [dependencies]
-mojo = ">=0.26.3.0.dev2026032521,<0.27"
+mojo = ">=0.26.3.0.dev2026040905,<0.27"
 openmpi = ">=5.0.10,<6"
 jupyterlab = ">=4.5.6,<5"
 ipykernel = ">=7.1.0,<8"

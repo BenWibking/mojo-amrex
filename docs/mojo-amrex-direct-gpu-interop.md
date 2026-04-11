@@ -1,6 +1,6 @@
 # Direct GPU Interop for `mojo-amrex`
 
-Last updated: 2026-03-22
+Last updated: 2026-03-25
 
 ## Goal
 
@@ -28,13 +28,10 @@ This repository now implements an opt-in direct CUDA/HIP path.
 The primary working direction used in this repo is:
 
 - Mojo and AMReX must agree on the same backend device ordinal
-- Mojo exports a raw handle for its current stream
-- AMReX adopts that stream for a scoped region with
-  `setExternalGpuStream` / `ExternalGpuStreamRegion`
+- AMReX exposes its current stream handle through the C ABI
+- Mojo wraps that AMReX-owned stream with
+  `DeviceContext.create_external_stream(...)`
 - Mojo and AMReX both issue work onto that same backend stream
-
-The inverse direction now exists in Mojo stdlib, but this repo does not
-currently use it.
 
 Recent Mojo toolchains expose:
 
@@ -62,7 +59,7 @@ In other words, AMReX-owned-stream to Mojo launch order is now expressible as:
 That makes the ownership split:
 
 - AMReX owns `MultiFab` storage, async allocation semantics, and ordering
-- Mojo owns kernel code generation and the stream handle it exports
+- Mojo owns kernel code generation and wraps the AMReX stream non-owningly
 
 Device selection is stricter than stream selection:
 
@@ -77,7 +74,8 @@ So the interoperable path is:
 
 - pick or construct the Mojo `DeviceContext`
 - initialize `AmrexRuntime` on `Int(ctx.id())`
-- only then enter the external-stream scope
+- ask AMReX for its current stream handle
+- wrap that stream in Mojo and enqueue kernels there
 
 ## How It Works
 
@@ -89,51 +87,39 @@ The CMake option `AMREX_MOJO_GPU_BACKEND` controls whether AMReX is built with
 Today:
 
 - `AUTO` selects `CUDA` when a CUDA compiler is detected, otherwise `HIP` when
-  a HIP compiler is detected, otherwise `NONE`
+  a HIP compiler is detected and `AMReX_AMD_ARCH` is available, otherwise
+  `NONE`
+- `AUTO` fills `AMReX_AMD_ARCH` from `rocminfo` when possible
 - `CUDA` works
-- `HIP` works
+- `HIP` works when configured with `-DAMReX_AMD_ARCH=<gfx*>` or when that value
+  can be autodetected
 
-### 2. Mojo exports the native stream handle
+### 2. AMReX exports the native stream handle
 
-At the Mojo layer, `AmrexRuntime.external_gpu_stream_scope(ctx, ...)` inspects
-`ctx.api()` and exports the native stream handle from the current Mojo stream.
-
-Current implementation:
-
-- CUDA: `std.gpu.host._nvidia_cuda.CUDA(ctx.stream()) -> CUstream`
-- HIP: `std.gpu.host._amdgpu_hip.HIP(ctx.stream()) -> hipStream_t`
-
-Those typed handles are erased to `void*` for the C ABI boundary.
-
-Important caveat:
-
-- those Mojo modules are internal stdlib modules in the currently installed
-  toolchain for this repo
-- they are the mechanism that works today, but they are not a stable public API
-
-If a stable public stdlib export surface becomes available later, the AMReX
-side of this design does not need to change.
-
-### 3. AMReX installs that stream as the current external stream
-
-The C ABI function
-`amrex_mojo_external_gpu_stream_scope_create(stream_handle, sync_on_exit)`
-constructs an AMReX `ExternalGpuStreamRegion`.
+At the C ABI layer, `amrex_mojo_gpu_stream()` returns the current
+`amrex::Gpu::gpuStream()` value as `void*`. The Mojo wrapper exposes that as
+`AmrexRuntime.gpu_stream_handle(ctx)`.
 
 That means:
 
-- every AMReX GPU launch in that scope uses the Mojo stream handle
-- `resetExternalGpuStream(...)` happens automatically when the scope is
-  destroyed
-- AMReX rejects the scope if the active Mojo `DeviceContext` is on a different
-  GPU device than the initialized AMReX runtime
+- Mojo sees the actual stream AMReX will use for GPU work
+- AMReX stream selection remains the source of truth
+- the Mojo wrapper rejects mismatched backend or device contexts before
+  exposing the raw handle
 
-The `sync_on_exit` flag is forwarded to AMReX's
-`ExternalStreamSync::{Yes,No}` behavior:
+### 3. Mojo wraps that stream as a `DeviceStream`
 
-- `True` is conservative and synchronizes on teardown
-- `False` avoids an unconditional sync, although AMReX may still synchronize if
-  deferred async frees require it
+At the Mojo layer, `ctx.create_external_stream(runtime.gpu_stream_handle(ctx))`
+constructs a non-owning `DeviceStream` for the current AMReX stream.
+
+That means:
+
+- AMReX work such as `setVal`, `FillBoundary`, and `ParallelCopy` stays on the
+  stream AMReX already selected
+- Mojo kernels compiled with `ctx.compile_function(...)` can be enqueued onto
+  that same stream with `DeviceStream.enqueue_function(...)`
+- explicit synchronization should happen on the wrapped `DeviceStream` before
+  host-visible uses such as plotfile output or teardown
 
 ### 4. Device borrows expose pointer-and-shape metadata
 
@@ -164,21 +150,20 @@ from std.gpu.host import DeviceContext
 fn main() raises:
     var ctx = DeviceContext()
     var runtime = AmrexRuntime(Int(ctx.id()))
-
-    # Install the current Mojo stream as AMReX's active stream for this scope.
-    var stream_scope = runtime.external_gpu_stream_scope(
-        ctx, sync_on_exit=False
+    var amrex_stream = ctx.create_external_stream(
+        runtime.gpu_stream_handle(ctx)
     )
+    var kernel = ctx.compile_function[my_kernel, my_kernel]()
 
-    # Borrow device views from a GPU-backed MultiFab and launch Mojo kernels on
-    # ctx.stream() while AMReX calls in this scope use that same stream.
+    # Borrow device views from a GPU-backed MultiFab and enqueue Mojo kernels on
+    # the AMReX-owned stream while AMReX calls use that same stream.
 ```
 
-Within that scope:
+Within that flow:
 
 - AMReX operations such as `setVal`, reductions, `FillBoundary`, or
-  `ParallelCopy` issue work on the exported Mojo stream
-- Mojo kernels launched on `ctx.stream()` see the same ordering
+  `ParallelCopy` issue work on the current AMReX stream
+- Mojo kernels enqueued on the wrapped `DeviceStream` see the same ordering
 
 What does not work as an interop setter:
 
@@ -215,16 +200,13 @@ without hiding the risk.
 ## Limits and Caveats
 
 - CUDA and HIP only for now
-- AMReX's external-stream override is not supported inside OpenMP parallel
-  regions
 - direct interop is only meaningful for device-accessible `MultiFab`
   allocations
 - the current Mojo `DeviceContext` and initialized AMReX runtime must point to
   the same device ordinal
-- this repo currently uses the Mojo-stream-to-AMReX path, although current Mojo
-  stdlib also supports arbitrary external-stream import into Mojo through
-  `DeviceContext.create_external_stream(...)`
-- the current Mojo raw-handle export path depends on internal stdlib modules
+- `DeviceStream` does not provide the `DeviceContext.enqueue_function[...]`
+  convenience overload, so kernels must be compiled first and then enqueued
+  explicitly
 
 ## Fallback Path
 
