@@ -251,7 +251,7 @@ struct MultiFab(Movable):
     def for_each_tile[
         tile_func: def[borrow_origin: Origin[mut=True]](
             TileF64View[borrow_origin]
-        ) raises -> None
+        ) raises thin -> None
     ](mut self) raises:
         for tile_index in range(self.tile_count()):
             tile_func(self.tile(tile_index))
@@ -649,7 +649,7 @@ struct MultiFabF32(Movable):
     def for_each_tile[
         tile_func: def[borrow_origin: Origin[mut=True]](
             TileF32View[borrow_origin]
-        ) raises -> None
+        ) raises thin -> None
     ](mut self) raises:
         for tile_index in range(self.tile_count()):
             tile_func(self.tile(tile_index))
