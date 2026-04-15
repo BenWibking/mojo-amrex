@@ -31,7 +31,7 @@ else
     && [ -n "$hip_cxx" ]; then
     env OMPI_CC=cc OMPI_CXX="$hip_cxx" cmake --fresh -S . -B build \
     -DAMREX_MOJO_ENABLE_MPI=ON \
-    -DCMAKE_C_COMPILER=mpicc \
+    -DCMAKE_C_COMPILER=cc \
     -DCMAKE_CXX_COMPILER="$hip_cxx" \
     -DMPI_C_COMPILER=mpicc \
     -DMPI_CXX_COMPILER=mpicxx \
@@ -40,8 +40,10 @@ else
   else
     env OMPI_CC=cc OMPI_CXX=c++ cmake --fresh -S . -B build \
     -DAMREX_MOJO_ENABLE_MPI=ON \
-    -DCMAKE_C_COMPILER=mpicc \
-    -DCMAKE_CXX_COMPILER=mpicxx \
+    -DCMAKE_C_COMPILER=cc \
+    -DCMAKE_CXX_COMPILER=c++ \
+    -DMPI_C_COMPILER=mpicc \
+    -DMPI_CXX_COMPILER=mpicxx \
     -DCMAKE_INSTALL_PREFIX="$PWD/.pixi/envs/default"
   fi
 fi
