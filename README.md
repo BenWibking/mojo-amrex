@@ -43,6 +43,23 @@ If CMake can see a HIP toolchain, `AUTO` now tries to fill
 `AMReX_AMD_ARCH=<gfx*>` from `rocminfo` before selecting HIP; otherwise it
 falls back to a CPU-only AMReX build.
 
+On some HPC login nodes, Pixi can fail before task execution with a Rayon thread
+pool error such as `failed to initialize global rayon pool` or `Resource
+temporarily unavailable`. In that case, rerun with lower Pixi concurrency:
+
+```bash
+RAYON_NUM_THREADS=1 pixi run --frozen bootstrap
+```
+
+or:
+
+```bash
+pixi run --concurrent-solves 1 --frozen bootstrap
+```
+
+That failure happens inside Pixi's solver/fetch path, not in this repository's
+CMake or Mojo build logic.
+
 ## Common commands
 
 Setup and build:
