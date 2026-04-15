@@ -3,6 +3,13 @@ set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$repo_root"
+platform="$(uname -s)"
+
+if [ "$platform" != "Linux" ]; then
+  echo "error: scripts/repro_mojo_package_oom.sh requires Linux; current platform is $platform" >&2
+  echo "error: RLIMIT_AS reproduction depends on 'ulimit -v', which is not supported reliably here" >&2
+  exit 1
+fi
 
 if ! command -v pixi >/dev/null 2>&1; then
   echo "error: pixi is required but was not found in PATH" >&2
