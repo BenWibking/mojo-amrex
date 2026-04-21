@@ -7,9 +7,11 @@ from amrex.ffi import (
     IntVect3D,
     boxarray_box,
     boxarray_create_from_box,
+    boxarray_destroy,
     boxarray_max_size,
     boxarray_size,
     distmap_create_from_boxarray,
+    distmap_destroy,
     intvect3d,
     last_error_message,
 )
@@ -24,26 +26,26 @@ struct BoxArray(Movable):
     def __init__(out self, ref runtime: AmrexRuntime, domain: Box3D) raises:
         self.runtime = runtime._lease()
         self.handle = boxarray_create_from_box(
-            self.runtime[].lib, self.runtime[].handle, domain
+            self.runtime[].functions, self.runtime[].handle, domain
         )
         if not self.handle:
-            raise Error(last_error_message(self.runtime[].lib))
+            raise Error(last_error_message(self.runtime[].functions))
 
     def __del__(deinit self):
         if self.handle:
-            self.runtime[].lib.call["amrex_mojo_boxarray_destroy"](self.handle)
+            self.runtime[].functions.boxarray_destroy_fn(self.handle)
 
     def max_size(mut self, max_size: IntVect3D) raises:
         var handle = self._handle()
-        if boxarray_max_size(self.runtime[].lib, handle, max_size) != 0:
-            raise Error(last_error_message(self.runtime[].lib))
+        if boxarray_max_size(self.runtime[].functions, handle, max_size) != 0:
+            raise Error(last_error_message(self.runtime[].functions))
 
     def max_size(mut self, max_size: Int) raises:
         self.max_size(intvect3d(max_size, max_size, max_size))
 
     def size(ref self) raises -> Int:
         var handle = self._handle()
-        return boxarray_size(self.runtime[].lib, handle)
+        return boxarray_size(self.runtime[].functions, handle)
 
     def box(ref self, index: Int) raises -> Box3D:
         var handle = self._handle()
@@ -72,14 +74,14 @@ struct DistributionMapping(Movable):
     ) raises:
         self.runtime = runtime._lease()
         self.handle = distmap_create_from_boxarray(
-            self.runtime[].lib, self.runtime[].handle, boxarray._handle()
+            self.runtime[].functions, self.runtime[].handle, boxarray._handle()
         )
         if not self.handle:
-            raise Error(last_error_message(self.runtime[].lib))
+            raise Error(last_error_message(self.runtime[].functions))
 
     def __del__(deinit self):
         if self.handle:
-            self.runtime[].lib.call["amrex_mojo_distmap_destroy"](self.handle)
+            self.runtime[].functions.distmap_destroy_fn(self.handle)
 
     def _handle(ref self) raises -> DistributionMappingHandle:
         require_live_handle(

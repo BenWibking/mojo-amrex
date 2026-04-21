@@ -8,17 +8,30 @@ from amrex.ffi import (
     MULTIFAB_DATATYPE_FLOAT32,
     MultiFabMemoryInfo,
     MultiFabHandle,
+    RawArray4Metadata,
+    RawTileMetadata,
     TileF32View,
     TileF64View,
-    device_tile_view,
-    device_tile_view_f32,
+    array4_view_from_mfiter,
+    array4_view_from_mfiter_f32,
     device_array4_view_from_mfiter,
     device_array4_view_from_mfiter_f32,
-    array4_view_from_mfiter_f32,
-    array4_view_from_mfiter,
+    raw_array4_metadata_for_mfiter,
+    raw_data_ptr_f32,
+    raw_data_ptr_f32_device,
+    raw_data_ptr_f32_for_mfiter,
+    raw_data_ptr_f32_for_mfiter_device,
+    raw_data_ptr_f64,
+    raw_data_ptr_f64_device,
+    raw_data_ptr_f64_for_mfiter,
+    raw_data_ptr_f64_for_mfiter_device,
+    raw_tile_metadata,
+    tile_view,
+    tile_view_f32,
     last_error_message,
     multifab_copy,
     multifab_create,
+    multifab_destroy,
     multifab_fill_boundary,
     multifab_max,
     multifab_memory_info,
@@ -49,6 +62,65 @@ from amrex.space3d.mfiter import (
     create_gpu_mfiter,
     create_mfiter,
 )
+from std.ffi import c_double, c_float
+
+
+def make_array4_f64(
+    data: UnsafePointer[c_double, MutAnyOrigin], metadata: RawArray4Metadata
+) -> Array4F64View[MutAnyOrigin]:
+    return Array4F64View[MutAnyOrigin](
+        data=data,
+        lo_x=metadata.lo_x,
+        lo_y=metadata.lo_y,
+        lo_z=metadata.lo_z,
+        hi_x=metadata.hi_x,
+        hi_y=metadata.hi_y,
+        hi_z=metadata.hi_z,
+        stride_i=metadata.stride_i,
+        stride_j=metadata.stride_j,
+        stride_k=metadata.stride_k,
+        stride_n=metadata.stride_n,
+        ncomp=metadata.ncomp,
+    )
+
+
+def make_array4_f32(
+    data: UnsafePointer[c_float, MutAnyOrigin], metadata: RawArray4Metadata
+) -> Array4F32View[MutAnyOrigin]:
+    return Array4F32View[MutAnyOrigin](
+        data=data,
+        lo_x=metadata.lo_x,
+        lo_y=metadata.lo_y,
+        lo_z=metadata.lo_z,
+        hi_x=metadata.hi_x,
+        hi_y=metadata.hi_y,
+        hi_z=metadata.hi_z,
+        stride_i=metadata.stride_i,
+        stride_j=metadata.stride_j,
+        stride_k=metadata.stride_k,
+        stride_n=metadata.stride_n,
+        ncomp=metadata.ncomp,
+    )
+
+
+def make_tile_f64(
+    metadata: RawTileMetadata, data: UnsafePointer[c_double, MutAnyOrigin]
+) -> TileF64View[MutAnyOrigin]:
+    return TileF64View[MutAnyOrigin](
+        tile_box=metadata.tile_box,
+        valid_box=metadata.valid_box,
+        array_view=make_array4_f64(data, metadata.array),
+    )
+
+
+def make_tile_f32(
+    metadata: RawTileMetadata, data: UnsafePointer[c_float, MutAnyOrigin]
+) -> TileF32View[MutAnyOrigin]:
+    return TileF32View[MutAnyOrigin](
+        tile_box=metadata.tile_box,
+        valid_box=metadata.valid_box,
+        array_view=make_array4_f32(data, metadata.array),
+    )
 
 
 struct MultiFab(Movable):
@@ -67,7 +139,7 @@ struct MultiFab(Movable):
     ) raises:
         self.runtime = runtime._lease()
         self.handle = multifab_create(
-            self.runtime[].lib,
+            self.runtime[].functions,
             self.runtime[].handle,
             boxarray._handle(),
             distmap._handle(),
@@ -77,15 +149,15 @@ struct MultiFab(Movable):
         )
         self.ngrow_vect = ngrow.copy()
         if not self.handle:
-            raise Error(last_error_message(self.runtime[].lib))
+            raise Error(last_error_message(self.runtime[].functions))
 
     def __del__(deinit self):
         if self.handle:
-            self.runtime[].lib.call["amrex_mojo_multifab_destroy"](self.handle)
+            self.runtime[].functions.multifab_destroy_fn(self.handle)
 
     def ncomp(ref self) raises -> Int:
         var handle = self._handle()
-        return multifab_ncomp(self.runtime[].lib, handle)
+        return multifab_ncomp(self.runtime[].functions, handle)
 
     def ngrow(ref self) raises -> IntVect3D:
         return self.ngrow_vect.copy()
@@ -98,27 +170,29 @@ struct MultiFab(Movable):
         var handle = self._handle()
         if (
             multifab_set_val(
-                self.runtime[].lib, handle, value, start_comp, ncomp
+                self.runtime[].functions, handle, value, start_comp, ncomp
             )
             != 0
         ):
-            raise Error(last_error_message(self.runtime[].lib))
+            raise Error(last_error_message(self.runtime[].functions))
 
     def set_val(mut self, value: Float64) raises:
         self.set_val(value, 0, self.ncomp())
 
     def tile_count(ref self) raises -> Int:
         var handle = self._handle()
-        return multifab_tile_count(self.runtime[].lib, handle)
+        return multifab_tile_count(self.runtime[].functions, handle)
 
     def tile_box(ref self, tile_index: Int) raises -> Box3D:
         self._require_tile_index(tile_index)
-        return multifab_tile_box(self.runtime[].lib, self._handle(), tile_index)
+        return multifab_tile_box(
+            self.runtime[].functions, self._handle(), tile_index
+        )
 
     def valid_box(ref self, tile_index: Int) raises -> Box3D:
         self._require_tile_index(tile_index)
         return multifab_valid_box(
-            self.runtime[].lib, self._handle(), tile_index
+            self.runtime[].functions, self._handle(), tile_index
         )
 
     def mfiter(ref self) raises -> MFIter:
@@ -163,9 +237,11 @@ struct MultiFab(Movable):
     ) raises -> Array4F64View[MutAnyOrigin]:
         self._require_tile_index(tile_index)
         var handle = self._handle()
-        var array_view = device_tile_view(
-            self.runtime[].lib, handle, tile_index
-        ).array()
+        var metadata = raw_tile_metadata(self.runtime[].lib, handle, tile_index)
+        var array_view = make_array4_f64(
+            raw_data_ptr_f64_device(self.runtime[].lib, handle, tile_index),
+            metadata.array,
+        )
         if not array_view.data:
             raise Error(last_error_message(self.runtime[].lib))
         return array_view.copy()
@@ -174,8 +250,13 @@ struct MultiFab(Movable):
         ref self, ref mfi: MFIter
     ) raises -> Array4F64View[MutAnyOrigin]:
         var handle = self._handle()
-        var array_view = device_array4_view_from_mfiter(
-            self.runtime[].lib, handle, mfi._handle()
+        var array_view = make_array4_f64(
+            raw_data_ptr_f64_for_mfiter_device(
+                self.runtime[].lib, handle, mfi._handle()
+            ),
+            raw_array4_metadata_for_mfiter(
+                self.runtime[].lib, handle, mfi._handle()
+            ),
         )
         if not array_view.data:
             raise Error(last_error_message(self.runtime[].lib))
@@ -185,8 +266,13 @@ struct MultiFab(Movable):
         ref self, ref mfi: GpuMFIter
     ) raises -> Array4F64View[MutAnyOrigin]:
         var handle = self._handle()
-        var array_view = device_array4_view_from_mfiter(
-            self.runtime[].lib, handle, mfi._handle()
+        var array_view = make_array4_f64(
+            raw_data_ptr_f64_for_mfiter_device(
+                self.runtime[].lib, handle, mfi._handle()
+            ),
+            raw_array4_metadata_for_mfiter(
+                self.runtime[].lib, handle, mfi._handle()
+            ),
         )
         if not array_view.data:
             raise Error(last_error_message(self.runtime[].lib))
@@ -258,27 +344,27 @@ struct MultiFab(Movable):
 
     def min(ref self, comp: Int) raises -> Float64:
         var handle = self._handle()
-        return multifab_min(self.runtime[].lib, handle, comp)
+        return multifab_min(self.runtime[].functions, handle, comp)
 
     def max(ref self, comp: Int) raises -> Float64:
         var handle = self._handle()
-        return multifab_max(self.runtime[].lib, handle, comp)
+        return multifab_max(self.runtime[].functions, handle, comp)
 
     def sum(ref self, comp: Int) raises -> Float64:
         var handle = self._handle()
-        return multifab_sum(self.runtime[].lib, handle, comp)
+        return multifab_sum(self.runtime[].functions, handle, comp)
 
     def norm0(ref self, comp: Int) raises -> Float64:
         var handle = self._handle()
-        return multifab_norm0(self.runtime[].lib, handle, comp)
+        return multifab_norm0(self.runtime[].functions, handle, comp)
 
     def norm1(ref self, comp: Int) raises -> Float64:
         var handle = self._handle()
-        return multifab_norm1(self.runtime[].lib, handle, comp)
+        return multifab_norm1(self.runtime[].functions, handle, comp)
 
     def norm2(ref self, comp: Int) raises -> Float64:
         var handle = self._handle()
-        return multifab_norm2(self.runtime[].lib, handle, comp)
+        return multifab_norm2(self.runtime[].functions, handle, comp)
 
     def plus(
         mut self,
@@ -290,7 +376,7 @@ struct MultiFab(Movable):
         var handle = self._handle()
         if (
             multifab_plus(
-                self.runtime[].lib,
+                self.runtime[].functions,
                 handle,
                 value,
                 start_comp,
@@ -299,7 +385,7 @@ struct MultiFab(Movable):
             )
             != 0
         ):
-            raise Error(last_error_message(self.runtime[].lib))
+            raise Error(last_error_message(self.runtime[].functions))
 
     def mult(
         mut self,
@@ -311,7 +397,7 @@ struct MultiFab(Movable):
         var handle = self._handle()
         if (
             multifab_mult(
-                self.runtime[].lib,
+                self.runtime[].functions,
                 handle,
                 value,
                 start_comp,
@@ -320,7 +406,7 @@ struct MultiFab(Movable):
             )
             != 0
         ):
-            raise Error(last_error_message(self.runtime[].lib))
+            raise Error(last_error_message(self.runtime[].functions))
 
     def copy_from(
         mut self,
@@ -333,7 +419,7 @@ struct MultiFab(Movable):
         var handle = self._handle()
         if (
             multifab_copy(
-                self.runtime[].lib,
+                self.runtime[].functions,
                 handle,
                 source._handle(),
                 src_comp,
@@ -343,7 +429,7 @@ struct MultiFab(Movable):
             )
             != 0
         ):
-            raise Error(last_error_message(self.runtime[].lib))
+            raise Error(last_error_message(self.runtime[].functions))
 
     def parallel_copy_from(
         mut self,
@@ -358,7 +444,7 @@ struct MultiFab(Movable):
         var handle = self._handle()
         if (
             multifab_parallel_copy(
-                self.runtime[].lib,
+                self.runtime[].functions,
                 handle,
                 source._handle(),
                 geometry._handle(),
@@ -370,7 +456,7 @@ struct MultiFab(Movable):
             )
             != 0
         ):
-            raise Error(last_error_message(self.runtime[].lib))
+            raise Error(last_error_message(self.runtime[].functions))
 
     def fill_boundary(
         mut self,
@@ -382,7 +468,7 @@ struct MultiFab(Movable):
         var handle = self._handle()
         if (
             multifab_fill_boundary(
-                self.runtime[].lib,
+                self.runtime[].functions,
                 handle,
                 geometry._handle(),
                 start_comp,
@@ -391,7 +477,7 @@ struct MultiFab(Movable):
             )
             != 0
         ):
-            raise Error(last_error_message(self.runtime[].lib))
+            raise Error(last_error_message(self.runtime[].functions))
 
     def fill_boundary(
         mut self, ref geometry: Geometry, cross: Bool = False
@@ -464,7 +550,7 @@ struct MultiFabF32(Movable):
     ) raises:
         self.runtime = runtime._lease()
         self.handle = multifab_create(
-            self.runtime[].lib,
+            self.runtime[].functions,
             self.runtime[].handle,
             boxarray._handle(),
             distmap._handle(),
@@ -475,15 +561,15 @@ struct MultiFabF32(Movable):
         )
         self.ngrow_vect = ngrow.copy()
         if not self.handle:
-            raise Error(last_error_message(self.runtime[].lib))
+            raise Error(last_error_message(self.runtime[].functions))
 
     def __del__(deinit self):
         if self.handle:
-            self.runtime[].lib.call["amrex_mojo_multifab_destroy"](self.handle)
+            self.runtime[].functions.multifab_destroy_fn(self.handle)
 
     def ncomp(ref self) raises -> Int:
         var handle = self._handle()
-        return multifab_ncomp(self.runtime[].lib, handle)
+        return multifab_ncomp(self.runtime[].functions, handle)
 
     def ngrow(ref self) raises -> IntVect3D:
         return self.ngrow_vect.copy()
@@ -496,27 +582,33 @@ struct MultiFabF32(Movable):
         var handle = self._handle()
         if (
             multifab_set_val(
-                self.runtime[].lib, handle, Float64(value), start_comp, ncomp
+                self.runtime[].functions,
+                handle,
+                Float64(value),
+                start_comp,
+                ncomp,
             )
             != 0
         ):
-            raise Error(last_error_message(self.runtime[].lib))
+            raise Error(last_error_message(self.runtime[].functions))
 
     def set_val(mut self, value: Float32) raises:
         self.set_val(value, 0, self.ncomp())
 
     def tile_count(ref self) raises -> Int:
         var handle = self._handle()
-        return multifab_tile_count(self.runtime[].lib, handle)
+        return multifab_tile_count(self.runtime[].functions, handle)
 
     def tile_box(ref self, tile_index: Int) raises -> Box3D:
         self._require_tile_index(tile_index)
-        return multifab_tile_box(self.runtime[].lib, self._handle(), tile_index)
+        return multifab_tile_box(
+            self.runtime[].functions, self._handle(), tile_index
+        )
 
     def valid_box(ref self, tile_index: Int) raises -> Box3D:
         self._require_tile_index(tile_index)
         return multifab_valid_box(
-            self.runtime[].lib, self._handle(), tile_index
+            self.runtime[].functions, self._handle(), tile_index
         )
 
     def mfiter(ref self) raises -> MFIter:
@@ -561,9 +653,11 @@ struct MultiFabF32(Movable):
     ) raises -> Array4F32View[MutAnyOrigin]:
         self._require_tile_index(tile_index)
         var handle = self._handle()
-        var array_view = device_tile_view_f32(
-            self.runtime[].lib, handle, tile_index
-        ).array()
+        var metadata = raw_tile_metadata(self.runtime[].lib, handle, tile_index)
+        var array_view = make_array4_f32(
+            raw_data_ptr_f32_device(self.runtime[].lib, handle, tile_index),
+            metadata.array,
+        )
         if not array_view.data:
             raise Error(last_error_message(self.runtime[].lib))
         return array_view.copy()
@@ -572,8 +666,13 @@ struct MultiFabF32(Movable):
         ref self, ref mfi: MFIter
     ) raises -> Array4F32View[MutAnyOrigin]:
         var handle = self._handle()
-        var array_view = device_array4_view_from_mfiter_f32(
-            self.runtime[].lib, handle, mfi._handle()
+        var array_view = make_array4_f32(
+            raw_data_ptr_f32_for_mfiter_device(
+                self.runtime[].lib, handle, mfi._handle()
+            ),
+            raw_array4_metadata_for_mfiter(
+                self.runtime[].lib, handle, mfi._handle()
+            ),
         )
         if not array_view.data:
             raise Error(last_error_message(self.runtime[].lib))
@@ -583,8 +682,13 @@ struct MultiFabF32(Movable):
         ref self, ref mfi: GpuMFIter
     ) raises -> Array4F32View[MutAnyOrigin]:
         var handle = self._handle()
-        var array_view = device_array4_view_from_mfiter_f32(
-            self.runtime[].lib, handle, mfi._handle()
+        var array_view = make_array4_f32(
+            raw_data_ptr_f32_for_mfiter_device(
+                self.runtime[].lib, handle, mfi._handle()
+            ),
+            raw_array4_metadata_for_mfiter(
+                self.runtime[].lib, handle, mfi._handle()
+            ),
         )
         if not array_view.data:
             raise Error(last_error_message(self.runtime[].lib))
@@ -656,27 +760,27 @@ struct MultiFabF32(Movable):
 
     def min(ref self, comp: Int) raises -> Float64:
         var handle = self._handle()
-        return multifab_min(self.runtime[].lib, handle, comp)
+        return multifab_min(self.runtime[].functions, handle, comp)
 
     def max(ref self, comp: Int) raises -> Float64:
         var handle = self._handle()
-        return multifab_max(self.runtime[].lib, handle, comp)
+        return multifab_max(self.runtime[].functions, handle, comp)
 
     def sum(ref self, comp: Int) raises -> Float64:
         var handle = self._handle()
-        return multifab_sum(self.runtime[].lib, handle, comp)
+        return multifab_sum(self.runtime[].functions, handle, comp)
 
     def norm0(ref self, comp: Int) raises -> Float64:
         var handle = self._handle()
-        return multifab_norm0(self.runtime[].lib, handle, comp)
+        return multifab_norm0(self.runtime[].functions, handle, comp)
 
     def norm1(ref self, comp: Int) raises -> Float64:
         var handle = self._handle()
-        return multifab_norm1(self.runtime[].lib, handle, comp)
+        return multifab_norm1(self.runtime[].functions, handle, comp)
 
     def norm2(ref self, comp: Int) raises -> Float64:
         var handle = self._handle()
-        return multifab_norm2(self.runtime[].lib, handle, comp)
+        return multifab_norm2(self.runtime[].functions, handle, comp)
 
     def plus(
         mut self,
@@ -688,7 +792,7 @@ struct MultiFabF32(Movable):
         var handle = self._handle()
         if (
             multifab_plus(
-                self.runtime[].lib,
+                self.runtime[].functions,
                 handle,
                 Float64(value),
                 start_comp,
@@ -697,7 +801,7 @@ struct MultiFabF32(Movable):
             )
             != 0
         ):
-            raise Error(last_error_message(self.runtime[].lib))
+            raise Error(last_error_message(self.runtime[].functions))
 
     def mult(
         mut self,
@@ -709,7 +813,7 @@ struct MultiFabF32(Movable):
         var handle = self._handle()
         if (
             multifab_mult(
-                self.runtime[].lib,
+                self.runtime[].functions,
                 handle,
                 Float64(value),
                 start_comp,
@@ -718,7 +822,7 @@ struct MultiFabF32(Movable):
             )
             != 0
         ):
-            raise Error(last_error_message(self.runtime[].lib))
+            raise Error(last_error_message(self.runtime[].functions))
 
     def copy_from(
         mut self,
@@ -731,7 +835,7 @@ struct MultiFabF32(Movable):
         var handle = self._handle()
         if (
             multifab_copy(
-                self.runtime[].lib,
+                self.runtime[].functions,
                 handle,
                 source._handle(),
                 src_comp,
@@ -741,7 +845,7 @@ struct MultiFabF32(Movable):
             )
             != 0
         ):
-            raise Error(last_error_message(self.runtime[].lib))
+            raise Error(last_error_message(self.runtime[].functions))
 
     def parallel_copy_from(
         mut self,
@@ -756,7 +860,7 @@ struct MultiFabF32(Movable):
         var handle = self._handle()
         if (
             multifab_parallel_copy(
-                self.runtime[].lib,
+                self.runtime[].functions,
                 handle,
                 source._handle(),
                 geometry._handle(),
@@ -768,7 +872,7 @@ struct MultiFabF32(Movable):
             )
             != 0
         ):
-            raise Error(last_error_message(self.runtime[].lib))
+            raise Error(last_error_message(self.runtime[].functions))
 
     def fill_boundary(
         mut self,
@@ -780,7 +884,7 @@ struct MultiFabF32(Movable):
         var handle = self._handle()
         if (
             multifab_fill_boundary(
-                self.runtime[].lib,
+                self.runtime[].functions,
                 handle,
                 geometry._handle(),
                 start_comp,
@@ -789,7 +893,7 @@ struct MultiFabF32(Movable):
             )
             != 0
         ):
-            raise Error(last_error_message(self.runtime[].lib))
+            raise Error(last_error_message(self.runtime[].functions))
 
     def fill_boundary(
         mut self, ref geometry: Geometry, cross: Bool = False
