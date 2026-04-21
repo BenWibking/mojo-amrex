@@ -44,24 +44,24 @@ struct MFIter(Movable):
 
     def __del__(deinit self):
         if self.handle:
-            self.runtime[].functions.mfiter_destroy_fn(self.handle)
+            self.runtime[].lib.call["amrex_mojo_mfiter_destroy"](self.handle)
 
     def is_valid(ref self) raises -> Bool:
         var handle = self._handle()
-        return mfiter_is_valid(self.runtime[].functions, handle)
+        return mfiter_is_valid(self.runtime[].lib, handle)
 
     def next(mut self) raises:
         var handle = self._handle()
-        if mfiter_next(self.runtime[].functions, handle) != 0:
-            raise Error(last_error_message(self.runtime[].functions))
+        if mfiter_next(self.runtime[].lib, handle) != 0:
+            raise Error(last_error_message(self.runtime[].lib))
 
     def index(ref self) raises -> Int:
         self._require_valid()
-        return mfiter_index(self.runtime[].functions, self.handle)
+        return mfiter_index(self.runtime[].lib, self.handle)
 
     def local_tile_index(ref self) raises -> Int:
         self._require_valid()
-        return mfiter_local_tile_index(self.runtime[].functions, self.handle)
+        return mfiter_local_tile_index(self.runtime[].lib, self.handle)
 
     def tilebox(ref self) raises -> Box3D:
         self._require_valid()
@@ -139,7 +139,7 @@ struct GpuMFIter(Movable):
     def __init__(out self, var mfiter: MFIter) raises:
         self.runtime = mfiter.runtime
         self.mfiter = mfiter^
-        self.num_streams = gpu_num_streams(self.runtime[].functions)
+        self.num_streams = gpu_num_streams(self.runtime[].lib)
         self.tile_ordinal = 0
         self.finalized = False
         if self.mfiter.is_valid():
@@ -148,8 +148,11 @@ struct GpuMFIter(Movable):
     def __del__(deinit self):
         if self.finalized:
             return
-        _ = self.runtime[].functions.gpu_stream_synchronize_active_fn()
-        self.runtime[].functions.gpu_reset_stream_fn()
+        _ = self.runtime[].lib.call[
+            "amrex_mojo_gpu_stream_synchronize_active",
+            c_int,
+        ]()
+        self.runtime[].lib.call["amrex_mojo_gpu_reset_stream"]()
 
     def is_valid(ref self) raises -> Bool:
         return self.mfiter.is_valid()
@@ -194,9 +197,9 @@ struct GpuMFIter(Movable):
         ref self,
     ) raises -> UnsafePointer[NoneType, MutExternalOrigin]:
         self._require_valid()
-        var handle = gpu_stream(self.runtime[].functions)
+        var handle = gpu_stream(self.runtime[].lib)
         if not handle:
-            raise Error(last_error_message(self.runtime[].functions))
+            raise Error(last_error_message(self.runtime[].lib))
         return handle
 
     def stream(ref self, ref ctx: DeviceContext) raises -> DeviceStream:
@@ -210,8 +213,8 @@ struct GpuMFIter(Movable):
         return self.mfiter._handle()
 
     def _activate_current_stream(mut self) raises:
-        if gpu_set_stream_index(self.runtime[].functions, self.stream_index()) != 0:
-            raise Error(last_error_message(self.runtime[].functions))
+        if gpu_set_stream_index(self.runtime[].lib, self.stream_index()) != 0:
+            raise Error(last_error_message(self.runtime[].lib))
 
     def _finalize(mut self) raises:
         if self.finalized:
@@ -220,9 +223,9 @@ struct GpuMFIter(Movable):
         # before restoring the default stream index. AMReX implements
         # `stream_synchronize_active` as an all-stream sync unless it is already
         # in a single-stream region.
-        if gpu_stream_synchronize_active(self.runtime[].functions) != 0:
-            raise Error(last_error_message(self.runtime[].functions))
-        gpu_reset_stream(self.runtime[].functions)
+        if gpu_stream_synchronize_active(self.runtime[].lib) != 0:
+            raise Error(last_error_message(self.runtime[].lib))
+        gpu_reset_stream(self.runtime[].lib)
         self.finalized = True
 
     def _require_valid(ref self) raises:
@@ -237,7 +240,7 @@ def create_mfiter(
 ) raises -> MFIter:
     var handle = mfiter_create(runtime[].lib, multifab)
     if not handle:
-        raise Error(last_error_message(runtime[].functions))
+        raise Error(last_error_message(runtime[].lib))
     return MFIter(runtime, handle, default_ngrow)
 
 

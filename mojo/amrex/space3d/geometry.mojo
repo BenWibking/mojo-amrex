@@ -8,7 +8,6 @@ from amrex.ffi import (
     RealVect3D,
     geometry_cell_size,
     geometry_create,
-    geometry_destroy,
     geometry_domain,
     geometry_periodicity,
     geometry_prob_domain,
@@ -25,10 +24,10 @@ struct Geometry(Movable):
     def __init__(out self, ref runtime: AmrexRuntime, domain: Box3D) raises:
         self.runtime = runtime._lease()
         self.handle = geometry_create(
-            self.runtime[].functions, self.runtime[].handle, domain
+            self.runtime[].lib, self.runtime[].handle, domain
         )
         if not self.handle:
-            raise Error(last_error_message(self.runtime[].functions))
+            raise Error(last_error_message(self.runtime[].lib))
 
     def __init__(
         out self,
@@ -39,18 +38,18 @@ struct Geometry(Movable):
     ) raises:
         self.runtime = runtime._lease()
         self.handle = geometry_create(
-            self.runtime[].functions,
+            self.runtime[].lib,
             self.runtime[].handle,
             domain,
             real_box,
             is_periodic,
         )
         if not self.handle:
-            raise Error(last_error_message(self.runtime[].functions))
+            raise Error(last_error_message(self.runtime[].lib))
 
     def __del__(deinit self):
         if self.handle:
-            self.runtime[].functions.geometry_destroy_fn(self.handle)
+            self.runtime[].lib.call["amrex_mojo_geometry_destroy"](self.handle)
 
     def domain(ref self) raises -> Box3D:
         var handle = self._handle()

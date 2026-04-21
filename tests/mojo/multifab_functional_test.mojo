@@ -22,16 +22,6 @@ comptime DOMAIN_EXTENT = 64
 comptime DOMAIN_CELLS = DOMAIN_EXTENT * DOMAIN_EXTENT * DOMAIN_EXTENT
 
 
-@fieldwise_init
-struct UpdateTileContext[
-    dst_origin: Origin[mut=True],
-    src_origin: Origin[mut=True],
-](Copyable):
-    var dst_array: Array4F64View[Self.dst_origin]
-    var src_array: Array4F64View[Self.src_origin]
-    var add_value: Float64
-
-
 def expect(condition: Bool, message: StringLiteral) raises:
     if not condition:
         raise Error(message)
@@ -168,20 +158,17 @@ def main() raises:
             _ = mfi.growntilebox()
             _ = mfi.index()
             _ = mfi.local_tile_index()
-
-            var update_ctx = UpdateTileContext(
-                dst_array=destination.array(mfi).copy(),
-                src_array=source.array(mfi).copy(),
-                add_value=Float64(params.query_int("tile_add")),
-            )
-
-            @parameter
-            def update_tile(
-                ctx: type_of(update_ctx), i: Int, j: Int, k: Int
-            ) raises:
-                ctx.dst_array[i, j, k] = ctx.src_array[i, j, k] + ctx.add_value
-
-            ParallelFor[body=update_tile](tile_box, update_ctx)
+            var dst_array = destination.array(mfi)
+            var src_array = source.array(mfi)
+            var add_value = Float64(params.query_int("tile_add"))
+            for k in range(Int(tile_box.small_end.z), Int(tile_box.big_end.z) + 1):
+                for j in range(
+                    Int(tile_box.small_end.y), Int(tile_box.big_end.y) + 1
+                ):
+                    for i in range(
+                        Int(tile_box.small_end.x), Int(tile_box.big_end.x) + 1
+                    ):
+                        dst_array[i, j, k] = src_array[i, j, k] + add_value
             iterated_tiles += 1
             mfi.next()
 
@@ -253,7 +240,6 @@ def main() raises:
             3.0 * Float64(DOMAIN_CELLS),
             "destination.norm1 mismatch",
         )
-
         copy_target.copy_from(destination, 0, 0, 1)
         expect_equal(
             copy_target.sum(0),

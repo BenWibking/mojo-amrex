@@ -5,7 +5,6 @@ from amrex.ffi import (
     last_error_message,
     parmparse_add_int,
     parmparse_create,
-    parmparse_destroy,
     parmparse_query_int,
     parmparse_query_real,
 )
@@ -37,7 +36,7 @@ struct ParmParse(Movable):
 
     def __del__(deinit self):
         if self.handle:
-            self.runtime[].functions.parmparse_destroy_fn(self.handle)
+            self.runtime[].lib.call["amrex_mojo_parmparse_destroy"](self.handle)
 
     def add_int(mut self, name: String, value: Int) raises:
         var handle = self._handle()
