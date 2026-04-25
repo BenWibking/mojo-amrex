@@ -2,6 +2,7 @@
 
 from amrex.ffi import (
     ParmParseHandle,
+    OptionalParmParseHandle,
     last_error_message,
     parmparse_add_int,
     parmparse_create,
@@ -14,7 +15,7 @@ from amrex.runtime import AmrexRuntime, RuntimeLease
 
 struct ParmParse(Movable):
     var runtime: RuntimeLease
-    var handle: ParmParseHandle
+    var handle: OptionalParmParseHandle
 
     def __init__(
         out self, ref runtime: AmrexRuntime, prefix: StringLiteral = ""
@@ -36,7 +37,9 @@ struct ParmParse(Movable):
 
     def __del__(deinit self):
         if self.handle:
-            self.runtime[].lib.call["amrex_mojo_parmparse_destroy"](self.handle)
+            self.runtime[].lib.call["amrex_mojo_parmparse_destroy"](
+                self.handle.value()
+            )
 
     def add_int(mut self, name: String, value: Int) raises:
         var handle = self._handle()
@@ -113,11 +116,10 @@ struct ParmParse(Movable):
         return self.query_real_or(String(name), default_value)
 
     def _handle(ref self) raises -> ParmParseHandle:
-        require_live_handle(
+        return require_live_handle(
             self.handle,
             (
                 "ParmParse no longer owns a live AMReX handle. The value may"
                 " have been moved from."
             ),
         )
-        return self.handle

@@ -5,6 +5,7 @@ from amrex.ffi import (
     IntVect3D,
     MFIterHandle,
     MultiFabHandle,
+    OptionalMFIterHandle,
     gpu_num_streams,
     gpu_reset_stream,
     gpu_set_stream_index,
@@ -29,7 +30,7 @@ from std.gpu.host import DeviceContext, DeviceStream
 
 struct MFIter(Movable):
     var runtime: RuntimeLease
-    var handle: MFIterHandle
+    var handle: OptionalMFIterHandle
     var default_ngrow: IntVect3D
 
     def __init__(
@@ -39,12 +40,14 @@ struct MFIter(Movable):
         default_ngrow: IntVect3D,
     ) raises:
         self.runtime = runtime
-        self.handle = handle
+        self.handle = OptionalMFIterHandle(handle)
         self.default_ngrow = default_ngrow.copy()
 
     def __del__(deinit self):
         if self.handle:
-            self.runtime[].lib.call["amrex_mojo_mfiter_destroy"](self.handle)
+            self.runtime[].lib.call["amrex_mojo_mfiter_destroy"](
+                self.handle.value()
+            )
 
     def is_valid(ref self) raises -> Bool:
         var handle = self._handle()
@@ -57,11 +60,11 @@ struct MFIter(Movable):
 
     def index(ref self) raises -> Int:
         self._require_valid()
-        return mfiter_index(self.runtime[].lib, self.handle)
+        return mfiter_index(self.runtime[].lib, self._handle())
 
     def local_tile_index(ref self) raises -> Int:
         self._require_valid()
-        return mfiter_local_tile_index(self.runtime[].lib, self.handle)
+        return mfiter_local_tile_index(self.runtime[].lib, self._handle())
 
     def tilebox(ref self) raises -> Box3D:
         self._require_valid()
@@ -119,14 +122,13 @@ struct MFIter(Movable):
             raise Error("MFIter is not positioned on a valid tile.")
 
     def _handle(ref self) raises -> MFIterHandle:
-        require_live_handle(
+        return require_live_handle(
             self.handle,
             (
                 "MFIter no longer owns a live AMReX handle. The value may have"
                 " been moved from."
             ),
         )
-        return self.handle
 
 
 struct GpuMFIter(Movable):
@@ -200,7 +202,7 @@ struct GpuMFIter(Movable):
         var handle = gpu_stream(self.runtime[].lib)
         if not handle:
             raise Error(last_error_message(self.runtime[].lib))
-        return handle
+        return handle.value()
 
     def stream(ref self, ref ctx: DeviceContext) raises -> DeviceStream:
         _ = require_matching_gpu_context(self.runtime, ctx)
@@ -241,7 +243,7 @@ def create_mfiter(
     var handle = mfiter_create(runtime[].lib, multifab)
     if not handle:
         raise Error(last_error_message(runtime[].lib))
-    return MFIter(runtime, handle, default_ngrow)
+    return MFIter(runtime, handle.value(), default_ngrow)
 
 
 def create_gpu_mfiter(

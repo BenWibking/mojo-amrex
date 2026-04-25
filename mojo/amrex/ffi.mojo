@@ -10,6 +10,20 @@ comptime GeometryHandle = UnsafePointer[NoneType, MutExternalOrigin]
 comptime MultiFabHandle = UnsafePointer[NoneType, MutExternalOrigin]
 comptime MFIterHandle = UnsafePointer[NoneType, MutExternalOrigin]
 comptime ParmParseHandle = UnsafePointer[NoneType, MutExternalOrigin]
+comptime GpuStreamHandle = UnsafePointer[NoneType, MutExternalOrigin]
+
+comptime OptionalRuntimeHandle = Optional[RuntimeHandle]
+comptime OptionalBoxArrayHandle = Optional[BoxArrayHandle]
+comptime OptionalDistributionMappingHandle = Optional[DistributionMappingHandle]
+comptime OptionalGeometryHandle = Optional[GeometryHandle]
+comptime OptionalMultiFabHandle = Optional[MultiFabHandle]
+comptime OptionalMFIterHandle = Optional[MFIterHandle]
+comptime OptionalParmParseHandle = Optional[ParmParseHandle]
+comptime OptionalGpuStreamHandle = Optional[GpuStreamHandle]
+comptime CStringArrayHandle = UnsafePointer[
+    UnsafePointer[c_char, MutAnyOrigin], MutAnyOrigin
+]
+comptime OptionalCStringArrayHandle = Optional[CStringArrayHandle]
 
 comptime GPU_BACKEND_NONE = 0
 comptime GPU_BACKEND_CUDA = 1
@@ -376,27 +390,29 @@ def box3d(
 def last_error_message(ref lib: OwnedDLHandle) raises -> String:
     var message = lib.call[
         "amrex_mojo_last_error_message",
-        UnsafePointer[c_char, ImmutExternalOrigin],
+        Optional[UnsafePointer[c_char, ImmutExternalOrigin]],
     ]()
     if not message:
         return String("AMReX call failed.")
-    return String(unsafe_from_utf8_ptr=message)
+    return String(unsafe_from_utf8_ptr=message.value())
 
 
 def abi_version(ref lib: OwnedDLHandle) raises -> Int:
     return Int(lib.call["amrex_mojo_abi_version", c_int]())
 
 
-def runtime_create(ref lib: OwnedDLHandle) raises -> RuntimeHandle:
-    return lib.call["amrex_mojo_runtime_create_default", RuntimeHandle]()
+def runtime_create(ref lib: OwnedDLHandle) raises -> OptionalRuntimeHandle:
+    return lib.call[
+        "amrex_mojo_runtime_create_default", OptionalRuntimeHandle
+    ]()
 
 
 def runtime_create(
     ref lib: OwnedDLHandle, device_id: Int
-) raises -> RuntimeHandle:
+) raises -> OptionalRuntimeHandle:
     return lib.call[
         "amrex_mojo_runtime_create_default_on_device",
-        RuntimeHandle,
+        OptionalRuntimeHandle,
     ](c_int(device_id))
 
 
@@ -404,12 +420,13 @@ def runtime_create(
     ref lib: OwnedDLHandle,
     argv: List[String],
     use_parmparse: Bool = False,
-) raises -> RuntimeHandle:
+) raises -> OptionalRuntimeHandle:
     var argc = len(argv)
     if argc == 0:
-        return lib.call["amrex_mojo_runtime_create", RuntimeHandle](
+        var argv_null: OptionalCStringArrayHandle = None
+        return lib.call["amrex_mojo_runtime_create", OptionalRuntimeHandle](
             c_int(0),
-            UnsafePointer[UnsafePointer[c_char, MutAnyOrigin], MutAnyOrigin](),
+            argv_null,
             c_int(1 if use_parmparse else 0),
         )
 
@@ -422,7 +439,7 @@ def runtime_create(
     for i in range(1, argc):
         argv_ptrs[i] = argv_storage[i].as_c_string_slice().unsafe_ptr()
 
-    return lib.call["amrex_mojo_runtime_create", RuntimeHandle](
+    return lib.call["amrex_mojo_runtime_create", OptionalRuntimeHandle](
         c_int(argc),
         argv_ptrs.unsafe_ptr(),
         c_int(1 if use_parmparse else 0),
@@ -434,15 +451,16 @@ def runtime_create(
     argv: List[String],
     use_parmparse: Bool,
     device_id: Int,
-) raises -> RuntimeHandle:
+) raises -> OptionalRuntimeHandle:
     var argc = len(argv)
     if argc == 0:
+        var argv_null: OptionalCStringArrayHandle = None
         return lib.call[
             "amrex_mojo_runtime_create_on_device",
-            RuntimeHandle,
+            OptionalRuntimeHandle,
         ](
             c_int(0),
-            UnsafePointer[UnsafePointer[c_char, MutAnyOrigin], MutAnyOrigin](),
+            argv_null,
             c_int(1 if use_parmparse else 0),
             c_int(device_id),
         )
@@ -458,7 +476,7 @@ def runtime_create(
 
     return lib.call[
         "amrex_mojo_runtime_create_on_device",
-        RuntimeHandle,
+        OptionalRuntimeHandle,
     ](
         c_int(argc),
         argv_ptrs.unsafe_ptr(),
@@ -503,10 +521,10 @@ def gpu_reset_stream(ref lib: OwnedDLHandle) raises:
 
 def gpu_stream(
     ref lib: OwnedDLHandle,
-) raises -> UnsafePointer[NoneType, MutExternalOrigin]:
+) raises -> OptionalGpuStreamHandle:
     return lib.call[
         "amrex_mojo_gpu_stream",
-        UnsafePointer[NoneType, MutExternalOrigin],
+        OptionalGpuStreamHandle,
     ]()
 
 
@@ -532,8 +550,10 @@ def parallel_ioprocessor_number(ref lib: OwnedDLHandle) raises -> Int:
 
 def boxarray_create_from_box(
     ref lib: OwnedDLHandle, runtime: RuntimeHandle, domain: Box3D
-) raises -> BoxArrayHandle:
-    return lib.call["amrex_mojo_boxarray_create_from_bounds", BoxArrayHandle](
+) raises -> OptionalBoxArrayHandle:
+    return lib.call[
+        "amrex_mojo_boxarray_create_from_bounds", OptionalBoxArrayHandle
+    ](
         runtime,
         domain.small_end.x,
         domain.small_end.y,
@@ -571,9 +591,10 @@ def distmap_create_from_boxarray(
     ref lib: OwnedDLHandle,
     runtime: RuntimeHandle,
     boxarray: BoxArrayHandle,
-) raises -> DistributionMappingHandle:
+) raises -> OptionalDistributionMappingHandle:
     return lib.call[
-        "amrex_mojo_distmap_create_from_boxarray", DistributionMappingHandle
+        "amrex_mojo_distmap_create_from_boxarray",
+        OptionalDistributionMappingHandle,
     ](runtime, boxarray)
 
 
@@ -585,8 +606,10 @@ def distmap_destroy(
 
 def geometry_create(
     ref lib: OwnedDLHandle, runtime: RuntimeHandle, domain: Box3D
-) raises -> GeometryHandle:
-    return lib.call["amrex_mojo_geometry_create_from_bounds", GeometryHandle](
+) raises -> OptionalGeometryHandle:
+    return lib.call[
+        "amrex_mojo_geometry_create_from_bounds", OptionalGeometryHandle
+    ](
         runtime,
         domain.small_end.x,
         domain.small_end.y,
@@ -606,10 +629,10 @@ def geometry_create(
     domain: Box3D,
     real_box: RealBox3D,
     is_periodic: IntVect3D,
-) raises -> GeometryHandle:
+) raises -> OptionalGeometryHandle:
     return lib.call[
         "amrex_mojo_geometry_create_from_bounds_with_real_box_and_periodicity",
-        GeometryHandle,
+        OptionalGeometryHandle,
     ](
         runtime,
         domain.small_end.x,
@@ -646,10 +669,10 @@ def multifab_create(
     ngrow: IntVect3D,
     host_only: Bool = False,
     datatype: Int = MULTIFAB_DATATYPE_FLOAT64,
-) raises -> MultiFabHandle:
+) raises -> OptionalMultiFabHandle:
     return lib.call[
         "amrex_mojo_multifab_create_with_memory_and_datatype_xyz",
-        MultiFabHandle,
+        OptionalMultiFabHandle,
     ](
         runtime,
         boxarray,
@@ -734,8 +757,8 @@ def multifab_valid_box(
 
 def mfiter_create(
     ref lib: OwnedDLHandle, multifab: MultiFabHandle
-) raises -> MFIterHandle:
-    var out_handle = List[MFIterHandle](length=1, fill=MFIterHandle())
+) raises -> OptionalMFIterHandle:
+    var out_handle = List[OptionalMFIterHandle](length=1, fill=None)
     _ = lib.call["amrex_mojo_mfiter_create", c_int](
         multifab,
         out_handle.unsafe_ptr(),
@@ -894,11 +917,15 @@ def tile_view[
         ncomp_raw.unsafe_ptr(),
     )
 
+    var data = lib.call[
+        "amrex_mojo_multifab_data_ptr",
+        Optional[UnsafePointer[c_double, owner_origin]],
+    ](multifab, c_int(tile_index))
+    if not data:
+        raise Error(last_error_message(lib))
+
     var array_view = Array4F64View[owner_origin](
-        data=lib.call[
-            "amrex_mojo_multifab_data_ptr",
-            UnsafePointer[c_double, owner_origin],
-        ](multifab, c_int(tile_index)),
+        data=data.value(),
         lo_x=data_lo[0],
         lo_y=data_lo[1],
         lo_z=data_lo[2],
@@ -944,11 +971,15 @@ def device_tile_view(
         ncomp_raw.unsafe_ptr(),
     )
 
+    var data = lib.call[
+        "amrex_mojo_multifab_data_ptr_device",
+        Optional[UnsafePointer[c_double, MutAnyOrigin]],
+    ](multifab, c_int(tile_index))
+    if not data:
+        raise Error(last_error_message(lib))
+
     var array_view = Array4F64View[MutAnyOrigin](
-        data=lib.call[
-            "amrex_mojo_multifab_data_ptr_device",
-            UnsafePointer[c_double, MutAnyOrigin],
-        ](multifab, c_int(tile_index)),
+        data=data.value(),
         lo_x=data_lo[0],
         lo_y=data_lo[1],
         lo_z=data_lo[2],
@@ -996,11 +1027,15 @@ def tile_view_f32[
         ncomp_raw.unsafe_ptr(),
     )
 
+    var data = lib.call[
+        "amrex_mojo_multifab_data_ptr_f32",
+        Optional[UnsafePointer[c_float, owner_origin]],
+    ](multifab, c_int(tile_index))
+    if not data:
+        raise Error(last_error_message(lib))
+
     var array_view = Array4F32View[owner_origin](
-        data=lib.call[
-            "amrex_mojo_multifab_data_ptr_f32",
-            UnsafePointer[c_float, owner_origin],
-        ](multifab, c_int(tile_index)),
+        data=data.value(),
         lo_x=data_lo[0],
         lo_y=data_lo[1],
         lo_z=data_lo[2],
@@ -1046,11 +1081,15 @@ def device_tile_view_f32(
         ncomp_raw.unsafe_ptr(),
     )
 
+    var data = lib.call[
+        "amrex_mojo_multifab_data_ptr_device_f32",
+        Optional[UnsafePointer[c_float, MutAnyOrigin]],
+    ](multifab, c_int(tile_index))
+    if not data:
+        raise Error(last_error_message(lib))
+
     var array_view = Array4F32View[MutAnyOrigin](
-        data=lib.call[
-            "amrex_mojo_multifab_data_ptr_device_f32",
-            UnsafePointer[c_float, MutAnyOrigin],
-        ](multifab, c_int(tile_index)),
+        data=data.value(),
         lo_x=data_lo[0],
         lo_y=data_lo[1],
         lo_z=data_lo[2],
@@ -1092,11 +1131,15 @@ def array4_view_from_mfiter[
         ncomp_raw.unsafe_ptr(),
     )
 
+    var data = lib.call[
+        "amrex_mojo_multifab_data_ptr_for_mfiter",
+        Optional[UnsafePointer[c_double, owner_origin]],
+    ](multifab, mfiter)
+    if not data:
+        raise Error(last_error_message(lib))
+
     return Array4F64View[owner_origin](
-        data=lib.call[
-            "amrex_mojo_multifab_data_ptr_for_mfiter",
-            UnsafePointer[c_double, owner_origin],
-        ](multifab, mfiter),
+        data=data.value(),
         lo_x=data_lo[0],
         lo_y=data_lo[1],
         lo_z=data_lo[2],
@@ -1130,11 +1173,15 @@ def device_array4_view_from_mfiter(
         ncomp_raw.unsafe_ptr(),
     )
 
+    var data = lib.call[
+        "amrex_mojo_multifab_data_ptr_for_mfiter_device",
+        Optional[UnsafePointer[c_double, MutAnyOrigin]],
+    ](multifab, mfiter)
+    if not data:
+        raise Error(last_error_message(lib))
+
     return Array4F64View[MutAnyOrigin](
-        data=lib.call[
-            "amrex_mojo_multifab_data_ptr_for_mfiter_device",
-            UnsafePointer[c_double, MutAnyOrigin],
-        ](multifab, mfiter),
+        data=data.value(),
         lo_x=data_lo[0],
         lo_y=data_lo[1],
         lo_z=data_lo[2],
@@ -1170,11 +1217,15 @@ def array4_view_from_mfiter_f32[
         ncomp_raw.unsafe_ptr(),
     )
 
+    var data = lib.call[
+        "amrex_mojo_multifab_data_ptr_for_mfiter_f32",
+        Optional[UnsafePointer[c_float, owner_origin]],
+    ](multifab, mfiter)
+    if not data:
+        raise Error(last_error_message(lib))
+
     return Array4F32View[owner_origin](
-        data=lib.call[
-            "amrex_mojo_multifab_data_ptr_for_mfiter_f32",
-            UnsafePointer[c_float, owner_origin],
-        ](multifab, mfiter),
+        data=data.value(),
         lo_x=data_lo[0],
         lo_y=data_lo[1],
         lo_z=data_lo[2],
@@ -1208,11 +1259,15 @@ def device_array4_view_from_mfiter_f32(
         ncomp_raw.unsafe_ptr(),
     )
 
+    var data = lib.call[
+        "amrex_mojo_multifab_data_ptr_for_mfiter_device_f32",
+        Optional[UnsafePointer[c_float, MutAnyOrigin]],
+    ](multifab, mfiter)
+    if not data:
+        raise Error(last_error_message(lib))
+
     return Array4F32View[MutAnyOrigin](
-        data=lib.call[
-            "amrex_mojo_multifab_data_ptr_for_mfiter_device_f32",
-            UnsafePointer[c_float, MutAnyOrigin],
-        ](multifab, mfiter),
+        data=data.value(),
         lo_x=data_lo[0],
         lo_y=data_lo[1],
         lo_z=data_lo[2],
@@ -1519,17 +1574,17 @@ def multifab_write_single_level_plotfile(
 
 def parmparse_create(
     ref lib: OwnedDLHandle, runtime: RuntimeHandle, prefix: String
-) raises -> ParmParseHandle:
+) raises -> OptionalParmParseHandle:
     var prefix_owned = prefix
-    return lib.call["amrex_mojo_parmparse_create", ParmParseHandle](
+    return lib.call["amrex_mojo_parmparse_create", OptionalParmParseHandle](
         runtime, prefix_owned.as_c_string_slice().unsafe_ptr()
     )
 
 
 def parmparse_create(
     ref lib: OwnedDLHandle, runtime: RuntimeHandle, prefix: StringLiteral
-) raises -> ParmParseHandle:
-    return lib.call["amrex_mojo_parmparse_create", ParmParseHandle](
+) raises -> OptionalParmParseHandle:
+    return lib.call["amrex_mojo_parmparse_create", OptionalParmParseHandle](
         runtime, prefix.as_c_string_slice().unsafe_ptr()
     )
 
