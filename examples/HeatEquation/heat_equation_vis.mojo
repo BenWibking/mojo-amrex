@@ -2,7 +2,6 @@
 
 from amrex.space3d import (
     AmrexRuntime,
-    Array4F64View,
     BoxArray,
     DistributionMapping,
     Geometry,
@@ -21,48 +20,27 @@ from std.python import Python, PythonObject
 from std.python.bindings import PythonModuleBuilder
 
 
-@fieldwise_init
-struct InitializeContext[phi_origin: Origin[mut=True]](Copyable):
-    var phi_old: Array4F64View[Self.phi_origin]
-    var dx: RealVect3D
-
-
-@fieldwise_init
-struct AdvanceContext[
-    dst_origin: Origin[mut=True],
-    src_origin: Origin[mut=True],
-](Copyable):
-    var phi_new: Array4F64View[Self.dst_origin]
-    var phi_old: Array4F64View[Self.src_origin]
-    var dx: RealVect3D
-    var dt: Float64
-
-
 def initialize_phi(mut phi_old: MultiFab, dx: RealVect3D) raises:
     var mfi = phi_old.mfiter()
     while mfi.is_valid():
         var bx = mfi.validbox()
         var phi_old_array = phi_old.array(mfi)
-        var init_ctx = InitializeContext(
-            phi_old=phi_old_array.copy(),
-            dx=dx.copy(),
-        )
+        var tile_dx = dx.copy()
 
-        @parameter
         def initialize_cell(
-            ctx: type_of(init_ctx), i: Int, j: Int, k: Int
-        ) raises:
-            var x = (Float64(i) + 0.5) * ctx.dx.x
-            var y = (Float64(j) + 0.5) * ctx.dx.y
-            var z = (Float64(k) + 0.5) * ctx.dx.z
+            i: Int, j: Int, k: Int
+        ) raises {var phi_old_array^, var tile_dx^}:
+            var x = (Float64(i) + 0.5) * tile_dx.x
+            var y = (Float64(j) + 0.5) * tile_dx.y
+            var z = (Float64(k) + 0.5) * tile_dx.z
             var rsquared = (
                 (x - 0.5) * (x - 0.5)
                 + (y - 0.5) * (y - 0.5)
                 + (z - 0.5) * (z - 0.5)
             ) / 0.01
-            ctx.phi_old[i, j, k] = 1.0 + exp(-rsquared)
+            phi_old_array[i, j, k] = 1.0 + exp(-rsquared)
 
-        ParallelFor[body=initialize_cell](bx, init_ctx)
+        ParallelFor(initialize_cell, bx)
         mfi.next()
 
 
@@ -148,16 +126,13 @@ struct HeatEquationRunner(Movable, Writable):
         var slice_mfi = self.phi_old.mfiter()
         while slice_mfi.is_valid():
             var bx = slice_mfi.validbox()
-            if (
-                self.mid_plane >= Int(bx.small_end.z)
-                and self.mid_plane <= Int(bx.big_end.z)
+            if self.mid_plane >= Int(bx.small_end.z) and self.mid_plane <= Int(
+                bx.big_end.z
             ):
                 var phi_src = self.phi_old.array(slice_mfi)
                 for j in range(Int(bx.small_end.y), Int(bx.big_end.y) + 1):
                     for i in range(Int(bx.small_end.x), Int(bx.big_end.x) + 1):
-                        output_slice[i, j] = phi_src[
-                            i, j, self.mid_plane
-                        ]
+                        output_slice[i, j] = phi_src[i, j, self.mid_plane]
             slice_mfi.next()
         return output_slice
 
@@ -172,39 +147,39 @@ struct HeatEquationRunner(Movable, Writable):
             var bx = update_mfi.validbox()
             var phi_old_array = self.phi_old.array(update_mfi)
             var phi_new_array = self.phi_new.array(update_mfi)
-            var advance_ctx = AdvanceContext(
-                phi_new=phi_new_array.copy(),
-                phi_old=phi_old_array.copy(),
-                dx=self.dx.copy(),
-                dt=self.dt,
-            )
+            var tile_dx = self.dx.copy()
+            var tile_dt = self.dt
 
-            @parameter
             def advance_cell(
-                ctx: type_of(advance_ctx), i: Int, j: Int, k: Int
-            ) raises:
-                ctx.phi_new[i, j, k] = ctx.phi_old[i, j, k] + ctx.dt * (
+                i: Int, j: Int, k: Int
+            ) raises {
+                var phi_new_array^,
+                var phi_old_array^,
+                var tile_dx^,
+                var tile_dt,
+            }:
+                phi_new_array[i, j, k] = phi_old_array[i, j, k] + tile_dt * (
                     (
-                        ctx.phi_old[i + 1, j, k]
-                        - 2.0 * ctx.phi_old[i, j, k]
-                        + ctx.phi_old[i - 1, j, k]
+                        phi_old_array[i + 1, j, k]
+                        - 2.0 * phi_old_array[i, j, k]
+                        + phi_old_array[i - 1, j, k]
                     )
-                    / (ctx.dx.x * ctx.dx.x)
+                    / (tile_dx.x * tile_dx.x)
                     + (
-                        ctx.phi_old[i, j + 1, k]
-                        - 2.0 * ctx.phi_old[i, j, k]
-                        + ctx.phi_old[i, j - 1, k]
+                        phi_old_array[i, j + 1, k]
+                        - 2.0 * phi_old_array[i, j, k]
+                        + phi_old_array[i, j - 1, k]
                     )
-                    / (ctx.dx.y * ctx.dx.y)
+                    / (tile_dx.y * tile_dx.y)
                     + (
-                        ctx.phi_old[i, j, k + 1]
-                        - 2.0 * ctx.phi_old[i, j, k]
-                        + ctx.phi_old[i, j, k - 1]
+                        phi_old_array[i, j, k + 1]
+                        - 2.0 * phi_old_array[i, j, k]
+                        + phi_old_array[i, j, k - 1]
                     )
-                    / (ctx.dx.z * ctx.dx.z)
+                    / (tile_dx.z * tile_dx.z)
                 )
 
-            ParallelFor[body=advance_cell](bx, advance_ctx)
+            ParallelFor(advance_cell, bx)
             update_mfi.next()
 
         self.phi_old.copy_from(self.phi_new, 0, 0, 1)
@@ -240,9 +215,7 @@ struct HeatEquationRunner(Movable, Writable):
         return PythonObject(self_ptr[].current_step)
 
     @staticmethod
-    def nsteps_py(
-        self_ptr: UnsafePointer[Self, MutAnyOrigin]
-    ) -> PythonObject:
+    def nsteps_py(self_ptr: UnsafePointer[Self, MutAnyOrigin]) -> PythonObject:
         return PythonObject(self_ptr[].nsteps)
 
     def write_to(self, mut writer: Some[Writer]):

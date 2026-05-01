@@ -10,8 +10,6 @@ from amrex.ffi import (
     MultiFabHandle,
     TileF32View,
     TileF64View,
-    device_tile_view,
-    device_tile_view_f32,
     device_array4_view_from_mfiter,
     device_array4_view_from_mfiter_f32,
     array4_view_from_mfiter_f32,
@@ -36,8 +34,6 @@ from amrex.ffi import (
     multifab_tile_box,
     multifab_valid_box,
     multifab_write_single_level_plotfile,
-    tile_view_f32,
-    tile_view,
 )
 from amrex.ownership import require_live_handle
 from amrex.runtime import AmrexRuntime, RuntimeLease
@@ -139,13 +135,6 @@ struct MultiFab(Movable):
 
     def array[
         owner_origin: Origin[mut=True]
-    ](ref[owner_origin] self, tile_index: Int) raises -> Array4F64View[
-        owner_origin
-    ]:
-        return self.tile(tile_index).array()
-
-    def array[
-        owner_origin: Origin[mut=True]
     ](ref[owner_origin] self, ref mfi: MFIter) raises -> Array4F64View[
         owner_origin
     ]:
@@ -157,18 +146,6 @@ struct MultiFab(Movable):
         owner_origin
     ]:
         return self.tile(mfi).array()
-
-    def unsafe_device_array(
-        ref self, tile_index: Int
-    ) raises -> Array4F64View[MutAnyOrigin]:
-        self._require_tile_index(tile_index)
-        var handle = self._handle()
-        var array_view = device_tile_view(
-            self.runtime[].lib, handle, tile_index
-        ).array()
-        if not array_view.data:
-            raise Error(last_error_message(self.runtime[].lib))
-        return array_view.copy()
 
     def unsafe_device_array(
         ref self, ref mfi: MFIter
@@ -191,20 +168,6 @@ struct MultiFab(Movable):
         if not array_view.data:
             raise Error(last_error_message(self.runtime[].lib))
         return array_view.copy()
-
-    def tile[
-        owner_origin: Origin[mut=True]
-    ](ref[owner_origin] self, tile_index: Int) raises -> TileF64View[
-        owner_origin
-    ]:
-        self._require_tile_index(tile_index)
-        var handle = self._handle()
-        var tile = tile_view[owner_origin](
-            self.runtime[].lib, handle, tile_index
-        )
-        if not tile.array_view.data:
-            raise Error(last_error_message(self.runtime[].lib))
-        return tile.copy()
 
     def tile[
         owner_origin: Origin[mut=True]
@@ -253,8 +216,10 @@ struct MultiFab(Movable):
             TileF64View[borrow_origin]
         ) raises thin -> None
     ](mut self) raises:
-        for tile_index in range(self.tile_count()):
-            tile_func(self.tile(tile_index))
+        var mfi = self.mfiter()
+        while mfi.is_valid():
+            tile_func(self.tile(mfi))
+            mfi.next()
 
     def min(ref self, comp: Int) raises -> Float64:
         var handle = self._handle()
@@ -537,13 +502,6 @@ struct MultiFabF32(Movable):
 
     def array[
         owner_origin: Origin[mut=True]
-    ](ref[owner_origin] self, tile_index: Int) raises -> Array4F32View[
-        owner_origin
-    ]:
-        return self.tile(tile_index).array()
-
-    def array[
-        owner_origin: Origin[mut=True]
     ](ref[owner_origin] self, ref mfi: MFIter) raises -> Array4F32View[
         owner_origin
     ]:
@@ -555,18 +513,6 @@ struct MultiFabF32(Movable):
         owner_origin
     ]:
         return self.tile(mfi).array()
-
-    def unsafe_device_array(
-        ref self, tile_index: Int
-    ) raises -> Array4F32View[MutAnyOrigin]:
-        self._require_tile_index(tile_index)
-        var handle = self._handle()
-        var array_view = device_tile_view_f32(
-            self.runtime[].lib, handle, tile_index
-        ).array()
-        if not array_view.data:
-            raise Error(last_error_message(self.runtime[].lib))
-        return array_view.copy()
 
     def unsafe_device_array(
         ref self, ref mfi: MFIter
@@ -589,20 +535,6 @@ struct MultiFabF32(Movable):
         if not array_view.data:
             raise Error(last_error_message(self.runtime[].lib))
         return array_view.copy()
-
-    def tile[
-        owner_origin: Origin[mut=True]
-    ](ref[owner_origin] self, tile_index: Int) raises -> TileF32View[
-        owner_origin
-    ]:
-        self._require_tile_index(tile_index)
-        var handle = self._handle()
-        var tile = tile_view_f32[owner_origin](
-            self.runtime[].lib, handle, tile_index
-        )
-        if not tile.array_view.data:
-            raise Error(last_error_message(self.runtime[].lib))
-        return tile.copy()
 
     def tile[
         owner_origin: Origin[mut=True]
@@ -651,8 +583,10 @@ struct MultiFabF32(Movable):
             TileF32View[borrow_origin]
         ) raises thin -> None
     ](mut self) raises:
-        for tile_index in range(self.tile_count()):
-            tile_func(self.tile(tile_index))
+        var mfi = self.mfiter()
+        while mfi.is_valid():
+            tile_func(self.tile(mfi))
+            mfi.next()
 
     def min(ref self, comp: Int) raises -> Float64:
         var handle = self._handle()

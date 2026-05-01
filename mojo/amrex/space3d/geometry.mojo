@@ -53,31 +53,19 @@ struct Geometry(Movable):
 
     def domain(ref self) raises -> Box3D:
         var handle = self._handle()
-        var result = geometry_domain(self.runtime[].lib, handle)
-        if result.status != 0:
-            raise Error(last_error_message(self.runtime[].lib))
-        return result.value.copy()
+        return geometry_domain(self.runtime[].lib, handle)
 
     def prob_domain(ref self) raises -> RealBox3D:
         var handle = self._handle()
-        var result = geometry_prob_domain(self.runtime[].lib, handle)
-        if result.status != 0:
-            raise Error(last_error_message(self.runtime[].lib))
-        return result.value.copy()
+        return geometry_prob_domain(self.runtime[].lib, handle)
 
     def cell_size(ref self) raises -> RealVect3D:
         var handle = self._handle()
-        var result = geometry_cell_size(self.runtime[].lib, handle)
-        if result.status != 0:
-            raise Error(last_error_message(self.runtime[].lib))
-        return result.value.copy()
+        return geometry_cell_size(self.runtime[].lib, handle)
 
     def periodicity(ref self) raises -> IntVect3D:
         var handle = self._handle()
-        var result = geometry_periodicity(self.runtime[].lib, handle)
-        if result.status != 0:
-            raise Error(last_error_message(self.runtime[].lib))
-        return result.value.copy()
+        return geometry_periodicity(self.runtime[].lib, handle)
 
     def _handle(ref self) raises -> GeometryHandle:
         require_live_handle(

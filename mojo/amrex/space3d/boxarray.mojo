@@ -47,10 +47,9 @@ struct BoxArray(Movable):
 
     def box(ref self, index: Int) raises -> Box3D:
         var handle = self._handle()
-        var result = boxarray_box(self.runtime[].lib, handle, index)
-        if result.status != 0:
-            raise Error(last_error_message(self.runtime[].lib))
-        return result.value.copy()
+        if index < 0 or index >= self.size():
+            raise Error("BoxArray box index is out of range.")
+        return boxarray_box(self.runtime[].lib, handle, index)
 
     def _handle(ref self) raises -> BoxArrayHandle:
         require_live_handle(

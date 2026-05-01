@@ -1,15 +1,14 @@
 from std.collections import List
 
 
-def apply[body: def() raises capturing -> String]() raises -> String:
+def apply[body_type: def() raises -> String](body: body_type) raises -> String:
     return body()
 
 
 def main() raises:
     var src = List[String](length=1, fill=String("x"))
 
-    @parameter
-    def compute() raises -> String:
-        return src[0]
+    def compute() raises {var src^} -> String:
+        return src[0].copy()
 
-    print(apply[compute]())
+    print(apply(compute))

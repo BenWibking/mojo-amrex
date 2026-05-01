@@ -79,12 +79,107 @@ namespace
         }
     }
 
-    auto has_nonzero_ghost_cells(const amrex_mojo_multifab_t* multifab) -> bool
+    auto box_from_metadata(const int32_t* lo, const int32_t* hi, const int32_t* nodal)
+        -> amrex_mojo_box_3d
     {
-        const auto tile_count = amrex_mojo_multifab_tile_count(multifab);
-        for (int tile_index = 0; tile_index < tile_count; ++tile_index) {
-            const auto valid_box = amrex_mojo_multifab_valid_box(multifab, tile_index);
-            const auto array4 = amrex_mojo_multifab_array4(multifab, tile_index);
+        return amrex_mojo_box_3d{
+            amrex_mojo_intvect_3d{lo[0], lo[1], lo[2]},
+            amrex_mojo_intvect_3d{hi[0], hi[1], hi[2]},
+            amrex_mojo_intvect_3d{nodal[0], nodal[1], nodal[2]}
+        };
+    }
+
+    auto array4_from_mfiter(
+        const amrex_mojo_multifab_t* multifab,
+        const amrex_mojo_mfiter_t* mfiter
+    ) -> amrex_mojo_array4_view_f64
+    {
+        amrex_mojo_array4_view_f64 view{};
+        int32_t data_lo[3] = {0, 0, 0};
+        int32_t data_hi[3] = {0, 0, 0};
+        int64_t stride[4] = {0, 0, 0, 0};
+        int32_t ncomp = 0;
+        expect(
+            amrex_mojo_multifab_array4_metadata_for_mfiter(
+                multifab,
+                mfiter,
+                data_lo,
+                data_hi,
+                stride,
+                &ncomp
+            ) == AMREX_MOJO_STATUS_OK,
+            "multifab_array4_metadata_for_mfiter failed."
+        );
+        view.data = amrex_mojo_multifab_data_ptr_for_mfiter(multifab, mfiter);
+        view.lo_x = data_lo[0];
+        view.lo_y = data_lo[1];
+        view.lo_z = data_lo[2];
+        view.hi_x = data_hi[0];
+        view.hi_y = data_hi[1];
+        view.hi_z = data_hi[2];
+        view.stride_i = stride[0];
+        view.stride_j = stride[1];
+        view.stride_k = stride[2];
+        view.stride_n = stride[3];
+        view.ncomp = ncomp;
+        return view;
+    }
+
+    auto array4_f32_from_mfiter(
+        const amrex_mojo_multifab_t* multifab,
+        const amrex_mojo_mfiter_t* mfiter
+    ) -> amrex_mojo_array4_view_f32
+    {
+        amrex_mojo_array4_view_f32 view{};
+        int32_t data_lo[3] = {0, 0, 0};
+        int32_t data_hi[3] = {0, 0, 0};
+        int64_t stride[4] = {0, 0, 0, 0};
+        int32_t ncomp = 0;
+        expect(
+            amrex_mojo_multifab_array4_metadata_for_mfiter(
+                multifab,
+                mfiter,
+                data_lo,
+                data_hi,
+                stride,
+                &ncomp
+            ) == AMREX_MOJO_STATUS_OK,
+            "Float32 multifab_array4_metadata_for_mfiter failed."
+        );
+        view.data = amrex_mojo_multifab_data_ptr_for_mfiter_f32(multifab, mfiter);
+        view.lo_x = data_lo[0];
+        view.lo_y = data_lo[1];
+        view.lo_z = data_lo[2];
+        view.hi_x = data_hi[0];
+        view.hi_y = data_hi[1];
+        view.hi_z = data_hi[2];
+        view.stride_i = stride[0];
+        view.stride_j = stride[1];
+        view.stride_k = stride[2];
+        view.stride_n = stride[3];
+        view.ncomp = ncomp;
+        return view;
+    }
+
+    auto has_nonzero_ghost_cells(amrex_mojo_multifab_t* multifab) -> bool
+    {
+        amrex_mojo_mfiter_t* mfiter = nullptr;
+        expect(
+            amrex_mojo_mfiter_create(multifab, &mfiter) == AMREX_MOJO_STATUS_OK &&
+                mfiter != nullptr,
+            "has_nonzero_ghost_cells mfiter_create failed."
+        );
+        while (amrex_mojo_mfiter_is_valid(mfiter) != 0) {
+            int32_t valid_lo[3] = {0, 0, 0};
+            int32_t valid_hi[3] = {0, 0, 0};
+            int32_t nodal[3] = {0, 0, 0};
+            expect(
+                amrex_mojo_mfiter_valid_box_metadata(mfiter, valid_lo, valid_hi, nodal) ==
+                    AMREX_MOJO_STATUS_OK,
+                "mfiter_valid_box_metadata failed."
+            );
+            const auto valid_box = box_from_metadata(valid_lo, valid_hi, nodal);
+            const auto array4 = array4_from_mfiter(multifab, mfiter);
             for (int k = array4.lo_z; k <= array4.hi_z; ++k) {
                 for (int j = array4.lo_y; j <= array4.hi_y; ++j) {
                     for (int i = array4.lo_x; i <= array4.hi_x; ++i) {
@@ -93,13 +188,16 @@ namespace
                             j >= valid_box.small_end.y && j <= valid_box.big_end.y &&
                             k >= valid_box.small_end.z && k <= valid_box.big_end.z;
                         if (!in_valid && !close_enough(array4_value(array4, i, j, k), 0.0)) {
+                            amrex_mojo_mfiter_destroy(mfiter);
                             return true;
                         }
                     }
                 }
             }
+            expect(amrex_mojo_mfiter_next(mfiter) == AMREX_MOJO_STATUS_OK, "mfiter_next failed.");
         }
 
+        amrex_mojo_mfiter_destroy(mfiter);
         return false;
     }
 }
@@ -333,15 +431,23 @@ auto main() -> int
         "multifab_memory_info should succeed for host_only allocation."
     );
     expect(host_memory.host_accessible == 1, "host_only multifab should be host-accessible.");
+    amrex_mojo_mfiter_t* host_device_mfiter = nullptr;
     expect(
-        amrex_mojo_multifab_data_ptr_device(host_multifab, 0) == nullptr,
-        "host_only multifab_data_ptr_device should reject non-device storage."
+        amrex_mojo_mfiter_create(host_multifab, &host_device_mfiter) == AMREX_MOJO_STATUS_OK &&
+            host_device_mfiter != nullptr,
+        "host_only device access mfiter_create failed."
+    );
+    expect(
+        amrex_mojo_multifab_data_ptr_for_mfiter_device(host_multifab, host_device_mfiter) ==
+            nullptr,
+        "host_only multifab_data_ptr_for_mfiter_device should reject non-device storage."
     );
     expect(
         std::string(amrex_mojo_last_error_message()).find("device-accessible") !=
             std::string::npos,
-        "multifab_data_ptr_device should report a device-accessibility diagnostic."
+        "multifab_data_ptr_for_mfiter_device should report a device-accessibility diagnostic."
     );
+    amrex_mojo_mfiter_destroy(host_device_mfiter);
 
     expect(
         amrex_mojo_multifab_set_val(multifab, 2.0, 0, 1) == AMREX_MOJO_STATUS_OK,
@@ -358,10 +464,23 @@ auto main() -> int
     expect(close_enough(amrex_mojo_multifab_max(multifab, 0), 2.0), "multifab_max mismatch.");
     expect(close_enough(amrex_mojo_multifab_norm0(multifab, 0), 2.0), "multifab_norm0 mismatch.");
 
-    amrex_mojo_array4_view_f64 array4 = amrex_mojo_multifab_array4(multifab, 0);
+    amrex_mojo_mfiter_t* default_array_mfiter = nullptr;
+    expect(
+        amrex_mojo_mfiter_create(multifab, &default_array_mfiter) == AMREX_MOJO_STATUS_OK &&
+            default_array_mfiter != nullptr,
+        "default multifab array mfiter_create failed."
+    );
+    amrex_mojo_array4_view_f64 array4 = array4_from_mfiter(multifab, default_array_mfiter);
     expect(array4.data != nullptr, "multifab_array4 should return a live data pointer.");
+    amrex_mojo_mfiter_destroy(default_array_mfiter);
 
-    array4 = amrex_mojo_multifab_array4(host_multifab, 0);
+    amrex_mojo_mfiter_t* host_array_mfiter = nullptr;
+    expect(
+        amrex_mojo_mfiter_create(host_multifab, &host_array_mfiter) == AMREX_MOJO_STATUS_OK &&
+            host_array_mfiter != nullptr,
+        "host_only array mfiter_create failed."
+    );
+    array4 = array4_from_mfiter(host_multifab, host_array_mfiter);
     expect(array4.data != nullptr, "host_only multifab_array4 should return a live data pointer.");
     expect(array4.ncomp == 1, "multifab_array4 should report one component.");
     array4.data[0] = 3.0;
@@ -369,6 +488,7 @@ auto main() -> int
         close_enough(amrex_mojo_multifab_max(host_multifab, 0), 3.0),
         "array4 write should change max for host_only multifab."
     );
+    amrex_mojo_mfiter_destroy(host_array_mfiter);
 
     amrex_mojo_multifab_t* float_multifab =
         amrex_mojo_multifab_create_with_memory_and_datatype_xyz(
@@ -391,23 +511,22 @@ auto main() -> int
         amrex_mojo_multifab_set_val(float_multifab, 1.5, 0, 1) == AMREX_MOJO_STATUS_OK,
         "Float32 multifab set_val failed."
     );
-    expect(
-        amrex_mojo_multifab_array4(float_multifab, 0).data == nullptr,
-        "Float32 multifab_array4 should reject Float64 view access."
-    );
-    auto float_array4 = amrex_mojo_multifab_array4_f32(float_multifab, 0);
-    expect(float_array4.data != nullptr, "Float32 multifab_array4_f32 should return a live pointer.");
-    float_array4.data[0] = 2.5f;
-    expect(
-        close_enough(amrex_mojo_multifab_max(float_multifab, 0), 2.5),
-        "Float32 array4 write should change the multifab max."
-    );
-
     amrex_mojo_mfiter_t* float_mfiter = nullptr;
     expect(
         amrex_mojo_mfiter_create(float_multifab, &float_mfiter) == AMREX_MOJO_STATUS_OK &&
             float_mfiter != nullptr,
         "Float32 mfiter_create failed."
+    );
+    expect(
+        amrex_mojo_multifab_data_ptr_for_mfiter(float_multifab, float_mfiter) == nullptr,
+        "Float32 multifab_data_ptr_for_mfiter should reject Float64 view access."
+    );
+    auto float_array4 = array4_f32_from_mfiter(float_multifab, float_mfiter);
+    expect(float_array4.data != nullptr, "Float32 multifab_array4_f32 should return a live pointer.");
+    float_array4.data[0] = 2.5f;
+    expect(
+        close_enough(amrex_mojo_multifab_max(float_multifab, 0), 2.5),
+        "Float32 array4 write should change the multifab max."
     );
     expect(
         amrex_mojo_multifab_data_ptr_for_mfiter_f32(float_multifab, float_mfiter) != nullptr,
@@ -479,15 +598,31 @@ auto main() -> int
         "comm_destination set_val failed."
     );
 
-    for (int tile_index = 0; tile_index < amrex_mojo_multifab_tile_count(comm_source); ++tile_index) {
-        const auto tile_box = amrex_mojo_multifab_tile_box(comm_source, tile_index);
-        const auto tile_array = amrex_mojo_multifab_array4(comm_source, tile_index);
+    amrex_mojo_mfiter_t* comm_mfiter = nullptr;
+    expect(
+        amrex_mojo_mfiter_create(comm_source, &comm_mfiter) == AMREX_MOJO_STATUS_OK &&
+            comm_mfiter != nullptr,
+        "comm_source mfiter_create failed."
+    );
+    while (amrex_mojo_mfiter_is_valid(comm_mfiter) != 0) {
+        int32_t tile_lo[3] = {0, 0, 0};
+        int32_t tile_hi[3] = {0, 0, 0};
+        int32_t nodal[3] = {0, 0, 0};
+        expect(
+            amrex_mojo_mfiter_tile_box_metadata(comm_mfiter, tile_lo, tile_hi, nodal) ==
+                AMREX_MOJO_STATUS_OK,
+            "comm_source mfiter_tile_box_metadata failed."
+        );
+        const auto tile_box = box_from_metadata(tile_lo, tile_hi, nodal);
+        const auto tile_array = array4_from_mfiter(comm_source, comm_mfiter);
         fill_valid_box(
             tile_array,
             tile_box,
             static_cast<double>(amrex_mojo_parallel_myproc() + 1)
         );
+        expect(amrex_mojo_mfiter_next(comm_mfiter) == AMREX_MOJO_STATUS_OK, "mfiter_next failed.");
     }
+    amrex_mojo_mfiter_destroy(comm_mfiter);
 
     expect(!has_nonzero_ghost_cells(comm_source), "comm_source ghosts should start at zero.");
     expect(

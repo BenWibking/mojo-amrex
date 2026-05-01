@@ -1,6 +1,5 @@
 from amrex.space3d import (
     AmrexRuntime,
-    Array4F64View,
     BoxArray,
     DistributionMapping,
     Geometry,
@@ -11,16 +10,6 @@ from amrex.space3d import (
     intvect3d,
     ParallelFor,
 )
-
-
-@fieldwise_init
-struct UpdateTileContext[
-    dst_origin: Origin[mut=True],
-    src_origin: Origin[mut=True],
-](Copyable):
-    var dst_array: Array4F64View[Self.dst_origin]
-    var src_array: Array4F64View[Self.src_origin]
-    var fill_value: Int
 
 
 def fill_tile[
@@ -49,9 +38,7 @@ def main() raises:
         var multifab = MultiFab(
             runtime, boxarray, distmap, 1, intvect3d(1, 1, 1)
         )
-        var source = MultiFab(
-            runtime, boxarray, distmap, 1, intvect3d(1, 1, 1)
-        )
+        var source = MultiFab(runtime, boxarray, distmap, 1, intvect3d(1, 1, 1))
 
         var parmparse_prefix = String("multifab_smoke")
         var tile_fill_name = String("tile_fill_value")
@@ -71,21 +58,15 @@ def main() raises:
             var grown_box = mfi.growntilebox()
             var dst_array = multifab.array(mfi)
             var src_array = source.array(mfi)
-            var update_ctx = UpdateTileContext(
-                dst_array=dst_array.copy(),
-                src_array=src_array.copy(),
-                fill_value=fill_value,
-            )
 
-            @parameter
             def update_tile(
-                ctx: type_of(update_ctx), i: Int, j: Int, k: Int
-            ) raises:
-                ctx.dst_array[i, j, k] = ctx.src_array[i, j, k] + Float64(
-                    ctx.fill_value - 1
+                i: Int, j: Int, k: Int
+            ) raises {var dst_array^, var src_array^, var fill_value}:
+                dst_array[i, j, k] = src_array[i, j, k] + Float64(
+                    fill_value - 1
                 )
 
-            ParallelFor[body=update_tile](tile_box, update_ctx)
+            ParallelFor(update_tile, tile_box)
             mfi.next()
 
         var ntile = multifab.tile_count()

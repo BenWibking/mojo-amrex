@@ -6,7 +6,7 @@
 extern "C" {
 #endif
 
-#define AMREX_MOJO_ABI_VERSION 5
+#define AMREX_MOJO_ABI_VERSION 6
 
 typedef struct amrex_mojo_runtime amrex_mojo_runtime_t;
 typedef struct amrex_mojo_boxarray amrex_mojo_boxarray_t;
@@ -335,36 +335,6 @@ amrex_mojo_box_3d amrex_mojo_multifab_tile_box(
 amrex_mojo_box_3d amrex_mojo_multifab_valid_box(
     const amrex_mojo_multifab_t* multifab,
     int32_t tile_index
-);
-amrex_mojo_array4_view_f64 amrex_mojo_multifab_array4(
-    const amrex_mojo_multifab_t* multifab,
-    int32_t tile_index
-);
-double* amrex_mojo_multifab_data_ptr(const amrex_mojo_multifab_t* multifab, int32_t tile_index);
-amrex_mojo_array4_view_f32 amrex_mojo_multifab_array4_f32(
-    const amrex_mojo_multifab_t* multifab,
-    int32_t tile_index
-);
-float* amrex_mojo_multifab_data_ptr_f32(const amrex_mojo_multifab_t* multifab, int32_t tile_index);
-double* amrex_mojo_multifab_data_ptr_device(
-    const amrex_mojo_multifab_t* multifab,
-    int32_t tile_index
-);
-float* amrex_mojo_multifab_data_ptr_device_f32(
-    const amrex_mojo_multifab_t* multifab,
-    int32_t tile_index
-);
-amrex_mojo_status_code_t amrex_mojo_multifab_tile_metadata(
-    const amrex_mojo_multifab_t* multifab,
-    int32_t tile_index,
-    int32_t* tile_lo,
-    int32_t* tile_hi,
-    int32_t* valid_lo,
-    int32_t* valid_hi,
-    int32_t* data_lo,
-    int32_t* data_hi,
-    int64_t* stride,
-    int32_t* out_ncomp
 );
 amrex_mojo_status_code_t amrex_mojo_multifab_array4_metadata_for_mfiter(
     const amrex_mojo_multifab_t* multifab,

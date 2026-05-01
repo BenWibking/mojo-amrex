@@ -63,7 +63,7 @@ struct Box3D(DevicePassable, TrivialRegisterPassable):
 
 
 @fieldwise_init
-struct RealBox3D(Copyable):
+struct RealBox3D(Copyable, RegisterPassable):
     var lo_x: Float64
     var lo_y: Float64
     var lo_z: Float64
@@ -73,7 +73,7 @@ struct RealBox3D(Copyable):
 
 
 @fieldwise_init
-struct RealVect3D(Copyable):
+struct RealVect3D(Copyable, RegisterPassable):
     var x: Float64
     var y: Float64
     var z: Float64
@@ -97,24 +97,6 @@ struct ParmParseRealQueryResult(Copyable):
 struct Box3DResult(Copyable):
     var status: Int
     var value: Box3D
-
-
-@fieldwise_init
-struct RealBox3DResult(Copyable):
-    var status: Int
-    var value: RealBox3D
-
-
-@fieldwise_init
-struct RealVect3DResult(Copyable):
-    var status: Int
-    var value: RealVect3D
-
-
-@fieldwise_init
-struct IntVect3DResult(Copyable):
-    var status: Int
-    var value: IntVect3D
 
 
 @fieldwise_init
@@ -533,18 +515,10 @@ def parallel_ioprocessor_number(ref lib: OwnedDLHandle) raises -> Int:
 def boxarray_create_from_box(
     ref lib: OwnedDLHandle, runtime: RuntimeHandle, domain: Box3D
 ) raises -> BoxArrayHandle:
-    return lib.call["amrex_mojo_boxarray_create_from_bounds", BoxArrayHandle](
-        runtime,
-        domain.small_end.x,
-        domain.small_end.y,
-        domain.small_end.z,
-        domain.big_end.x,
-        domain.big_end.y,
-        domain.big_end.z,
-        domain.nodal.x,
-        domain.nodal.y,
-        domain.nodal.z,
-    )
+    var f = lib.get_function[
+        def(RuntimeHandle, Box3D) thin abi("C") -> BoxArrayHandle
+    ]("amrex_mojo_boxarray_create_from_box")
+    return f(runtime, domain)
 
 
 def boxarray_destroy(ref lib: OwnedDLHandle, boxarray: BoxArrayHandle) raises:
@@ -554,11 +528,10 @@ def boxarray_destroy(ref lib: OwnedDLHandle, boxarray: BoxArrayHandle) raises:
 def boxarray_max_size(
     ref lib: OwnedDLHandle, boxarray: BoxArrayHandle, max_size: IntVect3D
 ) raises -> Int:
-    return Int(
-        lib.call["amrex_mojo_boxarray_max_size_xyz", c_int](
-            boxarray, max_size.x, max_size.y, max_size.z
-        )
-    )
+    var f = lib.get_function[
+        def(BoxArrayHandle, IntVect3D) thin abi("C") -> c_int
+    ]("amrex_mojo_boxarray_max_size")
+    return Int(f(boxarray, max_size))
 
 
 def boxarray_size(
@@ -586,18 +559,10 @@ def distmap_destroy(
 def geometry_create(
     ref lib: OwnedDLHandle, runtime: RuntimeHandle, domain: Box3D
 ) raises -> GeometryHandle:
-    return lib.call["amrex_mojo_geometry_create_from_bounds", GeometryHandle](
-        runtime,
-        domain.small_end.x,
-        domain.small_end.y,
-        domain.small_end.z,
-        domain.big_end.x,
-        domain.big_end.y,
-        domain.big_end.z,
-        domain.nodal.x,
-        domain.nodal.y,
-        domain.nodal.z,
-    )
+    var f = lib.get_function[
+        def(RuntimeHandle, Box3D) thin abi("C") -> GeometryHandle
+    ]("amrex_mojo_geometry_create")
+    return f(runtime, domain)
 
 
 def geometry_create(
@@ -607,30 +572,12 @@ def geometry_create(
     real_box: RealBox3D,
     is_periodic: IntVect3D,
 ) raises -> GeometryHandle:
-    return lib.call[
-        "amrex_mojo_geometry_create_from_bounds_with_real_box_and_periodicity",
-        GeometryHandle,
-    ](
-        runtime,
-        domain.small_end.x,
-        domain.small_end.y,
-        domain.small_end.z,
-        domain.big_end.x,
-        domain.big_end.y,
-        domain.big_end.z,
-        domain.nodal.x,
-        domain.nodal.y,
-        domain.nodal.z,
-        c_double(real_box.lo_x),
-        c_double(real_box.lo_y),
-        c_double(real_box.lo_z),
-        c_double(real_box.hi_x),
-        c_double(real_box.hi_y),
-        c_double(real_box.hi_z),
-        is_periodic.x,
-        is_periodic.y,
-        is_periodic.z,
-    )
+    var f = lib.get_function[
+        def(
+            RuntimeHandle, Box3D, RealBox3D, IntVect3D
+        ) thin abi("C") -> GeometryHandle
+    ]("amrex_mojo_geometry_create_with_real_box_and_periodicity")
+    return f(runtime, domain, real_box, is_periodic)
 
 
 def geometry_destroy(ref lib: OwnedDLHandle, geometry: GeometryHandle) raises:
@@ -647,17 +594,23 @@ def multifab_create(
     host_only: Bool = False,
     datatype: Int = MULTIFAB_DATATYPE_FLOAT64,
 ) raises -> MultiFabHandle:
-    return lib.call[
-        "amrex_mojo_multifab_create_with_memory_and_datatype_xyz",
-        MultiFabHandle,
-    ](
+    var f = lib.get_function[
+        def(
+            RuntimeHandle,
+            BoxArrayHandle,
+            DistributionMappingHandle,
+            c_int,
+            IntVect3D,
+            c_int,
+            c_int,
+        ) thin abi("C") -> MultiFabHandle
+    ]("amrex_mojo_multifab_create_with_memory_and_datatype")
+    return f(
         runtime,
         boxarray,
         distmap,
         c_int(ncomp),
-        ngrow.x,
-        ngrow.y,
-        ngrow.z,
+        ngrow,
         c_int(1 if host_only else 0),
         c_int(datatype),
     )
@@ -719,17 +672,19 @@ def multifab_tile_count(
 def multifab_tile_box(
     ref lib: OwnedDLHandle, multifab: MultiFabHandle, tile_index: Int
 ) raises -> Box3D:
-    return lib.call["amrex_mojo_multifab_tile_box", Box3D](
-        multifab, c_int(tile_index)
+    var f = lib.get_function[def(MultiFabHandle, c_int) thin abi("C") -> Box3D](
+        "amrex_mojo_multifab_tile_box"
     )
+    return f(multifab, c_int(tile_index))
 
 
 def multifab_valid_box(
     ref lib: OwnedDLHandle, multifab: MultiFabHandle, tile_index: Int
 ) raises -> Box3D:
-    return lib.call["amrex_mojo_multifab_valid_box", Box3D](
-        multifab, c_int(tile_index)
+    var f = lib.get_function[def(MultiFabHandle, c_int) thin abi("C") -> Box3D](
+        "amrex_mojo_multifab_valid_box"
     )
+    return f(multifab, c_int(tile_index))
 
 
 def mfiter_create(
@@ -864,210 +819,6 @@ def box_from_parts(
         nodal=intvect3d(
             Int(nodal_raw[0]), Int(nodal_raw[1]), Int(nodal_raw[2])
         ),
-    )
-
-
-def tile_view[
-    owner_origin: Origin[mut=True]
-](
-    ref lib: OwnedDLHandle, multifab: MultiFabHandle, tile_index: Int
-) raises -> TileF64View[owner_origin]:
-    var tile_lo = List[c_int](length=3, fill=0)
-    var tile_hi = List[c_int](length=3, fill=0)
-    var valid_lo = List[c_int](length=3, fill=0)
-    var valid_hi = List[c_int](length=3, fill=0)
-    var data_lo = List[c_int](length=3, fill=0)
-    var data_hi = List[c_int](length=3, fill=0)
-    var stride = List[Int64](length=4, fill=0)
-    var ncomp_raw = List[c_int](length=1, fill=0)
-
-    _ = lib.call["amrex_mojo_multifab_tile_metadata", c_int](
-        multifab,
-        c_int(tile_index),
-        tile_lo.unsafe_ptr(),
-        tile_hi.unsafe_ptr(),
-        valid_lo.unsafe_ptr(),
-        valid_hi.unsafe_ptr(),
-        data_lo.unsafe_ptr(),
-        data_hi.unsafe_ptr(),
-        stride.unsafe_ptr(),
-        ncomp_raw.unsafe_ptr(),
-    )
-
-    var array_view = Array4F64View[owner_origin](
-        data=lib.call[
-            "amrex_mojo_multifab_data_ptr",
-            UnsafePointer[c_double, owner_origin],
-        ](multifab, c_int(tile_index)),
-        lo_x=data_lo[0],
-        lo_y=data_lo[1],
-        lo_z=data_lo[2],
-        hi_x=data_hi[0],
-        hi_y=data_hi[1],
-        hi_z=data_hi[2],
-        stride_i=stride[0],
-        stride_j=stride[1],
-        stride_k=stride[2],
-        stride_n=stride[3],
-        ncomp=ncomp_raw[0],
-    )
-
-    return TileF64View[owner_origin](
-        tile_box=box_from_bounds(tile_lo, tile_hi),
-        valid_box=box_from_bounds(valid_lo, valid_hi),
-        array_view=array_view.copy(),
-    )
-
-
-def device_tile_view(
-    ref lib: OwnedDLHandle, multifab: MultiFabHandle, tile_index: Int
-) raises -> TileF64View[MutAnyOrigin]:
-    var tile_lo = List[c_int](length=3, fill=0)
-    var tile_hi = List[c_int](length=3, fill=0)
-    var valid_lo = List[c_int](length=3, fill=0)
-    var valid_hi = List[c_int](length=3, fill=0)
-    var data_lo = List[c_int](length=3, fill=0)
-    var data_hi = List[c_int](length=3, fill=0)
-    var stride = List[Int64](length=4, fill=0)
-    var ncomp_raw = List[c_int](length=1, fill=0)
-
-    _ = lib.call["amrex_mojo_multifab_tile_metadata", c_int](
-        multifab,
-        c_int(tile_index),
-        tile_lo.unsafe_ptr(),
-        tile_hi.unsafe_ptr(),
-        valid_lo.unsafe_ptr(),
-        valid_hi.unsafe_ptr(),
-        data_lo.unsafe_ptr(),
-        data_hi.unsafe_ptr(),
-        stride.unsafe_ptr(),
-        ncomp_raw.unsafe_ptr(),
-    )
-
-    var array_view = Array4F64View[MutAnyOrigin](
-        data=lib.call[
-            "amrex_mojo_multifab_data_ptr_device",
-            UnsafePointer[c_double, MutAnyOrigin],
-        ](multifab, c_int(tile_index)),
-        lo_x=data_lo[0],
-        lo_y=data_lo[1],
-        lo_z=data_lo[2],
-        hi_x=data_hi[0],
-        hi_y=data_hi[1],
-        hi_z=data_hi[2],
-        stride_i=stride[0],
-        stride_j=stride[1],
-        stride_k=stride[2],
-        stride_n=stride[3],
-        ncomp=ncomp_raw[0],
-    )
-
-    return TileF64View[MutAnyOrigin](
-        tile_box=box_from_bounds(tile_lo, tile_hi),
-        valid_box=box_from_bounds(valid_lo, valid_hi),
-        array_view=array_view.copy(),
-    )
-
-
-def tile_view_f32[
-    owner_origin: Origin[mut=True]
-](
-    ref lib: OwnedDLHandle, multifab: MultiFabHandle, tile_index: Int
-) raises -> TileF32View[owner_origin]:
-    var tile_lo = List[c_int](length=3, fill=0)
-    var tile_hi = List[c_int](length=3, fill=0)
-    var valid_lo = List[c_int](length=3, fill=0)
-    var valid_hi = List[c_int](length=3, fill=0)
-    var data_lo = List[c_int](length=3, fill=0)
-    var data_hi = List[c_int](length=3, fill=0)
-    var stride = List[Int64](length=4, fill=0)
-    var ncomp_raw = List[c_int](length=1, fill=0)
-
-    _ = lib.call["amrex_mojo_multifab_tile_metadata", c_int](
-        multifab,
-        c_int(tile_index),
-        tile_lo.unsafe_ptr(),
-        tile_hi.unsafe_ptr(),
-        valid_lo.unsafe_ptr(),
-        valid_hi.unsafe_ptr(),
-        data_lo.unsafe_ptr(),
-        data_hi.unsafe_ptr(),
-        stride.unsafe_ptr(),
-        ncomp_raw.unsafe_ptr(),
-    )
-
-    var array_view = Array4F32View[owner_origin](
-        data=lib.call[
-            "amrex_mojo_multifab_data_ptr_f32",
-            UnsafePointer[c_float, owner_origin],
-        ](multifab, c_int(tile_index)),
-        lo_x=data_lo[0],
-        lo_y=data_lo[1],
-        lo_z=data_lo[2],
-        hi_x=data_hi[0],
-        hi_y=data_hi[1],
-        hi_z=data_hi[2],
-        stride_i=stride[0],
-        stride_j=stride[1],
-        stride_k=stride[2],
-        stride_n=stride[3],
-        ncomp=ncomp_raw[0],
-    )
-
-    return TileF32View[owner_origin](
-        tile_box=box_from_bounds(tile_lo, tile_hi),
-        valid_box=box_from_bounds(valid_lo, valid_hi),
-        array_view=array_view.copy(),
-    )
-
-
-def device_tile_view_f32(
-    ref lib: OwnedDLHandle, multifab: MultiFabHandle, tile_index: Int
-) raises -> TileF32View[MutAnyOrigin]:
-    var tile_lo = List[c_int](length=3, fill=0)
-    var tile_hi = List[c_int](length=3, fill=0)
-    var valid_lo = List[c_int](length=3, fill=0)
-    var valid_hi = List[c_int](length=3, fill=0)
-    var data_lo = List[c_int](length=3, fill=0)
-    var data_hi = List[c_int](length=3, fill=0)
-    var stride = List[Int64](length=4, fill=0)
-    var ncomp_raw = List[c_int](length=1, fill=0)
-
-    _ = lib.call["amrex_mojo_multifab_tile_metadata", c_int](
-        multifab,
-        c_int(tile_index),
-        tile_lo.unsafe_ptr(),
-        tile_hi.unsafe_ptr(),
-        valid_lo.unsafe_ptr(),
-        valid_hi.unsafe_ptr(),
-        data_lo.unsafe_ptr(),
-        data_hi.unsafe_ptr(),
-        stride.unsafe_ptr(),
-        ncomp_raw.unsafe_ptr(),
-    )
-
-    var array_view = Array4F32View[MutAnyOrigin](
-        data=lib.call[
-            "amrex_mojo_multifab_data_ptr_device_f32",
-            UnsafePointer[c_float, MutAnyOrigin],
-        ](multifab, c_int(tile_index)),
-        lo_x=data_lo[0],
-        lo_y=data_lo[1],
-        lo_z=data_lo[2],
-        hi_x=data_hi[0],
-        hi_y=data_hi[1],
-        hi_z=data_hi[2],
-        stride_i=stride[0],
-        stride_j=stride[1],
-        stride_k=stride[2],
-        stride_n=stride[3],
-        ncomp=ncomp_raw[0],
-    )
-
-    return TileF32View[MutAnyOrigin](
-        tile_box=box_from_bounds(tile_lo, tile_hi),
-        valid_box=box_from_bounds(valid_lo, valid_hi),
-        array_view=array_view.copy(),
     )
 
 
@@ -1235,108 +986,47 @@ def multifab_sum(
 
 def boxarray_box(
     ref lib: OwnedDLHandle, boxarray: BoxArrayHandle, index: Int
-) raises -> Box3DResult:
-    var small_end = List[c_int](length=3, fill=0)
-    var big_end = List[c_int](length=3, fill=0)
-    var nodal = List[c_int](length=3, fill=0)
-    var status = Int(
-        lib.call["amrex_mojo_boxarray_box_metadata", c_int](
-            boxarray,
-            c_int(index),
-            small_end.unsafe_ptr(),
-            big_end.unsafe_ptr(),
-            nodal.unsafe_ptr(),
-        )
+) raises -> Box3D:
+    var f = lib.get_function[def(BoxArrayHandle, c_int) thin abi("C") -> Box3D](
+        "amrex_mojo_boxarray_box"
     )
-    return Box3DResult(
-        status=status,
-        value=box_from_parts(small_end, big_end, nodal),
-    )
+    return f(boxarray, c_int(index))
 
 
 def geometry_domain(
     ref lib: OwnedDLHandle, geometry: GeometryHandle
-) raises -> Box3DResult:
-    var small_end = List[c_int](length=3, fill=0)
-    var big_end = List[c_int](length=3, fill=0)
-    var nodal = List[c_int](length=3, fill=0)
-    var status = Int(
-        lib.call["amrex_mojo_geometry_domain_metadata", c_int](
-            geometry,
-            small_end.unsafe_ptr(),
-            big_end.unsafe_ptr(),
-            nodal.unsafe_ptr(),
-        )
+) raises -> Box3D:
+    var f = lib.get_function[def(GeometryHandle) thin abi("C") -> Box3D](
+        "amrex_mojo_geometry_domain"
     )
-    return Box3DResult(
-        status=status,
-        value=box_from_parts(small_end, big_end, nodal),
-    )
+    return f(geometry)
 
 
 def geometry_prob_domain(
     ref lib: OwnedDLHandle, geometry: GeometryHandle
-) raises -> RealBox3DResult:
-    var lo = List[Float64](length=3, fill=0.0)
-    var hi = List[Float64](length=3, fill=0.0)
-    var status = Int(
-        lib.call["amrex_mojo_geometry_prob_domain_metadata", c_int](
-            geometry,
-            lo.unsafe_ptr(),
-            hi.unsafe_ptr(),
-        )
+) raises -> RealBox3D:
+    var f = lib.get_function[def(GeometryHandle) thin abi("C") -> RealBox3D](
+        "amrex_mojo_geometry_prob_domain"
     )
-    return RealBox3DResult(
-        status=status,
-        value=RealBox3D(
-            lo_x=lo[0],
-            lo_y=lo[1],
-            lo_z=lo[2],
-            hi_x=hi[0],
-            hi_y=hi[1],
-            hi_z=hi[2],
-        ),
-    )
+    return f(geometry)
 
 
 def geometry_cell_size(
     ref lib: OwnedDLHandle, geometry: GeometryHandle
-) raises -> RealVect3DResult:
-    var cell_size = List[Float64](length=3, fill=0.0)
-    var status = Int(
-        lib.call["amrex_mojo_geometry_cell_size_data", c_int](
-            geometry,
-            cell_size.unsafe_ptr(),
-        )
+) raises -> RealVect3D:
+    var f = lib.get_function[def(GeometryHandle) thin abi("C") -> RealVect3D](
+        "amrex_mojo_geometry_cell_size"
     )
-    return RealVect3DResult(
-        status=status,
-        value=RealVect3D(
-            x=cell_size[0],
-            y=cell_size[1],
-            z=cell_size[2],
-        ),
-    )
+    return f(geometry)
 
 
 def geometry_periodicity(
     ref lib: OwnedDLHandle, geometry: GeometryHandle
-) raises -> IntVect3DResult:
-    var periodicity = List[c_int](length=3, fill=0)
-    var status = Int(
-        lib.call["amrex_mojo_geometry_periodicity_data", c_int](
-            geometry,
-            periodicity.unsafe_ptr(),
-        )
+) raises -> IntVect3D:
+    var f = lib.get_function[def(GeometryHandle) thin abi("C") -> IntVect3D](
+        "amrex_mojo_geometry_periodicity"
     )
-    return IntVect3DResult(
-        status=status,
-        value=intvect3d(
-            Int(periodicity[0]),
-            Int(periodicity[1]),
-            Int(periodicity[2]),
-        ),
-    )
+    return f(geometry)
 
 
 def multifab_min(
@@ -1383,14 +1073,13 @@ def multifab_plus(
     ncomp: Int,
     ngrow: IntVect3D,
 ) raises -> Int:
+    var f = lib.get_function[
+        def(
+            MultiFabHandle, c_double, c_int, c_int, IntVect3D
+        ) thin abi("C") -> c_int
+    ]("amrex_mojo_multifab_plus")
     return Int(
-        lib.call["amrex_mojo_multifab_plus", c_int](
-            multifab,
-            c_double(value),
-            c_int(start_comp),
-            c_int(ncomp),
-            ngrow,
-        )
+        f(multifab, c_double(value), c_int(start_comp), c_int(ncomp), ngrow)
     )
 
 
@@ -1402,14 +1091,13 @@ def multifab_mult(
     ncomp: Int,
     ngrow: IntVect3D,
 ) raises -> Int:
+    var f = lib.get_function[
+        def(
+            MultiFabHandle, c_double, c_int, c_int, IntVect3D
+        ) thin abi("C") -> c_int
+    ]("amrex_mojo_multifab_mult")
     return Int(
-        lib.call["amrex_mojo_multifab_mult", c_int](
-            multifab,
-            c_double(value),
-            c_int(start_comp),
-            c_int(ncomp),
-            ngrow,
-        )
+        f(multifab, c_double(value), c_int(start_comp), c_int(ncomp), ngrow)
     )
 
 
@@ -1422,8 +1110,13 @@ def multifab_copy(
     ncomp: Int,
     ngrow: IntVect3D,
 ) raises -> Int:
+    var f = lib.get_function[
+        def(
+            MultiFabHandle, MultiFabHandle, c_int, c_int, c_int, IntVect3D
+        ) thin abi("C") -> c_int
+    ]("amrex_mojo_multifab_copy")
     return Int(
-        lib.call["amrex_mojo_multifab_copy", c_int](
+        f(
             dst_multifab,
             src_multifab,
             c_int(src_comp),
@@ -1445,8 +1138,20 @@ def multifab_parallel_copy(
     src_ngrow: IntVect3D,
     dst_ngrow: IntVect3D,
 ) raises -> Int:
+    var f = lib.get_function[
+        def(
+            MultiFabHandle,
+            MultiFabHandle,
+            GeometryHandle,
+            c_int,
+            c_int,
+            c_int,
+            IntVect3D,
+            IntVect3D,
+        ) thin abi("C") -> c_int
+    ]("amrex_mojo_multifab_parallel_copy")
     return Int(
-        lib.call["amrex_mojo_multifab_parallel_copy", c_int](
+        f(
             dst_multifab,
             src_multifab,
             geometry,
