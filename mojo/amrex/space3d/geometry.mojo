@@ -4,6 +4,7 @@ from amrex.ffi import (
     Box3D,
     GeometryHandle,
     IntVect3D,
+    OptionalGeometryHandle,
     RealBox3D,
     RealVect3D,
     geometry_cell_size,
@@ -19,7 +20,7 @@ from amrex.runtime import AmrexRuntime, RuntimeLease
 
 struct Geometry(Movable):
     var runtime: RuntimeLease
-    var handle: GeometryHandle
+    var handle: OptionalGeometryHandle
 
     def __init__(out self, ref runtime: AmrexRuntime, domain: Box3D) raises:
         self.runtime = runtime._lease()
@@ -49,7 +50,9 @@ struct Geometry(Movable):
 
     def __del__(deinit self):
         if self.handle:
-            self.runtime[].lib.call["amrex_mojo_geometry_destroy"](self.handle)
+            self.runtime[].lib.call["amrex_mojo_geometry_destroy"](
+                self.handle.value()
+            )
 
     def domain(ref self) raises -> Box3D:
         var handle = self._handle()
@@ -68,11 +71,10 @@ struct Geometry(Movable):
         return geometry_periodicity(self.runtime[].lib, handle)
 
     def _handle(ref self) raises -> GeometryHandle:
-        require_live_handle(
+        return require_live_handle(
             self.handle,
             (
                 "Geometry no longer owns a live AMReX handle. The value may"
                 " have been moved from."
             ),
         )
-        return self.handle

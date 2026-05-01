@@ -2,7 +2,9 @@
 
 
 def require_live_handle(
-    handle: UnsafePointer[NoneType, MutExternalOrigin], message: StringLiteral
-) raises:
+    handle: Optional[UnsafePointer[NoneType, MutExternalOrigin]],
+    message: StringLiteral,
+) raises -> UnsafePointer[NoneType, MutExternalOrigin]:
     if not handle:
         raise Error(message)
+    return handle.value()

@@ -5,6 +5,8 @@ from amrex.ffi import (
     BoxArrayHandle,
     DistributionMappingHandle,
     IntVect3D,
+    OptionalBoxArrayHandle,
+    OptionalDistributionMappingHandle,
     boxarray_box,
     boxarray_create_from_box,
     boxarray_max_size,
@@ -19,7 +21,7 @@ from amrex.runtime import AmrexRuntime, RuntimeLease
 
 struct BoxArray(Movable):
     var runtime: RuntimeLease
-    var handle: BoxArrayHandle
+    var handle: OptionalBoxArrayHandle
 
     def __init__(out self, ref runtime: AmrexRuntime, domain: Box3D) raises:
         self.runtime = runtime._lease()
@@ -31,7 +33,9 @@ struct BoxArray(Movable):
 
     def __del__(deinit self):
         if self.handle:
-            self.runtime[].lib.call["amrex_mojo_boxarray_destroy"](self.handle)
+            self.runtime[].lib.call["amrex_mojo_boxarray_destroy"](
+                self.handle.value()
+            )
 
     def max_size(mut self, max_size: IntVect3D) raises:
         var handle = self._handle()
@@ -52,19 +56,18 @@ struct BoxArray(Movable):
         return boxarray_box(self.runtime[].lib, handle, index)
 
     def _handle(ref self) raises -> BoxArrayHandle:
-        require_live_handle(
+        return require_live_handle(
             self.handle,
             (
                 "BoxArray no longer owns a live AMReX handle. The value may"
                 " have been moved from."
             ),
         )
-        return self.handle
 
 
 struct DistributionMapping(Movable):
     var runtime: RuntimeLease
-    var handle: DistributionMappingHandle
+    var handle: OptionalDistributionMappingHandle
 
     def __init__(
         out self, ref runtime: AmrexRuntime, ref boxarray: BoxArray
@@ -78,14 +81,15 @@ struct DistributionMapping(Movable):
 
     def __del__(deinit self):
         if self.handle:
-            self.runtime[].lib.call["amrex_mojo_distmap_destroy"](self.handle)
+            self.runtime[].lib.call["amrex_mojo_distmap_destroy"](
+                self.handle.value()
+            )
 
     def _handle(ref self) raises -> DistributionMappingHandle:
-        require_live_handle(
+        return require_live_handle(
             self.handle,
             (
                 "DistributionMapping no longer owns a live AMReX handle. The"
                 " value may have been moved from."
             ),
         )
-        return self.handle

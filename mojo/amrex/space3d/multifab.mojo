@@ -8,6 +8,7 @@ from amrex.ffi import (
     MULTIFAB_DATATYPE_FLOAT32,
     MultiFabMemoryInfo,
     MultiFabHandle,
+    OptionalMultiFabHandle,
     TileF32View,
     TileF64View,
     device_array4_view_from_mfiter,
@@ -49,7 +50,7 @@ from amrex.space3d.mfiter import (
 
 struct MultiFab(Movable):
     var runtime: RuntimeLease
-    var handle: MultiFabHandle
+    var handle: OptionalMultiFabHandle
     var ngrow_vect: IntVect3D
 
     def __init__(
@@ -77,7 +78,9 @@ struct MultiFab(Movable):
 
     def __del__(deinit self):
         if self.handle:
-            self.runtime[].lib.call["amrex_mojo_multifab_destroy"](self.handle)
+            self.runtime[].lib.call["amrex_mojo_multifab_destroy"](
+                self.handle.value()
+            )
 
     def ncomp(ref self) raises -> Int:
         var handle = self._handle()
@@ -154,8 +157,6 @@ struct MultiFab(Movable):
         var array_view = device_array4_view_from_mfiter(
             self.runtime[].lib, handle, mfi._handle()
         )
-        if not array_view.data:
-            raise Error(last_error_message(self.runtime[].lib))
         return array_view.copy()
 
     def unsafe_device_array(
@@ -165,8 +166,6 @@ struct MultiFab(Movable):
         var array_view = device_array4_view_from_mfiter(
             self.runtime[].lib, handle, mfi._handle()
         )
-        if not array_view.data:
-            raise Error(last_error_message(self.runtime[].lib))
         return array_view.copy()
 
     def tile[
@@ -182,8 +181,6 @@ struct MultiFab(Movable):
             handle,
             mfi._handle(),
         )
-        if not array_view.data:
-            raise Error(last_error_message(self.runtime[].lib))
         return TileF64View[owner_origin](
             tile_box=tile_box,
             valid_box=valid_box,
@@ -203,8 +200,6 @@ struct MultiFab(Movable):
             handle,
             mfi._handle(),
         )
-        if not array_view.data:
-            raise Error(last_error_message(self.runtime[].lib))
         return TileF64View[owner_origin](
             tile_box=tile_box,
             valid_box=valid_box,
@@ -403,19 +398,18 @@ struct MultiFab(Movable):
             raise Error("tile index is out of range.")
 
     def _handle(ref self) raises -> MultiFabHandle:
-        require_live_handle(
+        return require_live_handle(
             self.handle,
             (
                 "MultiFab no longer owns a live AMReX handle. The value may"
                 " have been moved from."
             ),
         )
-        return self.handle
 
 
 struct MultiFabF32(Movable):
     var runtime: RuntimeLease
-    var handle: MultiFabHandle
+    var handle: OptionalMultiFabHandle
     var ngrow_vect: IntVect3D
 
     def __init__(
@@ -444,7 +438,9 @@ struct MultiFabF32(Movable):
 
     def __del__(deinit self):
         if self.handle:
-            self.runtime[].lib.call["amrex_mojo_multifab_destroy"](self.handle)
+            self.runtime[].lib.call["amrex_mojo_multifab_destroy"](
+                self.handle.value()
+            )
 
     def ncomp(ref self) raises -> Int:
         var handle = self._handle()
@@ -521,8 +517,6 @@ struct MultiFabF32(Movable):
         var array_view = device_array4_view_from_mfiter_f32(
             self.runtime[].lib, handle, mfi._handle()
         )
-        if not array_view.data:
-            raise Error(last_error_message(self.runtime[].lib))
         return array_view.copy()
 
     def unsafe_device_array(
@@ -532,8 +526,6 @@ struct MultiFabF32(Movable):
         var array_view = device_array4_view_from_mfiter_f32(
             self.runtime[].lib, handle, mfi._handle()
         )
-        if not array_view.data:
-            raise Error(last_error_message(self.runtime[].lib))
         return array_view.copy()
 
     def tile[
@@ -549,8 +541,6 @@ struct MultiFabF32(Movable):
             handle,
             mfi._handle(),
         )
-        if not array_view.data:
-            raise Error(last_error_message(self.runtime[].lib))
         return TileF32View[owner_origin](
             tile_box=tile_box,
             valid_box=valid_box,
@@ -570,8 +560,6 @@ struct MultiFabF32(Movable):
             handle,
             mfi._handle(),
         )
-        if not array_view.data:
-            raise Error(last_error_message(self.runtime[].lib))
         return TileF32View[owner_origin](
             tile_box=tile_box,
             valid_box=valid_box,
@@ -770,11 +758,10 @@ struct MultiFabF32(Movable):
             raise Error("tile index is out of range.")
 
     def _handle(ref self) raises -> MultiFabHandle:
-        require_live_handle(
+        return require_live_handle(
             self.handle,
             (
                 "MultiFabF32 no longer owns a live AMReX handle. The value may"
                 " have been moved from."
             ),
         )
-        return self.handle

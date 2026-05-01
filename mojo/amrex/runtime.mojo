@@ -3,6 +3,7 @@ from amrex.ffi import (
     GPU_BACKEND_HIP,
     GPU_BACKEND_NONE,
     RuntimeHandle,
+    OptionalRuntimeHandle,
     abi_version,
     gpu_backend as ffi_gpu_backend,
     gpu_device_id as ffi_gpu_device_id,
@@ -78,7 +79,7 @@ def require_matching_gpu_context(
 @explicit_destroy("Must call close() on AmrexRuntime")
 struct AmrexRuntime(Movable):
     var state: RuntimeLease
-    var handle: RuntimeHandle
+    var handle: OptionalRuntimeHandle
 
     def __init__(out self) raises:
         var path = default_library_path()
@@ -86,8 +87,11 @@ struct AmrexRuntime(Movable):
         var handle = runtime_create(lib)
         if not handle:
             raise Error(last_error_message(lib))
-        self.state = RuntimeLease(_AmrexRuntimeState(lib^, handle, path^))
-        self.handle = handle
+        var runtime_handle = handle.value()
+        self.state = RuntimeLease(
+            _AmrexRuntimeState(lib^, runtime_handle, path^)
+        )
+        self.handle = OptionalRuntimeHandle(runtime_handle)
 
     def __init__(
         out self, argv: List[String], use_parmparse: Bool = False
@@ -97,8 +101,11 @@ struct AmrexRuntime(Movable):
         var handle = runtime_create(lib, argv, use_parmparse)
         if not handle:
             raise Error(last_error_message(lib))
-        self.state = RuntimeLease(_AmrexRuntimeState(lib^, handle, path^))
-        self.handle = handle
+        var runtime_handle = handle.value()
+        self.state = RuntimeLease(
+            _AmrexRuntimeState(lib^, runtime_handle, path^)
+        )
+        self.handle = OptionalRuntimeHandle(runtime_handle)
 
     def __init__(out self, path: String) raises:
         var path_owned = path.copy()
@@ -106,8 +113,11 @@ struct AmrexRuntime(Movable):
         var handle = runtime_create(lib)
         if not handle:
             raise Error(last_error_message(lib))
-        self.state = RuntimeLease(_AmrexRuntimeState(lib^, handle, path_owned^))
-        self.handle = handle
+        var runtime_handle = handle.value()
+        self.state = RuntimeLease(
+            _AmrexRuntimeState(lib^, runtime_handle, path_owned^)
+        )
+        self.handle = OptionalRuntimeHandle(runtime_handle)
 
     def __init__(
         out self, path: String, argv: List[String], use_parmparse: Bool = False
@@ -117,8 +127,11 @@ struct AmrexRuntime(Movable):
         var handle = runtime_create(lib, argv, use_parmparse)
         if not handle:
             raise Error(last_error_message(lib))
-        self.state = RuntimeLease(_AmrexRuntimeState(lib^, handle, path_owned^))
-        self.handle = handle
+        var runtime_handle = handle.value()
+        self.state = RuntimeLease(
+            _AmrexRuntimeState(lib^, runtime_handle, path_owned^)
+        )
+        self.handle = OptionalRuntimeHandle(runtime_handle)
 
     def __init__(out self, device_id: Int) raises:
         var path = default_library_path()
@@ -126,8 +139,11 @@ struct AmrexRuntime(Movable):
         var handle = runtime_create(lib, device_id)
         if not handle:
             raise Error(last_error_message(lib))
-        self.state = RuntimeLease(_AmrexRuntimeState(lib^, handle, path^))
-        self.handle = handle
+        var runtime_handle = handle.value()
+        self.state = RuntimeLease(
+            _AmrexRuntimeState(lib^, runtime_handle, path^)
+        )
+        self.handle = OptionalRuntimeHandle(runtime_handle)
 
     def __init__(
         out self,
@@ -140,8 +156,11 @@ struct AmrexRuntime(Movable):
         var handle = runtime_create(lib, argv, use_parmparse, device_id)
         if not handle:
             raise Error(last_error_message(lib))
-        self.state = RuntimeLease(_AmrexRuntimeState(lib^, handle, path^))
-        self.handle = handle
+        var runtime_handle = handle.value()
+        self.state = RuntimeLease(
+            _AmrexRuntimeState(lib^, runtime_handle, path^)
+        )
+        self.handle = OptionalRuntimeHandle(runtime_handle)
 
     def __init__(out self, path: String, device_id: Int) raises:
         var path_owned = path.copy()
@@ -149,8 +168,11 @@ struct AmrexRuntime(Movable):
         var handle = runtime_create(lib, device_id)
         if not handle:
             raise Error(last_error_message(lib))
-        self.state = RuntimeLease(_AmrexRuntimeState(lib^, handle, path_owned^))
-        self.handle = handle
+        var runtime_handle = handle.value()
+        self.state = RuntimeLease(
+            _AmrexRuntimeState(lib^, runtime_handle, path_owned^)
+        )
+        self.handle = OptionalRuntimeHandle(runtime_handle)
 
     def __init__(
         out self,
@@ -164,8 +186,11 @@ struct AmrexRuntime(Movable):
         var handle = runtime_create(lib, argv, use_parmparse, device_id)
         if not handle:
             raise Error(last_error_message(lib))
-        self.state = RuntimeLease(_AmrexRuntimeState(lib^, handle, path_owned^))
-        self.handle = handle
+        var runtime_handle = handle.value()
+        self.state = RuntimeLease(
+            _AmrexRuntimeState(lib^, runtime_handle, path_owned^)
+        )
+        self.handle = OptionalRuntimeHandle(runtime_handle)
 
     def abi_version(ref self) raises -> Int:
         var state = self._lease()
@@ -232,7 +257,7 @@ struct AmrexRuntime(Movable):
         var handle = ffi_gpu_stream(state[].lib)
         if not handle:
             raise Error(last_error_message(state[].lib))
-        return handle
+        return handle.value()
 
     def gpu_synchronize_active_streams(ref self) raises:
         var state = self._lease()
@@ -240,7 +265,7 @@ struct AmrexRuntime(Movable):
             raise Error(last_error_message(state[].lib))
 
     def _lease(ref self) raises -> RuntimeLease:
-        require_live_handle(
+        _ = require_live_handle(
             self.handle,
             (
                 "AmrexRuntime no longer owns a live AMReX runtime. The value"
@@ -251,8 +276,10 @@ struct AmrexRuntime(Movable):
 
     def _handle(ref self) raises -> RuntimeHandle:
         _ = self._lease()
-        return self.handle
+        return self.handle.value()
 
     def close(deinit self):
         if self.handle:
-            self.state[].lib.call["amrex_mojo_runtime_destroy"](self.handle)
+            self.state[].lib.call["amrex_mojo_runtime_destroy"](
+                self.handle.value()
+            )
