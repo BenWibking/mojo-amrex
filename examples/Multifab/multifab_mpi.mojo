@@ -160,16 +160,16 @@ def main() raises:
 
         var distmap = DistributionMapping(runtime, boxarray)
         var geometry = Geometry(runtime, domain)
-        var source = MultiFab(
-            runtime, boxarray, distmap, 1, intvect3d(1, 1, 1)
-        )
+        var source = MultiFab(runtime, boxarray, distmap, 1, intvect3d(1, 1, 1))
         var destination = MultiFab(
             runtime, boxarray, distmap, 1, intvect3d(1, 1, 1)
         )
 
         source.set_val(0.0)
         destination.set_val(0.0)
-        expect(source.tile_count() > 0, "each rank should own at least one tile")
+        expect(
+            source.tile_count() > 0, "each rank should own at least one tile"
+        )
 
         var mfi = source.mfiter()
         while mfi.is_valid():

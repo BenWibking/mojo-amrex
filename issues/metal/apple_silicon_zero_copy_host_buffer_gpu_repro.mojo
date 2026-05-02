@@ -28,7 +28,7 @@ def init_device_passable_value[
 
 
 @fieldwise_init
-struct BufferViewF32(TrivialRegisterPassable, DevicePassable):
+struct BufferViewF32(DevicePassable, TrivialRegisterPassable):
     comptime device_type = Self
 
     var data: UnsafePointer[c_float, MutAnyOrigin]
@@ -36,10 +36,7 @@ struct BufferViewF32(TrivialRegisterPassable, DevicePassable):
 
     def _to_device_type[
         mut_origin: Origin[mut=True]
-    ](
-        self,
-        target: UnsafePointer[NoneType, mut_origin],
-    ):
+    ](self, target: UnsafePointer[NoneType, mut_origin],):
         init_device_passable_value(self, target)
 
     @staticmethod
@@ -106,7 +103,8 @@ def fill_with_gpu_staged(
 def main() raises:
     if not has_accelerator():
         raise Error(
-            "issues/apple_silicon_zero_copy_host_buffer_gpu_repro.mojo requires a Mojo-supported accelerator."
+            "issues/apple_silicon_zero_copy_host_buffer_gpu_repro.mojo requires"
+            " a Mojo-supported accelerator."
         )
 
     var zero_copy_storage = List[c_float](length=ELEMENT_COUNT, fill=0.0)
