@@ -44,17 +44,13 @@ def fill_box_value[
                 array[i, j, k] = value
 
 
-def slab_fill_value(
-    box: Box3D, left_value: Int, right_value: Int
-) raises -> Float64:
+def slab_fill_value(box: Box3D, left_value: Int, right_value: Int) raises -> Float64:
     if Int(box.small_end.x) == 0:
         return Float64(left_value)
     return Float64(right_value)
 
 
-def slab_neighbor_value(
-    box: Box3D, left_value: Int, right_value: Int
-) raises -> Float64:
+def slab_neighbor_value(box: Box3D, left_value: Int, right_value: Int) raises -> Float64:
     if Int(box.small_end.x) == 0:
         return Float64(right_value)
     return Float64(left_value)
@@ -78,17 +74,12 @@ def has_nonzero_ghost_cells(mut multifab: MultiFab) raises -> Bool:
         var fab_box = mfi.fabbox()
         var array = multifab.array(mfi)
         for k in range(Int(fab_box.small_end.z), Int(fab_box.big_end.z) + 1):
-            for j in range(
-                Int(fab_box.small_end.y), Int(fab_box.big_end.y) + 1
-            ):
+            for j in range(Int(fab_box.small_end.y), Int(fab_box.big_end.y) + 1):
                 for i in range(
                     Int(fab_box.small_end.x),
                     Int(fab_box.big_end.x) + 1,
                 ):
-                    if (
-                        not box_contains(valid_box, i, j, k)
-                        and array[i, j, k] != 0.0
-                    ):
+                    if not box_contains(valid_box, i, j, k) and array[i, j, k] != 0.0:
                         return True
         mfi.next()
 
@@ -111,16 +102,11 @@ def interface_ghost_sample(mut multifab: MultiFab) raises -> Float64:
     raise Error("expected a local tile touching the slab interface")
 
 
-def interface_expected_value(
-    mut multifab: MultiFab, left_value: Int, right_value: Int
-) raises -> Float64:
+def interface_expected_value(mut multifab: MultiFab, left_value: Int, right_value: Int) raises -> Float64:
     var mfi = multifab.mfiter()
     while mfi.is_valid():
         var valid_box = mfi.validbox()
-        if (
-            Int(valid_box.small_end.x) == 0
-            or Int(valid_box.big_end.x) == DOMAIN_EXTENT - 1
-        ):
+        if Int(valid_box.small_end.x) == 0 or Int(valid_box.big_end.x) == DOMAIN_EXTENT - 1:
             return slab_neighbor_value(valid_box, left_value, right_value)
         mfi.next()
 
@@ -145,9 +131,7 @@ def main() raises:
 
         var domain = box3d(
             small_end=intvect3d(0, 0, 0),
-            big_end=intvect3d(
-                DOMAIN_EXTENT - 1, DOMAIN_EXTENT - 1, DOMAIN_EXTENT - 1
-            ),
+            big_end=intvect3d(DOMAIN_EXTENT - 1, DOMAIN_EXTENT - 1, DOMAIN_EXTENT - 1),
         )
 
         var boxarray = BoxArray(runtime, domain)
@@ -161,15 +145,11 @@ def main() raises:
         var distmap = DistributionMapping(runtime, boxarray)
         var geometry = Geometry(runtime, domain)
         var source = MultiFab(runtime, boxarray, distmap, 1, intvect3d(1, 1, 1))
-        var destination = MultiFab(
-            runtime, boxarray, distmap, 1, intvect3d(1, 1, 1)
-        )
+        var destination = MultiFab(runtime, boxarray, distmap, 1, intvect3d(1, 1, 1))
 
         source.set_val(0.0)
         destination.set_val(0.0)
-        expect(
-            source.tile_count() > 0, "each rank should own at least one tile"
-        )
+        expect(source.tile_count() > 0, "each rank should own at least one tile")
 
         var mfi = source.mfiter()
         while mfi.is_valid():
@@ -182,9 +162,7 @@ def main() raises:
             mfi.next()
 
         source.fill_boundary(geometry)
-        var expected_ghost = interface_expected_value(
-            source, left_value, right_value
-        )
+        var expected_ghost = interface_expected_value(source, left_value, right_value)
         var source_ghost = interface_ghost_sample(source)
         expect_close(
             source_ghost,
@@ -212,9 +190,7 @@ def main() raises:
         )
 
         var expected_sum = Float64(CELLS_PER_SLAB * (left_value + right_value))
-        expect_close(
-            source.sum(0), expected_sum, 1.0e-12, "source.sum mismatch"
-        )
+        expect_close(source.sum(0), expected_sum, 1.0e-12, "source.sum mismatch")
         expect_close(
             destination.sum(0),
             expected_sum,

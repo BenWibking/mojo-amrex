@@ -65,11 +65,7 @@ def initialize_tile_gpu(
         var x = (Float64(i) + 0.5) * dx_x
         var y = (Float64(j) + 0.5) * dx_y
         var z = (Float64(k) + 0.5) * dx_z
-        var rsquared = (
-            (x - 0.5) * (x - 0.5)
-            + (y - 0.5) * (y - 0.5)
-            + (z - 0.5) * (z - 0.5)
-        ) / 0.01
+        var rsquared = ((x - 0.5) * (x - 0.5) + (y - 0.5) * (y - 0.5) + (z - 0.5) * (z - 0.5)) / 0.01
         phi_old[i, j, k] = 1.0 + exp(-rsquared)
 
 
@@ -98,41 +94,20 @@ def advance_tile_gpu(
         var i = lo_x + plane_index % nx
 
         phi_new[i, j, k] = phi_old[i, j, k] + dt * (
-            (
-                phi_old[i + 1, j, k]
-                - 2.0 * phi_old[i, j, k]
-                + phi_old[i - 1, j, k]
-            )
-            / (dx_x * dx_x)
-            + (
-                phi_old[i, j + 1, k]
-                - 2.0 * phi_old[i, j, k]
-                + phi_old[i, j - 1, k]
-            )
-            / (dx_y * dx_y)
-            + (
-                phi_old[i, j, k + 1]
-                - 2.0 * phi_old[i, j, k]
-                + phi_old[i, j, k - 1]
-            )
-            / (dx_z * dx_z)
+            (phi_old[i + 1, j, k] - 2.0 * phi_old[i, j, k] + phi_old[i - 1, j, k]) / (dx_x * dx_x)
+            + (phi_old[i, j + 1, k] - 2.0 * phi_old[i, j, k] + phi_old[i, j - 1, k]) / (dx_y * dx_y)
+            + (phi_old[i, j, k + 1] - 2.0 * phi_old[i, j, k] + phi_old[i, j, k - 1]) / (dx_z * dx_z)
         )
 
 
-def require_direct_gpu_interop(
-    ref runtime: AmrexRuntime, ref multifab: MultiFab
-) raises:
+def require_direct_gpu_interop(ref runtime: AmrexRuntime, ref multifab: MultiFab) raises:
     if runtime.gpu_backend() == "none":
         raise Error(
-            "examples/HeatEquation/heat_equation_gpu_interop.mojo requires"
-            " AMReX built with CUDA or HIP support."
+            "examples/HeatEquation/heat_equation_gpu_interop.mojo requires AMReX built with CUDA or HIP support."
         )
 
     if not has_accelerator():
-        raise Error(
-            "examples/HeatEquation/heat_equation_gpu_interop.mojo requires"
-            " a Mojo-supported accelerator."
-        )
+        raise Error("examples/HeatEquation/heat_equation_gpu_interop.mojo requires a Mojo-supported accelerator.")
 
     var info = multifab.memory_info()
     if not info.device_accessible:
@@ -220,12 +195,8 @@ def main() raises:
 
         var time = 0.0
 
-        var initialize_tile_kernel = ctx.compile_function[
-            initialize_tile_gpu, initialize_tile_gpu
-        ]()
-        var advance_tile_kernel = ctx.compile_function[
-            advance_tile_gpu, advance_tile_gpu
-        ]()
+        var initialize_tile_kernel = ctx.compile_function[initialize_tile_gpu, initialize_tile_gpu]()
+        var advance_tile_kernel = ctx.compile_function[advance_tile_gpu, advance_tile_gpu]()
 
         # **********************************
         # INITIALIZE DATA LOOP

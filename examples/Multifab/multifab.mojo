@@ -12,9 +12,7 @@ from amrex.space3d import (
 )
 
 
-def fill_tile[
-    owner_origin: Origin[mut=True]
-](tile: TileF64View[owner_origin]) raises:
+def fill_tile[owner_origin: Origin[mut=True]](tile: TileF64View[owner_origin]) raises:
     tile.fill(1.0)
 
 
@@ -35,9 +33,7 @@ def main() raises:
         var prob_domain = geometry.prob_domain()
         var cell_size = geometry.cell_size()
         var periodicity = geometry.periodicity()
-        var multifab = MultiFab(
-            runtime, boxarray, distmap, 1, intvect3d(1, 1, 1)
-        )
+        var multifab = MultiFab(runtime, boxarray, distmap, 1, intvect3d(1, 1, 1))
         var source = MultiFab(runtime, boxarray, distmap, 1, intvect3d(1, 1, 1))
 
         var parmparse_prefix = String("multifab_smoke")
@@ -59,12 +55,8 @@ def main() raises:
             var dst_array = multifab.array(mfi)
             var src_array = source.array(mfi)
 
-            def update_tile(
-                i: Int, j: Int, k: Int
-            ) raises {var dst_array^, var src_array^, var fill_value}:
-                dst_array[i, j, k] = src_array[i, j, k] + Float64(
-                    fill_value - 1
-                )
+            def update_tile(i: Int, j: Int, k: Int) raises {var dst_array^, var src_array^, var fill_value}:
+                dst_array[i, j, k] = src_array[i, j, k] + Float64(fill_value - 1)
 
             ParallelFor(update_tile, tile_box)
             mfi.next()

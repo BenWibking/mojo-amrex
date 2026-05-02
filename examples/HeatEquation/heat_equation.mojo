@@ -98,17 +98,11 @@ def main() raises:
             var phi_old_array = phi_old.array(mfi)
             var tile_dx = dx.copy()
 
-            def initialize_cell(
-                i: Int, j: Int, k: Int
-            ) raises {var phi_old_array^, var tile_dx^}:
+            def initialize_cell(i: Int, j: Int, k: Int) raises {var phi_old_array^, var tile_dx^}:
                 var x = (Float64(i) + 0.5) * tile_dx.x
                 var y = (Float64(j) + 0.5) * tile_dx.y
                 var z = (Float64(k) + 0.5) * tile_dx.z
-                var rsquared = (
-                    (x - 0.5) * (x - 0.5)
-                    + (y - 0.5) * (y - 0.5)
-                    + (z - 0.5) * (z - 0.5)
-                ) / 0.01
+                var rsquared = ((x - 0.5) * (x - 0.5) + (y - 0.5) * (y - 0.5) + (z - 0.5) * (z - 0.5)) / 0.01
                 phi_old_array[i, j, k] = 1.0 + exp(-rsquared)
 
             ParallelFor(initialize_cell, bx)
@@ -142,30 +136,13 @@ def main() raises:
 
                 def advance_cell(
                     i: Int, j: Int, k: Int
-                ) raises {
-                    var phi_new_array^,
-                    var phi_old_array^,
-                    var tile_dx^,
-                    var dt,
-                }:
+                ) raises {var phi_new_array^, var phi_old_array^, var tile_dx^, var dt,}:
                     phi_new_array[i, j, k] = phi_old_array[i, j, k] + dt * (
-                        (
-                            phi_old_array[i + 1, j, k]
-                            - 2.0 * phi_old_array[i, j, k]
-                            + phi_old_array[i - 1, j, k]
-                        )
+                        (phi_old_array[i + 1, j, k] - 2.0 * phi_old_array[i, j, k] + phi_old_array[i - 1, j, k])
                         / (tile_dx.x * tile_dx.x)
-                        + (
-                            phi_old_array[i, j + 1, k]
-                            - 2.0 * phi_old_array[i, j, k]
-                            + phi_old_array[i, j - 1, k]
-                        )
+                        + (phi_old_array[i, j + 1, k] - 2.0 * phi_old_array[i, j, k] + phi_old_array[i, j - 1, k])
                         / (tile_dx.y * tile_dx.y)
-                        + (
-                            phi_old_array[i, j, k + 1]
-                            - 2.0 * phi_old_array[i, j, k]
-                            + phi_old_array[i, j, k - 1]
-                        )
+                        + (phi_old_array[i, j, k + 1] - 2.0 * phi_old_array[i, j, k] + phi_old_array[i, j, k - 1])
                         / (tile_dx.z * tile_dx.z)
                     )
 

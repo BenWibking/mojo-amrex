@@ -27,9 +27,7 @@ def expect(condition: Bool, message: StringLiteral) raises:
         raise Error(message)
 
 
-def expect_equal(
-    actual: Float64, expected: Float64, message: StringLiteral
-) raises:
+def expect_equal(actual: Float64, expected: Float64, message: StringLiteral) raises:
     expect(actual == expected, message)
 
 
@@ -69,31 +67,20 @@ def has_nonzero_ghost_cells(mut multifab: MultiFab) raises -> Bool:
         var fab_box = mfi.fabbox()
         var array = multifab.array(mfi)
         for k in range(Int(fab_box.small_end.z), Int(fab_box.big_end.z) + 1):
-            for j in range(
-                Int(fab_box.small_end.y), Int(fab_box.big_end.y) + 1
-            ):
-                for i in range(
-                    Int(fab_box.small_end.x), Int(fab_box.big_end.x) + 1
-                ):
-                    if (
-                        not box_contains(valid_box, i, j, k)
-                        and array[i, j, k] != 0.0
-                    ):
+            for j in range(Int(fab_box.small_end.y), Int(fab_box.big_end.y) + 1):
+                for i in range(Int(fab_box.small_end.x), Int(fab_box.big_end.x) + 1):
+                    if not box_contains(valid_box, i, j, k) and array[i, j, k] != 0.0:
                         return True
         mfi.next()
 
     return False
 
 
-def fill_source_tile[
-    owner_origin: Origin[mut=True]
-](tile: TileF64View[owner_origin]) raises:
+def fill_source_tile[owner_origin: Origin[mut=True]](tile: TileF64View[owner_origin]) raises:
     tile.fill(2.0)
 
 
-def fill_source_tile_f32[
-    owner_origin: Origin[mut=True]
-](tile: TileF32View[owner_origin]) raises:
+def fill_source_tile_f32[owner_origin: Origin[mut=True]](tile: TileF32View[owner_origin]) raises:
     tile.fill(Float32(1.25))
 
 
@@ -102,9 +89,7 @@ def main() raises:
     try:
         var domain = box3d(
             small_end=intvect3d(0, 0, 0),
-            big_end=intvect3d(
-                DOMAIN_EXTENT - 1, DOMAIN_EXTENT - 1, DOMAIN_EXTENT - 1
-            ),
+            big_end=intvect3d(DOMAIN_EXTENT - 1, DOMAIN_EXTENT - 1, DOMAIN_EXTENT - 1),
         )
 
         var boxarray = BoxArray(runtime, domain)
@@ -119,15 +104,9 @@ def main() raises:
             "default multifab should be host-accessible",
         )
 
-        var source = MultiFab(
-            runtime, boxarray, distmap, 1, intvect3d(1, 1, 1), host_only=True
-        )
-        var destination = MultiFab(
-            runtime, boxarray, distmap, 1, intvect3d(1, 1, 1), host_only=True
-        )
-        var copy_target = MultiFab(
-            runtime, boxarray, distmap, 1, intvect3d(1, 1, 1), host_only=True
-        )
+        var source = MultiFab(runtime, boxarray, distmap, 1, intvect3d(1, 1, 1), host_only=True)
+        var destination = MultiFab(runtime, boxarray, distmap, 1, intvect3d(1, 1, 1), host_only=True)
+        var copy_target = MultiFab(runtime, boxarray, distmap, 1, intvect3d(1, 1, 1), host_only=True)
 
         expect(source.ncomp() == 1, "source should have one component")
         var ngrow = source.ngrow()
@@ -138,9 +117,7 @@ def main() raises:
 
         var params = ParmParse(runtime, "multifab_functional_test")
         params.add_int("tile_add", 3)
-        expect(
-            params.query_int("tile_add") == 3, "ParmParse query_int mismatch"
-        )
+        expect(params.query_int("tile_add") == 3, "ParmParse query_int mismatch")
         expect(
             params.query_int_or("missing_value", 11) == 11,
             "ParmParse query_int_or mismatch",
@@ -161,15 +138,9 @@ def main() raises:
             var dst_array = destination.array(mfi)
             var src_array = source.array(mfi)
             var add_value = Float64(params.query_int("tile_add"))
-            for k in range(
-                Int(tile_box.small_end.z), Int(tile_box.big_end.z) + 1
-            ):
-                for j in range(
-                    Int(tile_box.small_end.y), Int(tile_box.big_end.y) + 1
-                ):
-                    for i in range(
-                        Int(tile_box.small_end.x), Int(tile_box.big_end.x) + 1
-                    ):
+            for k in range(Int(tile_box.small_end.z), Int(tile_box.big_end.z) + 1):
+                for j in range(Int(tile_box.small_end.y), Int(tile_box.big_end.y) + 1):
+                    for i in range(Int(tile_box.small_end.x), Int(tile_box.big_end.x) + 1):
                         dst_array[i, j, k] = src_array[i, j, k] + add_value
             iterated_tiles += 1
             mfi.next()
@@ -185,10 +156,7 @@ def main() raises:
         while gpu_mfi.is_valid():
             expect(
                 gpu_mfi.stream_index() == gpu_iterated_tiles % num_gpu_streams,
-                (
-                    "GpuMFIter stream index should round-robin over the active"
-                    " stream set"
-                ),
+                "GpuMFIter stream index should round-robin over the active stream set",
             )
             _ = gpu_mfi.tilebox()
             _ = gpu_mfi.validbox()
@@ -231,12 +199,8 @@ def main() raises:
             3.0 * Float64(DOMAIN_CELLS),
             "destination.sum after mult mismatch",
         )
-        expect_equal(
-            destination.min(0), 3.0, "destination.min after mult mismatch"
-        )
-        expect_equal(
-            destination.max(0), 3.0, "destination.max after mult mismatch"
-        )
+        expect_equal(destination.min(0), 3.0, "destination.min after mult mismatch")
+        expect_equal(destination.max(0), 3.0, "destination.max after mult mismatch")
         expect_equal(
             destination.norm1(0),
             3.0 * Float64(DOMAIN_CELLS),
@@ -249,12 +213,8 @@ def main() raises:
             "copy_target.sum mismatch",
         )
 
-        var source_f32 = MultiFabF32(
-            runtime, boxarray, distmap, 1, intvect3d(1, 1, 1), host_only=True
-        )
-        var destination_f32 = MultiFabF32(
-            runtime, boxarray, distmap, 1, intvect3d(1, 1, 1), host_only=True
-        )
+        var source_f32 = MultiFabF32(runtime, boxarray, distmap, 1, intvect3d(1, 1, 1), host_only=True)
+        var destination_f32 = MultiFabF32(runtime, boxarray, distmap, 1, intvect3d(1, 1, 1), host_only=True)
         source_f32.for_each_tile[fill_source_tile_f32]()
         destination_f32.set_val(Float32(0.0))
         destination_f32.copy_from(source_f32, 0, 0, 1)
@@ -269,9 +229,7 @@ def main() raises:
             var tile_box_f32 = mfi_f32.tilebox()
             var dst_array_f32 = destination_f32.array(mfi_f32)
             var src_array_f32 = source_f32.array(mfi_f32)
-            for k in range(
-                Int(tile_box_f32.small_end.z), Int(tile_box_f32.big_end.z) + 1
-            ):
+            for k in range(Int(tile_box_f32.small_end.z), Int(tile_box_f32.big_end.z) + 1):
                 for j in range(
                     Int(tile_box_f32.small_end.y),
                     Int(tile_box_f32.big_end.y) + 1,
@@ -280,9 +238,7 @@ def main() raises:
                         Int(tile_box_f32.small_end.x),
                         Int(tile_box_f32.big_end.x) + 1,
                     ):
-                        dst_array_f32[i, j, k] = src_array_f32[
-                            i, j, k
-                        ] + Float32(0.5)
+                        dst_array_f32[i, j, k] = src_array_f32[i, j, k] + Float32(0.5)
             mfi_f32.next()
 
         expect_equal(
@@ -296,30 +252,22 @@ def main() raises:
             2.0,
             "destination_f32.max after plus mismatch",
         )
-        var plotfile_path_f32 = String(
-            "build/multifab_functional_test_plotfile_f32"
-        )
+        var plotfile_path_f32 = String("build/multifab_functional_test_plotfile_f32")
         destination_f32.write_single_level_plotfile(plotfile_path_f32, geometry)
         expect(
             exists(plotfile_path_f32 + "/Header"),
             "Float32 plotfile Header was not written",
         )
 
-        var comm_source = MultiFab(
-            runtime, boxarray, distmap, 1, intvect3d(1, 1, 1), host_only=True
-        )
-        var comm_destination = MultiFab(
-            runtime, boxarray, distmap, 1, intvect3d(1, 1, 1), host_only=True
-        )
+        var comm_source = MultiFab(runtime, boxarray, distmap, 1, intvect3d(1, 1, 1), host_only=True)
+        var comm_destination = MultiFab(runtime, boxarray, distmap, 1, intvect3d(1, 1, 1), host_only=True)
         comm_source.set_val(0.0)
         comm_destination.set_val(0.0)
 
         var comm_mfi = comm_source.mfiter()
         var rank_value = Float64(runtime.myproc() + 1)
         while comm_mfi.is_valid():
-            fill_box_value(
-                comm_source.array(comm_mfi), comm_mfi.tilebox(), rank_value
-            )
+            fill_box_value(comm_source.array(comm_mfi), comm_mfi.tilebox(), rank_value)
             comm_mfi.next()
 
         expect(

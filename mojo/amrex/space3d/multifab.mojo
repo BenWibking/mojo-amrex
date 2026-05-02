@@ -78,9 +78,7 @@ struct MultiFab(Movable):
 
     def __del__(deinit self):
         if self.handle:
-            self.runtime[].lib.call["amrex_mojo_multifab_destroy"](
-                self.handle.value()
-            )
+            self.runtime[].lib.call["amrex_mojo_multifab_destroy"](self.handle.value())
 
     def ncomp(ref self) raises -> Int:
         var handle = self._handle()
@@ -95,12 +93,7 @@ struct MultiFab(Movable):
 
     def set_val(mut self, value: Float64, start_comp: Int, ncomp: Int) raises:
         var handle = self._handle()
-        if (
-            multifab_set_val(
-                self.runtime[].lib, handle, value, start_comp, ncomp
-            )
-            != 0
-        ):
+        if multifab_set_val(self.runtime[].lib, handle, value, start_comp, ncomp) != 0:
             raise Error(last_error_message(self.runtime[].lib))
 
     def set_val(mut self, value: Float64) raises:
@@ -116,9 +109,7 @@ struct MultiFab(Movable):
 
     def valid_box(ref self, tile_index: Int) raises -> Box3D:
         self._require_tile_index(tile_index)
-        return multifab_valid_box(
-            self.runtime[].lib, self._handle(), tile_index
-        )
+        return multifab_valid_box(self.runtime[].lib, self._handle(), tile_index)
 
     def mfiter(ref self) raises -> MFIter:
         var handle = self._handle()
@@ -138,41 +129,27 @@ struct MultiFab(Movable):
 
     def array[
         owner_origin: Origin[mut=True]
-    ](ref[owner_origin] self, ref mfi: MFIter) raises -> Array4F64View[
-        owner_origin
-    ]:
+    ](ref[owner_origin] self, ref mfi: MFIter) raises -> Array4F64View[owner_origin]:
         return self.tile(mfi).array()
 
     def array[
         owner_origin: Origin[mut=True]
-    ](ref[owner_origin] self, ref mfi: GpuMFIter) raises -> Array4F64View[
-        owner_origin
-    ]:
+    ](ref[owner_origin] self, ref mfi: GpuMFIter) raises -> Array4F64View[owner_origin]:
         return self.tile(mfi).array()
 
-    def unsafe_device_array(
-        ref self, ref mfi: MFIter
-    ) raises -> Array4F64View[MutAnyOrigin]:
+    def unsafe_device_array(ref self, ref mfi: MFIter) raises -> Array4F64View[MutAnyOrigin]:
         var handle = self._handle()
-        var array_view = device_array4_view_from_mfiter(
-            self.runtime[].lib, handle, mfi._handle()
-        )
+        var array_view = device_array4_view_from_mfiter(self.runtime[].lib, handle, mfi._handle())
         return array_view.copy()
 
-    def unsafe_device_array(
-        ref self, ref mfi: GpuMFIter
-    ) raises -> Array4F64View[MutAnyOrigin]:
+    def unsafe_device_array(ref self, ref mfi: GpuMFIter) raises -> Array4F64View[MutAnyOrigin]:
         var handle = self._handle()
-        var array_view = device_array4_view_from_mfiter(
-            self.runtime[].lib, handle, mfi._handle()
-        )
+        var array_view = device_array4_view_from_mfiter(self.runtime[].lib, handle, mfi._handle())
         return array_view.copy()
 
     def tile[
         owner_origin: Origin[mut=True]
-    ](ref[owner_origin] self, ref mfi: MFIter) raises -> TileF64View[
-        owner_origin
-    ]:
+    ](ref[owner_origin] self, ref mfi: MFIter) raises -> TileF64View[owner_origin]:
         var handle = self._handle()
         var tile_box = mfi.tilebox()
         var valid_box = mfi.validbox()
@@ -189,9 +166,7 @@ struct MultiFab(Movable):
 
     def tile[
         owner_origin: Origin[mut=True]
-    ](ref[owner_origin] self, ref mfi: GpuMFIter) raises -> TileF64View[
-        owner_origin
-    ]:
+    ](ref[owner_origin] self, ref mfi: GpuMFIter) raises -> TileF64View[owner_origin]:
         var handle = self._handle()
         var tile_box = mfi.tilebox()
         var valid_box = mfi.validbox()
@@ -207,9 +182,7 @@ struct MultiFab(Movable):
         )
 
     def for_each_tile[
-        tile_func: def[borrow_origin: Origin[mut=True]](
-            TileF64View[borrow_origin]
-        ) raises thin -> None
+        tile_func: def[borrow_origin: Origin[mut=True]](TileF64View[borrow_origin]) raises thin -> None
     ](mut self) raises:
         var mfi = self.mfiter()
         while mfi.is_valid():
@@ -353,9 +326,7 @@ struct MultiFab(Movable):
         ):
             raise Error(last_error_message(self.runtime[].lib))
 
-    def fill_boundary(
-        mut self, ref geometry: Geometry, cross: Bool = False
-    ) raises:
+    def fill_boundary(mut self, ref geometry: Geometry, cross: Bool = False) raises:
         self.fill_boundary(geometry, 0, self.ncomp(), cross)
 
     def write_single_level_plotfile(
@@ -400,10 +371,7 @@ struct MultiFab(Movable):
     def _handle(ref self) raises -> MultiFabHandle:
         return require_live_handle(
             self.handle,
-            (
-                "MultiFab no longer owns a live AMReX handle. The value may"
-                " have been moved from."
-            ),
+            "MultiFab no longer owns a live AMReX handle. The value may have been moved from.",
         )
 
 
@@ -438,9 +406,7 @@ struct MultiFabF32(Movable):
 
     def __del__(deinit self):
         if self.handle:
-            self.runtime[].lib.call["amrex_mojo_multifab_destroy"](
-                self.handle.value()
-            )
+            self.runtime[].lib.call["amrex_mojo_multifab_destroy"](self.handle.value())
 
     def ncomp(ref self) raises -> Int:
         var handle = self._handle()
@@ -455,12 +421,7 @@ struct MultiFabF32(Movable):
 
     def set_val(mut self, value: Float32, start_comp: Int, ncomp: Int) raises:
         var handle = self._handle()
-        if (
-            multifab_set_val(
-                self.runtime[].lib, handle, Float64(value), start_comp, ncomp
-            )
-            != 0
-        ):
+        if multifab_set_val(self.runtime[].lib, handle, Float64(value), start_comp, ncomp) != 0:
             raise Error(last_error_message(self.runtime[].lib))
 
     def set_val(mut self, value: Float32) raises:
@@ -476,9 +437,7 @@ struct MultiFabF32(Movable):
 
     def valid_box(ref self, tile_index: Int) raises -> Box3D:
         self._require_tile_index(tile_index)
-        return multifab_valid_box(
-            self.runtime[].lib, self._handle(), tile_index
-        )
+        return multifab_valid_box(self.runtime[].lib, self._handle(), tile_index)
 
     def mfiter(ref self) raises -> MFIter:
         var handle = self._handle()
@@ -498,41 +457,27 @@ struct MultiFabF32(Movable):
 
     def array[
         owner_origin: Origin[mut=True]
-    ](ref[owner_origin] self, ref mfi: MFIter) raises -> Array4F32View[
-        owner_origin
-    ]:
+    ](ref[owner_origin] self, ref mfi: MFIter) raises -> Array4F32View[owner_origin]:
         return self.tile(mfi).array()
 
     def array[
         owner_origin: Origin[mut=True]
-    ](ref[owner_origin] self, ref mfi: GpuMFIter) raises -> Array4F32View[
-        owner_origin
-    ]:
+    ](ref[owner_origin] self, ref mfi: GpuMFIter) raises -> Array4F32View[owner_origin]:
         return self.tile(mfi).array()
 
-    def unsafe_device_array(
-        ref self, ref mfi: MFIter
-    ) raises -> Array4F32View[MutAnyOrigin]:
+    def unsafe_device_array(ref self, ref mfi: MFIter) raises -> Array4F32View[MutAnyOrigin]:
         var handle = self._handle()
-        var array_view = device_array4_view_from_mfiter_f32(
-            self.runtime[].lib, handle, mfi._handle()
-        )
+        var array_view = device_array4_view_from_mfiter_f32(self.runtime[].lib, handle, mfi._handle())
         return array_view.copy()
 
-    def unsafe_device_array(
-        ref self, ref mfi: GpuMFIter
-    ) raises -> Array4F32View[MutAnyOrigin]:
+    def unsafe_device_array(ref self, ref mfi: GpuMFIter) raises -> Array4F32View[MutAnyOrigin]:
         var handle = self._handle()
-        var array_view = device_array4_view_from_mfiter_f32(
-            self.runtime[].lib, handle, mfi._handle()
-        )
+        var array_view = device_array4_view_from_mfiter_f32(self.runtime[].lib, handle, mfi._handle())
         return array_view.copy()
 
     def tile[
         owner_origin: Origin[mut=True]
-    ](ref[owner_origin] self, ref mfi: MFIter) raises -> TileF32View[
-        owner_origin
-    ]:
+    ](ref[owner_origin] self, ref mfi: MFIter) raises -> TileF32View[owner_origin]:
         var handle = self._handle()
         var tile_box = mfi.tilebox()
         var valid_box = mfi.validbox()
@@ -549,9 +494,7 @@ struct MultiFabF32(Movable):
 
     def tile[
         owner_origin: Origin[mut=True]
-    ](ref[owner_origin] self, ref mfi: GpuMFIter) raises -> TileF32View[
-        owner_origin
-    ]:
+    ](ref[owner_origin] self, ref mfi: GpuMFIter) raises -> TileF32View[owner_origin]:
         var handle = self._handle()
         var tile_box = mfi.tilebox()
         var valid_box = mfi.validbox()
@@ -567,9 +510,7 @@ struct MultiFabF32(Movable):
         )
 
     def for_each_tile[
-        tile_func: def[borrow_origin: Origin[mut=True]](
-            TileF32View[borrow_origin]
-        ) raises thin -> None
+        tile_func: def[borrow_origin: Origin[mut=True]](TileF32View[borrow_origin]) raises thin -> None
     ](mut self) raises:
         var mfi = self.mfiter()
         while mfi.is_valid():
@@ -713,9 +654,7 @@ struct MultiFabF32(Movable):
         ):
             raise Error(last_error_message(self.runtime[].lib))
 
-    def fill_boundary(
-        mut self, ref geometry: Geometry, cross: Bool = False
-    ) raises:
+    def fill_boundary(mut self, ref geometry: Geometry, cross: Bool = False) raises:
         self.fill_boundary(geometry, 0, self.ncomp(), cross)
 
     def write_single_level_plotfile(
@@ -760,8 +699,5 @@ struct MultiFabF32(Movable):
     def _handle(ref self) raises -> MultiFabHandle:
         return require_live_handle(
             self.handle,
-            (
-                "MultiFabF32 no longer owns a live AMReX handle. The value may"
-                " have been moved from."
-            ),
+            "MultiFabF32 no longer owns a live AMReX handle. The value may have been moved from.",
         )

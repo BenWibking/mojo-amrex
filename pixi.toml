@@ -79,7 +79,7 @@ test-mojo-multifab-mpi = { depends-on = ["build-tests-mpi", "install-mojo-packag
 test-mojo = { depends-on = ["test-mojo-runtime", "test-mojo-multifab"] }
 test-mpi = { depends-on = ["test-capi-mpi", "test-mojo-runtime-mpi", "test-mojo-multifab-mpi"] }
 test = { depends-on = ["test-capi", "test-mojo"] }
-format-mojo = "mojo format mojo/amrex examples tests/mojo"
+format-mojo = "mojo format -l 120 mojo/amrex examples tests/mojo"
 
 [dependencies]
 mojo = ">=1.0.0b2.dev2026050205,<2"

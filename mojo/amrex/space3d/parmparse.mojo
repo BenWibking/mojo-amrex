@@ -17,29 +17,21 @@ struct ParmParse(Movable):
     var runtime: RuntimeLease
     var handle: OptionalParmParseHandle
 
-    def __init__(
-        out self, ref runtime: AmrexRuntime, prefix: StringLiteral = ""
-    ) raises:
+    def __init__(out self, ref runtime: AmrexRuntime, prefix: StringLiteral = "") raises:
         self.runtime = runtime._lease()
-        self.handle = parmparse_create(
-            self.runtime[].lib, self.runtime[].handle, prefix
-        )
+        self.handle = parmparse_create(self.runtime[].lib, self.runtime[].handle, prefix)
         if not self.handle:
             raise Error(last_error_message(self.runtime[].lib))
 
     def __init__(out self, ref runtime: AmrexRuntime, prefix: String) raises:
         self.runtime = runtime._lease()
-        self.handle = parmparse_create(
-            self.runtime[].lib, self.runtime[].handle, prefix
-        )
+        self.handle = parmparse_create(self.runtime[].lib, self.runtime[].handle, prefix)
         if not self.handle:
             raise Error(last_error_message(self.runtime[].lib))
 
     def __del__(deinit self):
         if self.handle:
-            self.runtime[].lib.call["amrex_mojo_parmparse_destroy"](
-                self.handle.value()
-            )
+            self.runtime[].lib.call["amrex_mojo_parmparse_destroy"](self.handle.value())
 
     def add_int(mut self, name: String, value: Int) raises:
         var handle = self._handle()
@@ -76,9 +68,7 @@ struct ParmParse(Movable):
             return default_value
         return result.value
 
-    def query_int_or(
-        ref self, name: StringLiteral, default_value: Int
-    ) raises -> Int:
+    def query_int_or(ref self, name: StringLiteral, default_value: Int) raises -> Int:
         return self.query_int_or(String(name), default_value)
 
     def query_real(ref self, name: String) raises -> Float64:
@@ -99,9 +89,7 @@ struct ParmParse(Movable):
     def get_real(ref self, name: StringLiteral) raises -> Float64:
         return self.get_real(String(name))
 
-    def query_real_or(
-        ref self, name: String, default_value: Float64
-    ) raises -> Float64:
+    def query_real_or(ref self, name: String, default_value: Float64) raises -> Float64:
         var handle = self._handle()
         var result = parmparse_query_real(self.runtime[].lib, handle, name)
         if result.status != 0:
@@ -110,16 +98,11 @@ struct ParmParse(Movable):
             return default_value
         return result.value
 
-    def query_real_or(
-        ref self, name: StringLiteral, default_value: Float64
-    ) raises -> Float64:
+    def query_real_or(ref self, name: StringLiteral, default_value: Float64) raises -> Float64:
         return self.query_real_or(String(name), default_value)
 
     def _handle(ref self) raises -> ParmParseHandle:
         return require_live_handle(
             self.handle,
-            (
-                "ParmParse no longer owns a live AMReX handle. The value may"
-                " have been moved from."
-            ),
+            "ParmParse no longer owns a live AMReX handle. The value may have been moved from.",
         )

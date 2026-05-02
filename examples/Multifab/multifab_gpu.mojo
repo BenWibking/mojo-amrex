@@ -52,20 +52,12 @@ def update_tile_gpu(
         dst[i, j, k] = src[i, j, k] + add_value
 
 
-def require_direct_gpu_interop(
-    ref runtime: AmrexRuntime, ref multifab: MultiFabF32
-) raises:
+def require_direct_gpu_interop(ref runtime: AmrexRuntime, ref multifab: MultiFabF32) raises:
     if runtime.gpu_backend() == "none":
-        raise Error(
-            "examples/multifab_gpu_interop.mojo requires AMReX built with CUDA"
-            " or HIP support."
-        )
+        raise Error("examples/multifab_gpu_interop.mojo requires AMReX built with CUDA or HIP support.")
 
     if not has_accelerator():
-        raise Error(
-            "examples/multifab_gpu_interop.mojo requires a Mojo-supported"
-            " accelerator."
-        )
+        raise Error("examples/multifab_gpu_interop.mojo requires a Mojo-supported accelerator.")
 
     var info = multifab.memory_info()
     if not info.device_accessible:
@@ -88,9 +80,7 @@ def main() raises:
         comptime DOMAIN_EXTENT = 64
         var domain = box3d(
             small_end=intvect3d(0, 0, 0),
-            big_end=intvect3d(
-                DOMAIN_EXTENT - 1, DOMAIN_EXTENT - 1, DOMAIN_EXTENT - 1
-            ),
+            big_end=intvect3d(DOMAIN_EXTENT - 1, DOMAIN_EXTENT - 1, DOMAIN_EXTENT - 1),
         )
 
         var boxarray = BoxArray(runtime, domain)
@@ -99,12 +89,8 @@ def main() raises:
 
         var distmap = DistributionMapping(runtime, boxarray)
         var geometry = Geometry(runtime, domain)
-        var destination = MultiFabF32(
-            runtime, boxarray, distmap, 1, intvect3d(1, 1, 1)
-        )
-        var source = MultiFabF32(
-            runtime, boxarray, distmap, 1, intvect3d(1, 1, 1)
-        )
+        var destination = MultiFabF32(runtime, boxarray, distmap, 1, intvect3d(1, 1, 1))
+        var source = MultiFabF32(runtime, boxarray, distmap, 1, intvect3d(1, 1, 1))
 
         require_direct_gpu_interop(runtime, source)
         require_direct_gpu_interop(runtime, destination)
@@ -115,9 +101,7 @@ def main() raises:
         var add_value = Float32(params.query_int("tile_fill_value") - 1)
         var plotfile_path = String("build/multifab_gpu_interop_plotfile")
 
-        var update_tile_kernel = ctx.compile_function[
-            update_tile_gpu, update_tile_gpu
-        ]()
+        var update_tile_kernel = ctx.compile_function[update_tile_gpu, update_tile_gpu]()
 
         # runs on device
         source.set_val(Float32(1.0))

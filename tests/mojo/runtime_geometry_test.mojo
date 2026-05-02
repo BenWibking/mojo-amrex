@@ -77,9 +77,7 @@ def main() raises:
 
         var domain = box3d(
             small_end=intvect3d(0, 0, 0),
-            big_end=intvect3d(
-                DOMAIN_EXTENT - 1, DOMAIN_EXTENT - 1, DOMAIN_EXTENT - 1
-            ),
+            big_end=intvect3d(DOMAIN_EXTENT - 1, DOMAIN_EXTENT - 1, DOMAIN_EXTENT - 1),
         )
 
         var boxarray = BoxArray(runtime, domain)
@@ -92,9 +90,7 @@ def main() raises:
         var geometry = Geometry(runtime, domain)
         var periodicity = geometry.periodicity()
         expect(
-            Int(periodicity.x) == 0
-            and Int(periodicity.y) == 0
-            and Int(periodicity.z) == 0,
+            Int(periodicity.x) == 0 and Int(periodicity.y) == 0 and Int(periodicity.z) == 0,
             "geometry periodicity mismatch",
         )
 
@@ -106,9 +102,7 @@ def main() raises:
         )
         periodicity = periodic_geometry.periodicity()
         expect(
-            Int(periodicity.x) == 1
-            and Int(periodicity.y) == 0
-            and Int(periodicity.z) == 1,
+            Int(periodicity.x) == 1 and Int(periodicity.y) == 0 and Int(periodicity.z) == 1,
             "custom geometry periodicity mismatch",
         )
         var prob_domain = periodic_geometry.prob_domain()

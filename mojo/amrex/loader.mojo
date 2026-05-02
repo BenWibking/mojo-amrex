@@ -22,17 +22,13 @@ def installed_library_path() raises -> String:
 
     var conda_prefix = getenv("CONDA_PREFIX")
     if conda_prefix:
-        var candidate = resolve_library_candidate(
-            conda_prefix + "/lib/libamrex_mojo_capi_3d"
-        )
+        var candidate = resolve_library_candidate(conda_prefix + "/lib/libamrex_mojo_capi_3d")
         if exists(candidate):
             return candidate
 
     var modular_home = getenv("MODULAR_HOME")
     if modular_home:
-        var candidate = resolve_library_candidate(
-            modular_home + "/../../lib/libamrex_mojo_capi_3d"
-        )
+        var candidate = resolve_library_candidate(modular_home + "/../../lib/libamrex_mojo_capi_3d")
         if exists(candidate):
             return candidate
 
@@ -44,9 +40,7 @@ def default_library_path() raises -> String:
     if installed_path:
         return installed_path
 
-    var build_path = resolve_library_candidate(
-        "./build/src/capi/libamrex_mojo_capi_3d"
-    )
+    var build_path = resolve_library_candidate("./build/src/capi/libamrex_mojo_capi_3d")
     if build_path:
         return build_path
 

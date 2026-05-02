@@ -27,17 +27,11 @@ def initialize_phi(mut phi_old: MultiFab, dx: RealVect3D) raises:
         var phi_old_array = phi_old.array(mfi)
         var tile_dx = dx.copy()
 
-        def initialize_cell(
-            i: Int, j: Int, k: Int
-        ) raises {var phi_old_array^, var tile_dx^}:
+        def initialize_cell(i: Int, j: Int, k: Int) raises {var phi_old_array^, var tile_dx^}:
             var x = (Float64(i) + 0.5) * tile_dx.x
             var y = (Float64(j) + 0.5) * tile_dx.y
             var z = (Float64(k) + 0.5) * tile_dx.z
-            var rsquared = (
-                (x - 0.5) * (x - 0.5)
-                + (y - 0.5) * (y - 0.5)
-                + (z - 0.5) * (z - 0.5)
-            ) / 0.01
+            var rsquared = ((x - 0.5) * (x - 0.5) + (y - 0.5) * (y - 0.5) + (z - 0.5) * (z - 0.5)) / 0.01
             phi_old_array[i, j, k] = 1.0 + exp(-rsquared)
 
         ParallelFor(initialize_cell, bx)
@@ -120,15 +114,11 @@ struct HeatEquationRunner(Movable, Writable):
 
     def slice_array(mut self) raises -> PythonObject:
         var np = Python.import_module("numpy")
-        var output_slice = np.zeros(
-            shape=Python.tuple(self.n_cell, self.n_cell)
-        )
+        var output_slice = np.zeros(shape=Python.tuple(self.n_cell, self.n_cell))
         var slice_mfi = self.phi_old.mfiter()
         while slice_mfi.is_valid():
             var bx = slice_mfi.validbox()
-            if self.mid_plane >= Int(bx.small_end.z) and self.mid_plane <= Int(
-                bx.big_end.z
-            ):
+            if self.mid_plane >= Int(bx.small_end.z) and self.mid_plane <= Int(bx.big_end.z):
                 var phi_src = self.phi_old.array(slice_mfi)
                 for j in range(Int(bx.small_end.y), Int(bx.big_end.y) + 1):
                     for i in range(Int(bx.small_end.x), Int(bx.big_end.x) + 1):
@@ -152,30 +142,13 @@ struct HeatEquationRunner(Movable, Writable):
 
             def advance_cell(
                 i: Int, j: Int, k: Int
-            ) raises {
-                var phi_new_array^,
-                var phi_old_array^,
-                var tile_dx^,
-                var tile_dt,
-            }:
+            ) raises {var phi_new_array^, var phi_old_array^, var tile_dx^, var tile_dt,}:
                 phi_new_array[i, j, k] = phi_old_array[i, j, k] + tile_dt * (
-                    (
-                        phi_old_array[i + 1, j, k]
-                        - 2.0 * phi_old_array[i, j, k]
-                        + phi_old_array[i - 1, j, k]
-                    )
+                    (phi_old_array[i + 1, j, k] - 2.0 * phi_old_array[i, j, k] + phi_old_array[i - 1, j, k])
                     / (tile_dx.x * tile_dx.x)
-                    + (
-                        phi_old_array[i, j + 1, k]
-                        - 2.0 * phi_old_array[i, j, k]
-                        + phi_old_array[i, j - 1, k]
-                    )
+                    + (phi_old_array[i, j + 1, k] - 2.0 * phi_old_array[i, j, k] + phi_old_array[i, j - 1, k])
                     / (tile_dx.y * tile_dx.y)
-                    + (
-                        phi_old_array[i, j, k + 1]
-                        - 2.0 * phi_old_array[i, j, k]
-                        + phi_old_array[i, j, k - 1]
-                    )
+                    + (phi_old_array[i, j, k + 1] - 2.0 * phi_old_array[i, j, k] + phi_old_array[i, j, k - 1])
                     / (tile_dx.z * tile_dx.z)
                 )
 
@@ -197,9 +170,7 @@ struct HeatEquationRunner(Movable, Writable):
         self = Self()
 
     @staticmethod
-    def step_py(
-        self_ptr: UnsafePointer[Self, MutAnyOrigin]
-    ) raises -> PythonObject:
+    def step_py(self_ptr: UnsafePointer[Self, MutAnyOrigin]) raises -> PythonObject:
         return PythonObject(self_ptr[].step())
 
     @staticmethod
@@ -209,9 +180,7 @@ struct HeatEquationRunner(Movable, Writable):
         return self_ptr[].slice_array()
 
     @staticmethod
-    def current_step_py(
-        self_ptr: UnsafePointer[Self, MutAnyOrigin]
-    ) -> PythonObject:
+    def current_step_py(self_ptr: UnsafePointer[Self, MutAnyOrigin]) -> PythonObject:
         return PythonObject(self_ptr[].current_step)
 
     @staticmethod

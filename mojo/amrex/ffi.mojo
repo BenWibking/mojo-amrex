@@ -20,9 +20,7 @@ comptime OptionalMultiFabHandle = Optional[MultiFabHandle]
 comptime OptionalMFIterHandle = Optional[MFIterHandle]
 comptime OptionalParmParseHandle = Optional[ParmParseHandle]
 comptime OptionalGpuStreamHandle = Optional[GpuStreamHandle]
-comptime CStringArrayHandle = UnsafePointer[
-    UnsafePointer[c_char, MutAnyOrigin], MutAnyOrigin
-]
+comptime CStringArrayHandle = UnsafePointer[UnsafePointer[c_char, MutAnyOrigin], MutAnyOrigin]
 comptime OptionalCStringArrayHandle = Optional[CStringArrayHandle]
 
 comptime GPU_BACKEND_NONE = 0
@@ -124,9 +122,7 @@ struct MultiFabMemoryInfo(Copyable):
 
 
 @fieldwise_init
-struct Array4F64View[origin: Origin[mut=True]](
-    DevicePassable, TrivialRegisterPassable
-):
+struct Array4F64View[origin: Origin[mut=True]](DevicePassable, TrivialRegisterPassable):
     comptime device_type = Array4F64View[MutAnyOrigin]
 
     var data: UnsafePointer[c_double, Self.origin]
@@ -195,9 +191,7 @@ struct Array4F64View[origin: Origin[mut=True]](
 
 
 @fieldwise_init
-struct Array4F32View[origin: Origin[mut=True]](
-    DevicePassable, TrivialRegisterPassable
-):
+struct Array4F32View[origin: Origin[mut=True]](DevicePassable, TrivialRegisterPassable):
     comptime device_type = Array4F32View[MutAnyOrigin]
 
     var data: UnsafePointer[c_float, Self.origin]
@@ -266,9 +260,7 @@ struct Array4F32View[origin: Origin[mut=True]](
 
 
 @fieldwise_init
-struct TileF64View[origin: Origin[mut=True]](
-    DevicePassable, TrivialRegisterPassable
-):
+struct TileF64View[origin: Origin[mut=True]](DevicePassable, TrivialRegisterPassable):
     comptime device_type = TileF64View[MutAnyOrigin]
 
     var tile_box: Box3D
@@ -299,9 +291,7 @@ struct TileF64View[origin: Origin[mut=True]](
 
 
 @fieldwise_init
-struct TileF32View[origin: Origin[mut=True]](
-    DevicePassable, TrivialRegisterPassable
-):
+struct TileF32View[origin: Origin[mut=True]](DevicePassable, TrivialRegisterPassable):
     comptime device_type = TileF32View[MutAnyOrigin]
 
     var tile_box: Box3D
@@ -384,14 +374,10 @@ def abi_version(ref lib: OwnedDLHandle) raises -> Int:
 
 
 def runtime_create(ref lib: OwnedDLHandle) raises -> OptionalRuntimeHandle:
-    return lib.call[
-        "amrex_mojo_runtime_create_default", OptionalRuntimeHandle
-    ]()
+    return lib.call["amrex_mojo_runtime_create_default", OptionalRuntimeHandle]()
 
 
-def runtime_create(
-    ref lib: OwnedDLHandle, device_id: Int
-) raises -> OptionalRuntimeHandle:
+def runtime_create(ref lib: OwnedDLHandle, device_id: Int) raises -> OptionalRuntimeHandle:
     return lib.call[
         "amrex_mojo_runtime_create_default_on_device",
         OptionalRuntimeHandle,
@@ -471,9 +457,7 @@ def runtime_destroy(ref lib: OwnedDLHandle, runtime: RuntimeHandle) raises:
     lib.call["amrex_mojo_runtime_destroy"](runtime)
 
 
-def runtime_initialized(
-    ref lib: OwnedDLHandle, runtime: RuntimeHandle
-) raises -> Bool:
+def runtime_initialized(ref lib: OwnedDLHandle, runtime: RuntimeHandle) raises -> Bool:
     return lib.call["amrex_mojo_runtime_initialized", c_int](runtime) != 0
 
 
@@ -489,12 +473,8 @@ def gpu_num_streams(ref lib: OwnedDLHandle) raises -> Int:
     return Int(lib.call["amrex_mojo_gpu_num_streams", c_int]())
 
 
-def gpu_set_stream_index(
-    ref lib: OwnedDLHandle, stream_index: Int
-) raises -> Int:
-    return Int(
-        lib.call["amrex_mojo_gpu_set_stream_index", c_int](c_int(stream_index))
-    )
+def gpu_set_stream_index(ref lib: OwnedDLHandle, stream_index: Int) raises -> Int:
+    return Int(lib.call["amrex_mojo_gpu_set_stream_index", c_int](c_int(stream_index)))
 
 
 def gpu_reset_stream(ref lib: OwnedDLHandle) raises:
@@ -533,9 +513,9 @@ def parallel_ioprocessor_number(ref lib: OwnedDLHandle) raises -> Int:
 def boxarray_create_from_box(
     ref lib: OwnedDLHandle, runtime: RuntimeHandle, domain: Box3D
 ) raises -> OptionalBoxArrayHandle:
-    var f = lib.get_function[
-        def(RuntimeHandle, Box3D) thin abi("C") -> OptionalBoxArrayHandle
-    ]("amrex_mojo_boxarray_create_from_box")
+    var f = lib.get_function[def(RuntimeHandle, Box3D) thin abi("C") -> OptionalBoxArrayHandle](
+        "amrex_mojo_boxarray_create_from_box"
+    )
     return f(runtime, domain)
 
 
@@ -543,18 +523,12 @@ def boxarray_destroy(ref lib: OwnedDLHandle, boxarray: BoxArrayHandle) raises:
     lib.call["amrex_mojo_boxarray_destroy"](boxarray)
 
 
-def boxarray_max_size(
-    ref lib: OwnedDLHandle, boxarray: BoxArrayHandle, max_size: IntVect3D
-) raises -> Int:
-    var f = lib.get_function[
-        def(BoxArrayHandle, IntVect3D) thin abi("C") -> c_int
-    ]("amrex_mojo_boxarray_max_size")
+def boxarray_max_size(ref lib: OwnedDLHandle, boxarray: BoxArrayHandle, max_size: IntVect3D) raises -> Int:
+    var f = lib.get_function[def(BoxArrayHandle, IntVect3D) thin abi("C") -> c_int]("amrex_mojo_boxarray_max_size")
     return Int(f(boxarray, max_size))
 
 
-def boxarray_size(
-    ref lib: OwnedDLHandle, boxarray: BoxArrayHandle
-) raises -> Int:
+def boxarray_size(ref lib: OwnedDLHandle, boxarray: BoxArrayHandle) raises -> Int:
     return Int(lib.call["amrex_mojo_boxarray_size", c_int](boxarray))
 
 
@@ -569,18 +543,14 @@ def distmap_create_from_boxarray(
     ](runtime, boxarray)
 
 
-def distmap_destroy(
-    ref lib: OwnedDLHandle, distmap: DistributionMappingHandle
-) raises:
+def distmap_destroy(ref lib: OwnedDLHandle, distmap: DistributionMappingHandle) raises:
     lib.call["amrex_mojo_distmap_destroy"](distmap)
 
 
-def geometry_create(
-    ref lib: OwnedDLHandle, runtime: RuntimeHandle, domain: Box3D
-) raises -> OptionalGeometryHandle:
-    var f = lib.get_function[
-        def(RuntimeHandle, Box3D) thin abi("C") -> OptionalGeometryHandle
-    ]("amrex_mojo_geometry_create")
+def geometry_create(ref lib: OwnedDLHandle, runtime: RuntimeHandle, domain: Box3D) raises -> OptionalGeometryHandle:
+    var f = lib.get_function[def(RuntimeHandle, Box3D) thin abi("C") -> OptionalGeometryHandle](
+        "amrex_mojo_geometry_create"
+    )
     return f(runtime, domain)
 
 
@@ -591,11 +561,9 @@ def geometry_create(
     real_box: RealBox3D,
     is_periodic: IntVect3D,
 ) raises -> OptionalGeometryHandle:
-    var f = lib.get_function[
-        def(
-            RuntimeHandle, Box3D, RealBox3D, IntVect3D
-        ) thin abi("C") -> OptionalGeometryHandle
-    ]("amrex_mojo_geometry_create_with_real_box_and_periodicity")
+    var f = lib.get_function[def(RuntimeHandle, Box3D, RealBox3D, IntVect3D) thin abi("C") -> OptionalGeometryHandle](
+        "amrex_mojo_geometry_create_with_real_box_and_periodicity"
+    )
     return f(runtime, domain, real_box, is_periodic)
 
 
@@ -639,25 +607,17 @@ def multifab_destroy(ref lib: OwnedDLHandle, multifab: MultiFabHandle) raises:
     lib.call["amrex_mojo_multifab_destroy"](multifab)
 
 
-def multifab_ncomp(
-    ref lib: OwnedDLHandle, multifab: MultiFabHandle
-) raises -> Int:
+def multifab_ncomp(ref lib: OwnedDLHandle, multifab: MultiFabHandle) raises -> Int:
     return Int(lib.call["amrex_mojo_multifab_ncomp", c_int](multifab))
 
 
-def multifab_datatype(
-    ref lib: OwnedDLHandle, multifab: MultiFabHandle
-) raises -> Int:
+def multifab_datatype(ref lib: OwnedDLHandle, multifab: MultiFabHandle) raises -> Int:
     return Int(lib.call["amrex_mojo_multifab_datatype", c_int](multifab))
 
 
-def multifab_memory_info(
-    ref lib: OwnedDLHandle, multifab: MultiFabHandle
-) raises -> MultiFabMemoryInfo:
+def multifab_memory_info(ref lib: OwnedDLHandle, multifab: MultiFabHandle) raises -> MultiFabMemoryInfo:
     var raw = List[c_int](length=6, fill=0)
-    _ = lib.call["amrex_mojo_multifab_memory_info", c_int](
-        multifab, raw.unsafe_ptr()
-    )
+    _ = lib.call["amrex_mojo_multifab_memory_info", c_int](multifab, raw.unsafe_ptr())
     return MultiFabMemoryInfo(
         requested_kind=Int(raw[0]),
         host_accessible=raw[1] != 0,
@@ -676,39 +636,25 @@ def multifab_set_val(
     ncomp: Int,
 ) raises -> Int:
     return Int(
-        lib.call["amrex_mojo_multifab_set_val", c_int](
-            multifab, c_double(value), c_int(start_comp), c_int(ncomp)
-        )
+        lib.call["amrex_mojo_multifab_set_val", c_int](multifab, c_double(value), c_int(start_comp), c_int(ncomp))
     )
 
 
-def multifab_tile_count(
-    ref lib: OwnedDLHandle, multifab: MultiFabHandle
-) raises -> Int:
+def multifab_tile_count(ref lib: OwnedDLHandle, multifab: MultiFabHandle) raises -> Int:
     return Int(lib.call["amrex_mojo_multifab_tile_count", c_int](multifab))
 
 
-def multifab_tile_box(
-    ref lib: OwnedDLHandle, multifab: MultiFabHandle, tile_index: Int
-) raises -> Box3D:
-    var f = lib.get_function[def(MultiFabHandle, c_int) thin abi("C") -> Box3D](
-        "amrex_mojo_multifab_tile_box"
-    )
+def multifab_tile_box(ref lib: OwnedDLHandle, multifab: MultiFabHandle, tile_index: Int) raises -> Box3D:
+    var f = lib.get_function[def(MultiFabHandle, c_int) thin abi("C") -> Box3D]("amrex_mojo_multifab_tile_box")
     return f(multifab, c_int(tile_index))
 
 
-def multifab_valid_box(
-    ref lib: OwnedDLHandle, multifab: MultiFabHandle, tile_index: Int
-) raises -> Box3D:
-    var f = lib.get_function[def(MultiFabHandle, c_int) thin abi("C") -> Box3D](
-        "amrex_mojo_multifab_valid_box"
-    )
+def multifab_valid_box(ref lib: OwnedDLHandle, multifab: MultiFabHandle, tile_index: Int) raises -> Box3D:
+    var f = lib.get_function[def(MultiFabHandle, c_int) thin abi("C") -> Box3D]("amrex_mojo_multifab_valid_box")
     return f(multifab, c_int(tile_index))
 
 
-def mfiter_create(
-    ref lib: OwnedDLHandle, multifab: MultiFabHandle
-) raises -> OptionalMFIterHandle:
+def mfiter_create(ref lib: OwnedDLHandle, multifab: MultiFabHandle) raises -> OptionalMFIterHandle:
     var out_handle = List[OptionalMFIterHandle](length=1, fill=None)
     _ = lib.call["amrex_mojo_mfiter_create", c_int](
         multifab,
@@ -721,9 +667,7 @@ def mfiter_destroy(ref lib: OwnedDLHandle, mfiter: MFIterHandle) raises:
     lib.call["amrex_mojo_mfiter_destroy"](mfiter)
 
 
-def mfiter_is_valid(
-    ref lib: OwnedDLHandle, mfiter: MFIterHandle
-) raises -> Bool:
+def mfiter_is_valid(ref lib: OwnedDLHandle, mfiter: MFIterHandle) raises -> Bool:
     return lib.call["amrex_mojo_mfiter_is_valid", c_int](mfiter) != 0
 
 
@@ -735,15 +679,11 @@ def mfiter_index(ref lib: OwnedDLHandle, mfiter: MFIterHandle) raises -> Int:
     return Int(lib.call["amrex_mojo_mfiter_index", c_int](mfiter))
 
 
-def mfiter_local_tile_index(
-    ref lib: OwnedDLHandle, mfiter: MFIterHandle
-) raises -> Int:
+def mfiter_local_tile_index(ref lib: OwnedDLHandle, mfiter: MFIterHandle) raises -> Int:
     return Int(lib.call["amrex_mojo_mfiter_local_tile_index", c_int](mfiter))
 
 
-def mfiter_tile_box(
-    ref lib: OwnedDLHandle, mfiter: MFIterHandle
-) raises -> Box3DResult:
+def mfiter_tile_box(ref lib: OwnedDLHandle, mfiter: MFIterHandle) raises -> Box3DResult:
     var small_end = List[c_int](length=3, fill=0)
     var big_end = List[c_int](length=3, fill=0)
     var nodal = List[c_int](length=3, fill=0)
@@ -761,9 +701,7 @@ def mfiter_tile_box(
     )
 
 
-def mfiter_valid_box(
-    ref lib: OwnedDLHandle, mfiter: MFIterHandle
-) raises -> Box3DResult:
+def mfiter_valid_box(ref lib: OwnedDLHandle, mfiter: MFIterHandle) raises -> Box3DResult:
     var small_end = List[c_int](length=3, fill=0)
     var big_end = List[c_int](length=3, fill=0)
     var nodal = List[c_int](length=3, fill=0)
@@ -781,9 +719,7 @@ def mfiter_valid_box(
     )
 
 
-def mfiter_fab_box(
-    ref lib: OwnedDLHandle, mfiter: MFIterHandle
-) raises -> Box3DResult:
+def mfiter_fab_box(ref lib: OwnedDLHandle, mfiter: MFIterHandle) raises -> Box3DResult:
     var small_end = List[c_int](length=3, fill=0)
     var big_end = List[c_int](length=3, fill=0)
     var nodal = List[c_int](length=3, fill=0)
@@ -801,9 +737,7 @@ def mfiter_fab_box(
     )
 
 
-def mfiter_growntile_box(
-    ref lib: OwnedDLHandle, mfiter: MFIterHandle, ngrow: IntVect3D
-) raises -> Box3DResult:
+def mfiter_growntile_box(ref lib: OwnedDLHandle, mfiter: MFIterHandle, ngrow: IntVect3D) raises -> Box3DResult:
     var small_end = List[c_int](length=3, fill=0)
     var big_end = List[c_int](length=3, fill=0)
     var nodal = List[c_int](length=3, fill=0)
@@ -829,25 +763,17 @@ def box_from_bounds(lo_raw: List[c_int], hi_raw: List[c_int]) raises -> Box3D:
     )
 
 
-def box_from_parts(
-    lo_raw: List[c_int], hi_raw: List[c_int], nodal_raw: List[c_int]
-) raises -> Box3D:
+def box_from_parts(lo_raw: List[c_int], hi_raw: List[c_int], nodal_raw: List[c_int]) raises -> Box3D:
     return box3d(
         small_end=intvect3d(Int(lo_raw[0]), Int(lo_raw[1]), Int(lo_raw[2])),
         big_end=intvect3d(Int(hi_raw[0]), Int(hi_raw[1]), Int(hi_raw[2])),
-        nodal=intvect3d(
-            Int(nodal_raw[0]), Int(nodal_raw[1]), Int(nodal_raw[2])
-        ),
+        nodal=intvect3d(Int(nodal_raw[0]), Int(nodal_raw[1]), Int(nodal_raw[2])),
     )
 
 
 def array4_view_from_mfiter[
     owner_origin: Origin[mut=True]
-](
-    ref lib: OwnedDLHandle,
-    multifab: MultiFabHandle,
-    mfiter: MFIterHandle,
-) raises -> Array4F64View[owner_origin]:
+](ref lib: OwnedDLHandle, multifab: MultiFabHandle, mfiter: MFIterHandle,) raises -> Array4F64View[owner_origin]:
     var data_lo = List[c_int](length=3, fill=0)
     var data_hi = List[c_int](length=3, fill=0)
     var stride = List[Int64](length=4, fill=0)
@@ -929,11 +855,7 @@ def device_array4_view_from_mfiter(
 
 def array4_view_from_mfiter_f32[
     owner_origin: Origin[mut=True]
-](
-    ref lib: OwnedDLHandle,
-    multifab: MultiFabHandle,
-    mfiter: MFIterHandle,
-) raises -> Array4F32View[owner_origin]:
+](ref lib: OwnedDLHandle, multifab: MultiFabHandle, mfiter: MFIterHandle,) raises -> Array4F32View[owner_origin]:
     var data_lo = List[c_int](length=3, fill=0)
     var data_hi = List[c_int](length=3, fill=0)
     var stride = List[Int64](length=4, fill=0)
@@ -1013,91 +935,53 @@ def device_array4_view_from_mfiter_f32(
     )
 
 
-def multifab_sum(
-    ref lib: OwnedDLHandle, multifab: MultiFabHandle, comp: Int
-) raises -> Float64:
+def multifab_sum(ref lib: OwnedDLHandle, multifab: MultiFabHandle, comp: Int) raises -> Float64:
     return lib.call["amrex_mojo_multifab_sum", c_double](multifab, c_int(comp))
 
 
-def boxarray_box(
-    ref lib: OwnedDLHandle, boxarray: BoxArrayHandle, index: Int
-) raises -> Box3D:
-    var f = lib.get_function[def(BoxArrayHandle, c_int) thin abi("C") -> Box3D](
-        "amrex_mojo_boxarray_box"
-    )
+def boxarray_box(ref lib: OwnedDLHandle, boxarray: BoxArrayHandle, index: Int) raises -> Box3D:
+    var f = lib.get_function[def(BoxArrayHandle, c_int) thin abi("C") -> Box3D]("amrex_mojo_boxarray_box")
     return f(boxarray, c_int(index))
 
 
-def geometry_domain(
-    ref lib: OwnedDLHandle, geometry: GeometryHandle
-) raises -> Box3D:
-    var f = lib.get_function[def(GeometryHandle) thin abi("C") -> Box3D](
-        "amrex_mojo_geometry_domain"
-    )
+def geometry_domain(ref lib: OwnedDLHandle, geometry: GeometryHandle) raises -> Box3D:
+    var f = lib.get_function[def(GeometryHandle) thin abi("C") -> Box3D]("amrex_mojo_geometry_domain")
     return f(geometry)
 
 
-def geometry_prob_domain(
-    ref lib: OwnedDLHandle, geometry: GeometryHandle
-) raises -> RealBox3D:
-    var f = lib.get_function[def(GeometryHandle) thin abi("C") -> RealBox3D](
-        "amrex_mojo_geometry_prob_domain"
-    )
+def geometry_prob_domain(ref lib: OwnedDLHandle, geometry: GeometryHandle) raises -> RealBox3D:
+    var f = lib.get_function[def(GeometryHandle) thin abi("C") -> RealBox3D]("amrex_mojo_geometry_prob_domain")
     return f(geometry)
 
 
-def geometry_cell_size(
-    ref lib: OwnedDLHandle, geometry: GeometryHandle
-) raises -> RealVect3D:
-    var f = lib.get_function[def(GeometryHandle) thin abi("C") -> RealVect3D](
-        "amrex_mojo_geometry_cell_size"
-    )
+def geometry_cell_size(ref lib: OwnedDLHandle, geometry: GeometryHandle) raises -> RealVect3D:
+    var f = lib.get_function[def(GeometryHandle) thin abi("C") -> RealVect3D]("amrex_mojo_geometry_cell_size")
     return f(geometry)
 
 
-def geometry_periodicity(
-    ref lib: OwnedDLHandle, geometry: GeometryHandle
-) raises -> IntVect3D:
-    var f = lib.get_function[def(GeometryHandle) thin abi("C") -> IntVect3D](
-        "amrex_mojo_geometry_periodicity"
-    )
+def geometry_periodicity(ref lib: OwnedDLHandle, geometry: GeometryHandle) raises -> IntVect3D:
+    var f = lib.get_function[def(GeometryHandle) thin abi("C") -> IntVect3D]("amrex_mojo_geometry_periodicity")
     return f(geometry)
 
 
-def multifab_min(
-    ref lib: OwnedDLHandle, multifab: MultiFabHandle, comp: Int
-) raises -> Float64:
+def multifab_min(ref lib: OwnedDLHandle, multifab: MultiFabHandle, comp: Int) raises -> Float64:
     return lib.call["amrex_mojo_multifab_min", c_double](multifab, c_int(comp))
 
 
-def multifab_max(
-    ref lib: OwnedDLHandle, multifab: MultiFabHandle, comp: Int
-) raises -> Float64:
+def multifab_max(ref lib: OwnedDLHandle, multifab: MultiFabHandle, comp: Int) raises -> Float64:
     return lib.call["amrex_mojo_multifab_max", c_double](multifab, c_int(comp))
 
 
-def multifab_norm0(
-    ref lib: OwnedDLHandle, multifab: MultiFabHandle, comp: Int
-) raises -> Float64:
-    return lib.call["amrex_mojo_multifab_norm0", c_double](
-        multifab, c_int(comp)
-    )
+def multifab_norm0(ref lib: OwnedDLHandle, multifab: MultiFabHandle, comp: Int) raises -> Float64:
+    return lib.call["amrex_mojo_multifab_norm0", c_double](multifab, c_int(comp))
 
 
-def multifab_norm1(
-    ref lib: OwnedDLHandle, multifab: MultiFabHandle, comp: Int
-) raises -> Float64:
-    return lib.call["amrex_mojo_multifab_norm1", c_double](
-        multifab, c_int(comp)
-    )
+def multifab_norm1(ref lib: OwnedDLHandle, multifab: MultiFabHandle, comp: Int) raises -> Float64:
+    return lib.call["amrex_mojo_multifab_norm1", c_double](multifab, c_int(comp))
 
 
-def multifab_norm2(
-    ref lib: OwnedDLHandle, multifab: MultiFabHandle, comp: Int
-) raises -> Float64:
-    return lib.call["amrex_mojo_multifab_norm2", c_double](
-        multifab, c_int(comp)
-    )
+def multifab_norm2(ref lib: OwnedDLHandle, multifab: MultiFabHandle, comp: Int) raises -> Float64:
+    return lib.call["amrex_mojo_multifab_norm2", c_double](multifab, c_int(comp))
 
 
 def multifab_plus(
@@ -1108,14 +992,10 @@ def multifab_plus(
     ncomp: Int,
     ngrow: IntVect3D,
 ) raises -> Int:
-    var f = lib.get_function[
-        def(
-            MultiFabHandle, c_double, c_int, c_int, IntVect3D
-        ) thin abi("C") -> c_int
-    ]("amrex_mojo_multifab_plus")
-    return Int(
-        f(multifab, c_double(value), c_int(start_comp), c_int(ncomp), ngrow)
+    var f = lib.get_function[def(MultiFabHandle, c_double, c_int, c_int, IntVect3D) thin abi("C") -> c_int](
+        "amrex_mojo_multifab_plus"
     )
+    return Int(f(multifab, c_double(value), c_int(start_comp), c_int(ncomp), ngrow))
 
 
 def multifab_mult(
@@ -1126,14 +1006,10 @@ def multifab_mult(
     ncomp: Int,
     ngrow: IntVect3D,
 ) raises -> Int:
-    var f = lib.get_function[
-        def(
-            MultiFabHandle, c_double, c_int, c_int, IntVect3D
-        ) thin abi("C") -> c_int
-    ]("amrex_mojo_multifab_mult")
-    return Int(
-        f(multifab, c_double(value), c_int(start_comp), c_int(ncomp), ngrow)
+    var f = lib.get_function[def(MultiFabHandle, c_double, c_int, c_int, IntVect3D) thin abi("C") -> c_int](
+        "amrex_mojo_multifab_mult"
     )
+    return Int(f(multifab, c_double(value), c_int(start_comp), c_int(ncomp), ngrow))
 
 
 def multifab_copy(
@@ -1146,9 +1022,7 @@ def multifab_copy(
     ngrow: IntVect3D,
 ) raises -> Int:
     var f = lib.get_function[
-        def(
-            MultiFabHandle, MultiFabHandle, c_int, c_int, c_int, IntVect3D
-        ) thin abi("C") -> c_int
+        def(MultiFabHandle, MultiFabHandle, c_int, c_int, c_int, IntVect3D) thin abi("C") -> c_int
     ]("amrex_mojo_multifab_copy")
     return Int(
         f(
@@ -1257,9 +1131,7 @@ def multifab_write_single_level_plotfile(
     )
 
 
-def parmparse_create(
-    ref lib: OwnedDLHandle, runtime: RuntimeHandle, prefix: String
-) raises -> OptionalParmParseHandle:
+def parmparse_create(ref lib: OwnedDLHandle, runtime: RuntimeHandle, prefix: String) raises -> OptionalParmParseHandle:
     var prefix_owned = prefix
     return lib.call["amrex_mojo_parmparse_create", OptionalParmParseHandle](
         runtime, prefix_owned.as_c_string_slice().unsafe_ptr()
@@ -1274,9 +1146,7 @@ def parmparse_create(
     )
 
 
-def parmparse_destroy(
-    ref lib: OwnedDLHandle, parmparse: ParmParseHandle
-) raises:
+def parmparse_destroy(ref lib: OwnedDLHandle, parmparse: ParmParseHandle) raises:
     lib.call["amrex_mojo_parmparse_destroy"](parmparse)
 
 

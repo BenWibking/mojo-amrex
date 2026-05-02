@@ -24,9 +24,7 @@ struct Geometry(Movable):
 
     def __init__(out self, ref runtime: AmrexRuntime, domain: Box3D) raises:
         self.runtime = runtime._lease()
-        self.handle = geometry_create(
-            self.runtime[].lib, self.runtime[].handle, domain
-        )
+        self.handle = geometry_create(self.runtime[].lib, self.runtime[].handle, domain)
         if not self.handle:
             raise Error(last_error_message(self.runtime[].lib))
 
@@ -50,9 +48,7 @@ struct Geometry(Movable):
 
     def __del__(deinit self):
         if self.handle:
-            self.runtime[].lib.call["amrex_mojo_geometry_destroy"](
-                self.handle.value()
-            )
+            self.runtime[].lib.call["amrex_mojo_geometry_destroy"](self.handle.value())
 
     def domain(ref self) raises -> Box3D:
         var handle = self._handle()
@@ -73,8 +69,5 @@ struct Geometry(Movable):
     def _handle(ref self) raises -> GeometryHandle:
         return require_live_handle(
             self.handle,
-            (
-                "Geometry no longer owns a live AMReX handle. The value may"
-                " have been moved from."
-            ),
+            "Geometry no longer owns a live AMReX handle. The value may have been moved from.",
         )

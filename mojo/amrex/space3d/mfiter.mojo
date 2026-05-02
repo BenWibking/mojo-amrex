@@ -45,9 +45,7 @@ struct MFIter(Movable):
 
     def __del__(deinit self):
         if self.handle:
-            self.runtime[].lib.call["amrex_mojo_mfiter_destroy"](
-                self.handle.value()
-            )
+            self.runtime[].lib.call["amrex_mojo_mfiter_destroy"](self.handle.value())
 
     def is_valid(ref self) raises -> Bool:
         var handle = self._handle()
@@ -124,10 +122,7 @@ struct MFIter(Movable):
     def _handle(ref self) raises -> MFIterHandle:
         return require_live_handle(
             self.handle,
-            (
-                "MFIter no longer owns a live AMReX handle. The value may have"
-                " been moved from."
-            ),
+            "MFIter no longer owns a live AMReX handle. The value may have been moved from.",
         )
 
 
