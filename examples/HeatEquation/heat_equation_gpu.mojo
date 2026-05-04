@@ -259,13 +259,15 @@ def main() raises:
                 update_mfi.next()
 
             time = time + dt
-            phi_old.copy_from(phi_new, 0, 0, 1)
+            var phi_swap = phi_old^
+            phi_old = phi_new^
+            phi_new = phi_swap^
 
             if runtime.ioprocessor():
                 print("Advanced step ", step)
 
             if plot_int > 0 and step % plot_int == 0:
-                phi_new.write_single_level_plotfile(
+                phi_old.write_single_level_plotfile(
                     plotfile_name(step),
                     geometry,
                     time,
