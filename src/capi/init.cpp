@@ -60,6 +60,15 @@ namespace
         return argv_ptrs;
     }
 
+    void initialize_default_parmparse()
+    {
+        amrex::ParmParse pp("amrex");
+        amrex::Long arena_init_size = 0;
+        amrex::Long device_arena_init_size = 0;
+        pp.queryAdd("the_arena_init_size", arena_init_size);
+        pp.queryAdd("the_device_arena_init_size", device_arena_init_size);
+    }
+
     auto parse_positive_env_int(const char* env_var) -> int32_t
     {
         const char* value = std::getenv(env_var);
@@ -200,14 +209,20 @@ namespace
                 argv,
                 use_parmparse,
                 MPI_COMM_WORLD,
-                {},
+                initialize_default_parmparse,
                 std::cout,
                 std::cerr,
                 nullptr,
                 device_id
             );
         } else {
-            amrex::Initialize(argc, argv, use_parmparse);
+            amrex::Initialize(
+                argc,
+                argv,
+                use_parmparse,
+                MPI_COMM_WORLD,
+                initialize_default_parmparse
+            );
         }
     }
 
