@@ -2,54 +2,17 @@
 
 from amrex.space3d import (
     AmrexRuntime,
-    Array4F32View,
-    Box3D,
     BoxArray,
     DistributionMapping,
     Geometry,
     MultiFabF32,
+    ParallelFor,
     ParmParse,
     box3d,
     intvect3d,
 )
-from std.gpu import global_idx
 from std.gpu.host import DeviceContext
-from std.math import ceildiv
 from std.sys import has_accelerator
-
-
-comptime KERNEL_BLOCK_SIZE = 256
-
-
-def cell_count(box: Box3D) -> Int:
-    return (
-        (Int(box.big_end.x) - Int(box.small_end.x) + 1)
-        * (Int(box.big_end.y) - Int(box.small_end.y) + 1)
-        * (Int(box.big_end.z) - Int(box.small_end.z) + 1)
-    )
-
-
-def update_tile_gpu(
-    src: Array4F32View[MutAnyOrigin],
-    dst: Array4F32View[MutAnyOrigin],
-    tile_box: Box3D,
-    add_value: Float32,
-):
-    var tid = global_idx.x
-    var lo_x = Int(tile_box.small_end.x)
-    var lo_y = Int(tile_box.small_end.y)
-    var lo_z = Int(tile_box.small_end.z)
-    var nx = Int(tile_box.big_end.x) - lo_x + 1
-    var ny = Int(tile_box.big_end.y) - lo_y + 1
-    var active_cells = cell_count(tile_box)
-    if tid < active_cells:
-        var linear_index = Int(tid)
-        var cells_per_plane = nx * ny
-        var k = lo_z + linear_index // cells_per_plane
-        var plane_index = linear_index % cells_per_plane
-        var j = lo_y + plane_index // nx
-        var i = lo_x + plane_index % nx
-        dst[i, j, k] = src[i, j, k] + add_value
 
 
 def require_direct_gpu_interop(ref runtime: AmrexRuntime, ref multifab: MultiFabF32) raises:
@@ -101,8 +64,6 @@ def main() raises:
         var add_value = Float32(params.query_int("tile_fill_value") - 1)
         var plotfile_path = String("build/multifab_gpu_interop_plotfile")
 
-        var update_tile_kernel = ctx.compile_function[update_tile_gpu]()
-
         # runs on device
         source.set_val(Float32(1.0))
         destination.set_val(Float32(0.0))
@@ -113,16 +74,11 @@ def main() raises:
             var tile_box = mfi.tilebox()
             var src_array = source.unsafe_device_array(mfi)
             var dst_array = destination.unsafe_device_array(mfi)
-            var stream = mfi.stream(ctx)
-            stream.enqueue_function(
-                update_tile_kernel,
-                src_array,
-                dst_array,
-                tile_box,
-                add_value,
-                grid_dim=ceildiv(cell_count(tile_box), KERNEL_BLOCK_SIZE),
-                block_dim=KERNEL_BLOCK_SIZE,
-            )
+
+            def update_tile(i: Int, j: Int, k: Int) {dst_array^, src_array^, add_value^}:
+                dst_array[i, j, k] = src_array[i, j, k] + add_value
+
+            ParallelFor(update_tile, ctx, mfi, tile_box)
             mfi.next()
 
         # write plotfile

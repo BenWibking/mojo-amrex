@@ -11,93 +11,20 @@ Run from the repo root so the bundled inputs file is found:
 
 from amrex.space3d import (
     AmrexRuntime,
-    Array4F64View,
-    Box3D,
     BoxArray,
     DistributionMapping,
     Geometry,
     MultiFab,
+    ParallelFor,
     ParmParse,
     box3d,
     intvect3d,
     realbox3d,
 )
 from std.collections import List
-from std.gpu import global_idx
 from std.gpu.host import DeviceContext
-from std.math import ceildiv, exp
+from std.math import exp
 from std.sys import has_accelerator
-
-
-comptime KERNEL_BLOCK_SIZE = 256
-
-
-def cell_count(box: Box3D) -> Int:
-    return (
-        (Int(box.big_end.x) - Int(box.small_end.x) + 1)
-        * (Int(box.big_end.y) - Int(box.small_end.y) + 1)
-        * (Int(box.big_end.z) - Int(box.small_end.z) + 1)
-    )
-
-
-def initialize_tile_gpu(
-    phi_old: Array4F64View[MutAnyOrigin],
-    tile_box: Box3D,
-    dx_x: Float64,
-    dx_y: Float64,
-    dx_z: Float64,
-):
-    var tid = global_idx.x
-    var lo_x = Int(tile_box.small_end.x)
-    var lo_y = Int(tile_box.small_end.y)
-    var lo_z = Int(tile_box.small_end.z)
-    var nx = Int(tile_box.big_end.x) - lo_x + 1
-    var ny = Int(tile_box.big_end.y) - lo_y + 1
-    var active_cells = cell_count(tile_box)
-    if tid < active_cells:
-        var linear_index = Int(tid)
-        var cells_per_plane = nx * ny
-        var k = lo_z + linear_index // cells_per_plane
-        var plane_index = linear_index % cells_per_plane
-        var j = lo_y + plane_index // nx
-        var i = lo_x + plane_index % nx
-
-        var x = (Float64(i) + 0.5) * dx_x
-        var y = (Float64(j) + 0.5) * dx_y
-        var z = (Float64(k) + 0.5) * dx_z
-        var rsquared = ((x - 0.5) * (x - 0.5) + (y - 0.5) * (y - 0.5) + (z - 0.5) * (z - 0.5)) / 0.01
-        phi_old[i, j, k] = 1.0 + exp(-rsquared)
-
-
-def advance_tile_gpu(
-    phi_new: Array4F64View[MutAnyOrigin],
-    phi_old: Array4F64View[MutAnyOrigin],
-    tile_box: Box3D,
-    dx_x: Float64,
-    dx_y: Float64,
-    dx_z: Float64,
-    dt: Float64,
-):
-    var tid = global_idx.x
-    var lo_x = Int(tile_box.small_end.x)
-    var lo_y = Int(tile_box.small_end.y)
-    var lo_z = Int(tile_box.small_end.z)
-    var nx = Int(tile_box.big_end.x) - lo_x + 1
-    var ny = Int(tile_box.big_end.y) - lo_y + 1
-    var active_cells = cell_count(tile_box)
-    if tid < active_cells:
-        var linear_index = Int(tid)
-        var cells_per_plane = nx * ny
-        var k = lo_z + linear_index // cells_per_plane
-        var plane_index = linear_index % cells_per_plane
-        var j = lo_y + plane_index // nx
-        var i = lo_x + plane_index % nx
-
-        phi_new[i, j, k] = phi_old[i, j, k] + dt * (
-            (phi_old[i + 1, j, k] - 2.0 * phi_old[i, j, k] + phi_old[i - 1, j, k]) / (dx_x * dx_x)
-            + (phi_old[i, j + 1, k] - 2.0 * phi_old[i, j, k] + phi_old[i, j - 1, k]) / (dx_y * dx_y)
-            + (phi_old[i, j, k + 1] - 2.0 * phi_old[i, j, k] + phi_old[i, j, k - 1]) / (dx_z * dx_z)
-        )
 
 
 def require_direct_gpu_interop(ref runtime: AmrexRuntime, ref multifab: MultiFab) raises:
@@ -195,9 +122,6 @@ def main() raises:
 
         var time = 0.0
 
-        var initialize_tile_kernel = ctx.compile_function[initialize_tile_gpu]()
-        var advance_tile_kernel = ctx.compile_function[advance_tile_gpu]()
-
         # **********************************
         # INITIALIZE DATA LOOP
         # **********************************
@@ -206,17 +130,16 @@ def main() raises:
         while mfi.is_valid():
             var bx = mfi.validbox()
             var phi_old_array = phi_old.unsafe_device_array(mfi)
-            var stream = mfi.stream(ctx)
-            stream.enqueue_function(
-                initialize_tile_kernel,
-                phi_old_array,
-                bx,
-                dx.x,
-                dx.y,
-                dx.z,
-                grid_dim=ceildiv(cell_count(bx), KERNEL_BLOCK_SIZE),
-                block_dim=KERNEL_BLOCK_SIZE,
-            )
+            var tile_dx = dx.copy()
+
+            def initialize_cell(i: Int, j: Int, k: Int) {phi_old_array^, tile_dx^}:
+                var x = (Float64(i) + 0.5) * tile_dx.x
+                var y = (Float64(j) + 0.5) * tile_dx.y
+                var z = (Float64(k) + 0.5) * tile_dx.z
+                var rsquared = ((x - 0.5) * (x - 0.5) + (y - 0.5) * (y - 0.5) + (z - 0.5) * (z - 0.5)) / 0.01
+                phi_old_array[i, j, k] = 1.0 + exp(-rsquared)
+
+            ParallelFor(initialize_cell, ctx, mfi, bx)
             mfi.next()
 
         # **********************************
@@ -243,19 +166,21 @@ def main() raises:
                 var bx = update_mfi.validbox()
                 var phi_old_array = phi_old.unsafe_device_array(update_mfi)
                 var phi_new_array = phi_new.unsafe_device_array(update_mfi)
-                var stream = update_mfi.stream(ctx)
-                stream.enqueue_function(
-                    advance_tile_kernel,
-                    phi_new_array,
-                    phi_old_array,
-                    bx,
-                    dx.x,
-                    dx.y,
-                    dx.z,
-                    dt,
-                    grid_dim=ceildiv(cell_count(bx), KERNEL_BLOCK_SIZE),
-                    block_dim=KERNEL_BLOCK_SIZE,
-                )
+                var tile_dx = dx.copy()
+
+                def advance_cell(
+                    i: Int, j: Int, k: Int
+                ) {phi_new_array^, phi_old_array^, tile_dx^, dt^}:
+                    phi_new_array[i, j, k] = phi_old_array[i, j, k] + dt * (
+                        (phi_old_array[i + 1, j, k] - 2.0 * phi_old_array[i, j, k] + phi_old_array[i - 1, j, k])
+                        / (tile_dx.x * tile_dx.x)
+                        + (phi_old_array[i, j + 1, k] - 2.0 * phi_old_array[i, j, k] + phi_old_array[i, j - 1, k])
+                        / (tile_dx.y * tile_dx.y)
+                        + (phi_old_array[i, j, k + 1] - 2.0 * phi_old_array[i, j, k] + phi_old_array[i, j, k - 1])
+                        / (tile_dx.z * tile_dx.z)
+                    )
+
+                ParallelFor(advance_cell, ctx, update_mfi, bx)
                 update_mfi.next()
 
             time = time + dt
