@@ -101,7 +101,7 @@ def main() raises:
         var add_value = Float32(params.query_int("tile_fill_value") - 1)
         var plotfile_path = String("build/multifab_gpu_interop_plotfile")
 
-        var update_tile_kernel = ctx.compile_function[update_tile_gpu, update_tile_gpu]()
+        var update_tile_kernel = ctx.compile_function[update_tile_gpu]()
 
         # runs on device
         source.set_val(Float32(1.0))

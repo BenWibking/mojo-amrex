@@ -195,8 +195,8 @@ def main() raises:
 
         var time = 0.0
 
-        var initialize_tile_kernel = ctx.compile_function[initialize_tile_gpu, initialize_tile_gpu]()
-        var advance_tile_kernel = ctx.compile_function[advance_tile_gpu, advance_tile_gpu]()
+        var initialize_tile_kernel = ctx.compile_function[initialize_tile_gpu]()
+        var advance_tile_kernel = ctx.compile_function[advance_tile_gpu]()
 
         # **********************************
         # INITIALIZE DATA LOOP
