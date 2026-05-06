@@ -21,7 +21,7 @@ macOS arm64
 
 ## Reproducer
 
-Package source saved as `issues/mojo_closure_capture_pkg_src/__init__.mojo`:
+Package source saved as `issues/closures/mojo_closure_capture_pkg_src/__init__.mojo`:
 
 ```mojo
 struct Box(Copyable):
@@ -30,7 +30,7 @@ struct Box(Copyable):
 ```
 
 Driver saved as
-`issues/mojo_unified_closure_imported_copyable_capture_crash_repro.mojo`:
+`issues/closures/mojo_unified_closure_imported_copyable_capture_crash_repro.mojo`:
 
 ```mojo
 from mojo_closure_capture_pkg import Box
@@ -45,8 +45,8 @@ def main() raises:
 Run from this repository:
 
 ```text
-pixi run mojo package issues/mojo_closure_capture_pkg_src -o /tmp/mojo_closure_capture_pkg.mojopkg
-pixi run mojo -I /tmp issues/mojo_unified_closure_imported_copyable_capture_crash_repro.mojo
+pixi run mojo package issues/closures/mojo_closure_capture_pkg_src -o /tmp/mojo_closure_capture_pkg.mojopkg
+pixi run mojo -I /tmp issues/closures/mojo_unified_closure_imported_copyable_capture_crash_repro.mojo
 ```
 
 For comparison, the same struct and closure in a single source file compiles
@@ -82,11 +82,11 @@ Stack excerpt:
 ```text
 Please submit a bug report to https://github.com/modular/modular/issues and include the crash backtrace along with all the relevant source codes.
 Stack dump:
-0. Program arguments: .../bin/mojo -I /tmp issues/mojo_unified_closure_imported_copyable_capture_crash_repro.mojo
-1. Crash resolving decl body at .../issues/mojo_unified_closure_imported_copyable_capture_crash_repro.mojo:4:5
-2. Crash parsing statement at .../issues/mojo_unified_closure_imported_copyable_capture_crash_repro.mojo:7:5
+0. Program arguments: .../bin/mojo -I /tmp issues/closures/mojo_unified_closure_imported_copyable_capture_crash_repro.mojo
+1. Crash resolving decl body at .../issues/closures/mojo_unified_closure_imported_copyable_capture_crash_repro.mojo:4:5
+2. Crash parsing statement at .../issues/closures/mojo_unified_closure_imported_copyable_capture_crash_repro.mojo:7:5
    def use_box() raises {var box^}:
-3. Crash resolving decl signature at .../issues/mojo_unified_closure_imported_copyable_capture_crash_repro.mojo:7:9
+3. Crash resolving decl signature at .../issues/closures/mojo_unified_closure_imported_copyable_capture_crash_repro.mojo:7:9
 ```
 
 ## Original AMReX Trigger
