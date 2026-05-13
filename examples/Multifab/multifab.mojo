@@ -55,7 +55,9 @@ def main() raises:
             var dst_array = multifab.array(mfi)
             var src_array = source.array(mfi)
 
-            def update_tile(i: Int, j: Int, k: Int) raises {var dst_array^, var src_array^, var fill_value}:
+            def update_tile(
+                i: Int, j: Int, k: Int
+            ) register_passable raises {var dst_array^, var src_array^, var fill_value}:
                 dst_array[i, j, k] = src_array[i, j, k] + Float64(fill_value - 1)
 
             ParallelFor(update_tile, tile_box)

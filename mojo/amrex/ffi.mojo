@@ -85,10 +85,21 @@ struct RealBox3D(Copyable, RegisterPassable):
 
 
 @fieldwise_init
-struct RealVect3D(Copyable, RegisterPassable):
+struct RealVect3D(DevicePassable, TrivialRegisterPassable):
+    comptime device_type = Self
+
     var x: Float64
     var y: Float64
     var z: Float64
+
+    def _to_device_type[
+        mut_origin: Origin[mut=True]
+    ](self, target: UnsafePointer[NoneType, mut_origin],):
+        init_device_passable_value(self, target)
+
+    @staticmethod
+    def get_type_name() -> String:
+        return String("RealVect3D")
 
 
 @fieldwise_init

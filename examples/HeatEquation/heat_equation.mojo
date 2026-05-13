@@ -37,7 +37,9 @@ def main() raises:
     var argv = List[String](length=2, fill=String(""))
     argv[0] = String("heat_equation")
     argv[1] = String("examples/HeatEquation/heat_equation.inputs")
+
     var runtime = AmrexRuntime(argv, use_parmparse=True)
+
     try:
         # **********************************
         # DECLARE SIMULATION PARAMETERS
@@ -65,25 +67,21 @@ def main() raises:
         var real_box = realbox3d(0.0, 0.0, 0.0, 1.0, 1.0, 1.0)
         var is_periodic = intvect3d(1, 1, 1)
         var geometry = Geometry(runtime, domain, real_box, is_periodic)
-        var dx = geometry.cell_size()
-
-        var nghost = 1
-        var ncomp = 1
-
         var distmap = DistributionMapping(runtime, boxarray)
+
         var phi_old = MultiFab(
             runtime,
             boxarray,
             distmap,
-            ncomp,
-            intvect3d(nghost, nghost, nghost),
+            1,
+            intvect3d(1, 1, 1),
         )
         var phi_new = MultiFab(
             runtime,
             boxarray,
             distmap,
-            ncomp,
-            intvect3d(nghost, nghost, nghost),
+            1,
+            intvect3d(1, 1, 1),
         )
 
         var time = 0.0
@@ -95,15 +93,15 @@ def main() raises:
         var mfi = phi_old.mfiter()
         while mfi.is_valid():
             var bx = mfi.validbox()
-            var phi_old_array = phi_old.array(mfi)
-            var tile_dx = dx.copy()
+            var phi_old_arr = phi_old.array(mfi)
+            var dx = geometry.cell_size()
 
-            def initialize_cell(i: Int, j: Int, k: Int) raises {var phi_old_array^, var tile_dx^}:
-                var x = (Float64(i) + 0.5) * tile_dx.x
-                var y = (Float64(j) + 0.5) * tile_dx.y
-                var z = (Float64(k) + 0.5) * tile_dx.z
+            def initialize_cell(i: Int, j: Int, k: Int) register_passable raises {var phi_old_arr^, var dx^}:
+                var x = (Float64(i) + 0.5) * dx.x
+                var y = (Float64(j) + 0.5) * dx.y
+                var z = (Float64(k) + 0.5) * dx.z
                 var rsquared = ((x - 0.5) * (x - 0.5) + (y - 0.5) * (y - 0.5) + (z - 0.5) * (z - 0.5)) / 0.01
-                phi_old_array[i, j, k] = 1.0 + exp(-rsquared)
+                phi_old_arr[i, j, k] = 1.0 + exp(-rsquared)
 
             ParallelFor(initialize_cell, bx)
             mfi.next()
@@ -130,19 +128,19 @@ def main() raises:
             var update_mfi = phi_old.mfiter()
             while update_mfi.is_valid():
                 var bx = update_mfi.validbox()
-                var phi_old_array = phi_old.array(update_mfi)
-                var phi_new_array = phi_new.array(update_mfi)
+                var phi_old_arr = phi_old.array(update_mfi)
+                var phi_new_arr = phi_new.array(update_mfi)
                 var tile_dx = dx.copy()
 
                 def advance_cell(
                     i: Int, j: Int, k: Int
-                ) raises {var phi_new_array^, var phi_old_array^, var tile_dx^, var dt,}:
-                    phi_new_array[i, j, k] = phi_old_array[i, j, k] + dt * (
-                        (phi_old_array[i + 1, j, k] - 2.0 * phi_old_array[i, j, k] + phi_old_array[i - 1, j, k])
+                ) register_passable raises {var phi_new_arr^, var phi_old_arr^, var tile_dx^, var dt,}:
+                    phi_new_arr[i, j, k] = phi_old_arr[i, j, k] + dt * (
+                        (phi_old_arr[i + 1, j, k] - 2.0 * phi_old_arr[i, j, k] + phi_old_arr[i - 1, j, k])
                         / (tile_dx.x * tile_dx.x)
-                        + (phi_old_array[i, j + 1, k] - 2.0 * phi_old_array[i, j, k] + phi_old_array[i, j - 1, k])
+                        + (phi_old_arr[i, j + 1, k] - 2.0 * phi_old_arr[i, j, k] + phi_old_arr[i, j - 1, k])
                         / (tile_dx.y * tile_dx.y)
-                        + (phi_old_array[i, j, k + 1] - 2.0 * phi_old_array[i, j, k] + phi_old_array[i, j, k - 1])
+                        + (phi_old_arr[i, j, k + 1] - 2.0 * phi_old_arr[i, j, k] + phi_old_arr[i, j, k - 1])
                         / (tile_dx.z * tile_dx.z)
                     )
 
