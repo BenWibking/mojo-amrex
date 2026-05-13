@@ -41,9 +41,8 @@ failure.
 - CUDA/HIP AMReX builds are now supported as an opt-in path. In those builds,
   `MultiFab.memory_info()` tells you whether a given allocation is host
   accessible, device accessible, managed, device-only, or pinned.
-- `MultiFab(..., host_only=True)` still forces host-accessible storage. Use the
-  default allocation path when you want AMReX to choose its normal GPU-capable
-  arena in a CUDA/HIP build.
+- `MultiFab` allocation follows the loaded AMReX runtime: CPU builds use the
+  host path, while CUDA/HIP builds use AMReX's GPU-capable default arena.
 - Mojo device kernels in user code are still supported. Use the staged helper
   types in `amrex.space3d.gpu` (`StagedArray4F32` / `StagedTileF32`) with
   `std.gpu.host.DeviceContext` when you want the portable host-to-device

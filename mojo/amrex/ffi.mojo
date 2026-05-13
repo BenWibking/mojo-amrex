@@ -589,7 +589,6 @@ def multifab_create(
     distmap: DistributionMappingHandle,
     ncomp: Int,
     ngrow: IntVect3D,
-    host_only: Bool = False,
     datatype: Int = MULTIFAB_DATATYPE_FLOAT64,
 ) raises -> OptionalMultiFabHandle:
     var f = lib.get_function[
@@ -609,7 +608,7 @@ def multifab_create(
         distmap,
         c_int(ncomp),
         ngrow,
-        c_int(1 if host_only else 0),
+        c_int(0),
         c_int(datatype),
     )
 
@@ -864,6 +863,46 @@ def device_array4_view_from_mfiter(
     )
 
 
+def device_array4_view_from_mfiter_as_origin[
+    owner_origin: Origin[mut=True]
+](ref lib: OwnedDLHandle, multifab: MultiFabHandle, mfiter: MFIterHandle,) raises -> Array4F64View[owner_origin]:
+    var data_lo = List[c_int](length=3, fill=0)
+    var data_hi = List[c_int](length=3, fill=0)
+    var stride = List[Int64](length=4, fill=0)
+    var ncomp_raw = List[c_int](length=1, fill=0)
+
+    _ = lib.call["amrex_mojo_multifab_array4_metadata_for_mfiter", c_int](
+        multifab,
+        mfiter,
+        data_lo.unsafe_ptr(),
+        data_hi.unsafe_ptr(),
+        stride.unsafe_ptr(),
+        ncomp_raw.unsafe_ptr(),
+    )
+
+    var data = lib.call[
+        "amrex_mojo_multifab_data_ptr_for_mfiter_device",
+        Optional[UnsafePointer[c_double, owner_origin]],
+    ](multifab, mfiter)
+    if not data:
+        raise Error(last_error_message(lib))
+
+    return Array4F64View[owner_origin](
+        data=data.value(),
+        lo_x=data_lo[0],
+        lo_y=data_lo[1],
+        lo_z=data_lo[2],
+        hi_x=data_hi[0],
+        hi_y=data_hi[1],
+        hi_z=data_hi[2],
+        stride_i=stride[0],
+        stride_j=stride[1],
+        stride_k=stride[2],
+        stride_n=stride[3],
+        ncomp=ncomp_raw[0],
+    )
+
+
 def array4_view_from_mfiter_f32[
     owner_origin: Origin[mut=True]
 ](ref lib: OwnedDLHandle, multifab: MultiFabHandle, mfiter: MFIterHandle,) raises -> Array4F32View[owner_origin]:
@@ -931,6 +970,46 @@ def device_array4_view_from_mfiter_f32(
         raise Error(last_error_message(lib))
 
     return Array4F32View[MutAnyOrigin](
+        data=data.value(),
+        lo_x=data_lo[0],
+        lo_y=data_lo[1],
+        lo_z=data_lo[2],
+        hi_x=data_hi[0],
+        hi_y=data_hi[1],
+        hi_z=data_hi[2],
+        stride_i=stride[0],
+        stride_j=stride[1],
+        stride_k=stride[2],
+        stride_n=stride[3],
+        ncomp=ncomp_raw[0],
+    )
+
+
+def device_array4_view_from_mfiter_f32_as_origin[
+    owner_origin: Origin[mut=True]
+](ref lib: OwnedDLHandle, multifab: MultiFabHandle, mfiter: MFIterHandle,) raises -> Array4F32View[owner_origin]:
+    var data_lo = List[c_int](length=3, fill=0)
+    var data_hi = List[c_int](length=3, fill=0)
+    var stride = List[Int64](length=4, fill=0)
+    var ncomp_raw = List[c_int](length=1, fill=0)
+
+    _ = lib.call["amrex_mojo_multifab_array4_metadata_for_mfiter", c_int](
+        multifab,
+        mfiter,
+        data_lo.unsafe_ptr(),
+        data_hi.unsafe_ptr(),
+        stride.unsafe_ptr(),
+        ncomp_raw.unsafe_ptr(),
+    )
+
+    var data = lib.call[
+        "amrex_mojo_multifab_data_ptr_for_mfiter_device_f32",
+        Optional[UnsafePointer[c_float, owner_origin]],
+    ](multifab, mfiter)
+    if not data:
+        raise Error(last_error_message(lib))
+
+    return Array4F32View[owner_origin](
         data=data.value(),
         lo_x=data_lo[0],
         lo_y=data_lo[1],

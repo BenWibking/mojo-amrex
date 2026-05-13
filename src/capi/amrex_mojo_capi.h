@@ -26,8 +26,7 @@ typedef enum amrex_mojo_status_code
 
 typedef enum amrex_mojo_multifab_memory_kind
 {
-    AMREX_MOJO_MULTIFAB_MEMORY_DEFAULT = 0,
-    AMREX_MOJO_MULTIFAB_MEMORY_HOST_ONLY = 1
+    AMREX_MOJO_MULTIFAB_MEMORY_DEFAULT = 0
 } amrex_mojo_multifab_memory_kind_t;
 
 typedef enum amrex_mojo_gpu_backend

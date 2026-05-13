@@ -179,7 +179,6 @@ namespace
     {
         switch (memory_kind) {
         case AMREX_MOJO_MULTIFAB_MEMORY_DEFAULT: return nullptr;
-        case AMREX_MOJO_MULTIFAB_MEMORY_HOST_ONLY: return amrex::The_Cpu_Arena();
         default: return nullptr;
         }
     }
@@ -187,8 +186,7 @@ namespace
     auto is_valid_memory_kind(amrex_mojo_multifab_memory_kind_t memory_kind) -> bool
     {
         switch (memory_kind) {
-        case AMREX_MOJO_MULTIFAB_MEMORY_DEFAULT:
-        case AMREX_MOJO_MULTIFAB_MEMORY_HOST_ONLY: return true;
+        case AMREX_MOJO_MULTIFAB_MEMORY_DEFAULT: return true;
         default: return false;
         }
     }

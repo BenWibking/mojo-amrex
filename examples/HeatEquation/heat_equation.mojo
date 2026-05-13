@@ -11,7 +11,6 @@ from amrex.space3d import (
     DistributionMapping,
     Geometry,
     MultiFab,
-    ParallelFor,
     ParmParse,
     box3d,
     intvect3d,
@@ -96,14 +95,14 @@ def main() raises:
             var phi_old_arr = phi_old.array(mfi)
             var dx = geometry.cell_size()
 
-            def initialize_cell(i: Int, j: Int, k: Int) register_passable raises {var phi_old_arr^, var dx^}:
+            def initialize_cell(i: Int, j: Int, k: Int) register_passable {var phi_old_arr^, var dx^}:
                 var x = (Float64(i) + 0.5) * dx.x
                 var y = (Float64(j) + 0.5) * dx.y
                 var z = (Float64(k) + 0.5) * dx.z
                 var rsquared = ((x - 0.5) * (x - 0.5) + (y - 0.5) * (y - 0.5) + (z - 0.5) * (z - 0.5)) / 0.01
                 phi_old_arr[i, j, k] = 1.0 + exp(-rsquared)
 
-            ParallelFor(initialize_cell, bx)
+            mfi.parallel_for(initialize_cell, bx)
             mfi.next()
 
         # **********************************
@@ -134,7 +133,7 @@ def main() raises:
 
                 def advance_cell(
                     i: Int, j: Int, k: Int
-                ) register_passable raises {var phi_new_arr^, var phi_old_arr^, var dx^, var dt,}:
+                ) register_passable {var phi_new_arr^, var phi_old_arr^, var dx^, var dt,}:
                     phi_new_arr[i, j, k] = phi_old_arr[i, j, k] + dt * (
                         (phi_old_arr[i + 1, j, k] - 2.0 * phi_old_arr[i, j, k] + phi_old_arr[i - 1, j, k])
                         / (dx.x * dx.x)
@@ -144,17 +143,19 @@ def main() raises:
                         / (dx.z * dx.z)
                     )
 
-                ParallelFor(advance_cell, bx)
+                update_mfi.parallel_for(advance_cell, bx)
                 update_mfi.next()
 
             time = time + dt
-            phi_old.copy_from(phi_new, 0, 0, 1)
+            var phi_swap = phi_old^
+            phi_old = phi_new^
+            phi_new = phi_swap^
 
             if runtime.ioprocessor():
                 print("Advanced step ", step)
 
             if plot_int > 0 and step % plot_int == 0:
-                phi_new.write_single_level_plotfile(
+                phi_old.write_single_level_plotfile(
                     plotfile_name(step),
                     geometry,
                     time,
