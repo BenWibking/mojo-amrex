@@ -211,6 +211,18 @@ message(
     "AMReX Mojo GPU backend request='${AMREX_MOJO_GPU_BACKEND}', resolved='${AMREX_MOJO_RESOLVED_GPU_BACKEND}'."
 )
 
+if(AMREX_MOJO_RESOLVED_GPU_BACKEND STREQUAL "CUDA" OR AMREX_MOJO_RESOLVED_GPU_BACKEND STREQUAL "HIP")
+    set(AMREX_MOJO_HAS_COMPILED_GPU_BACKEND True)
+else()
+    set(AMREX_MOJO_HAS_COMPILED_GPU_BACKEND False)
+endif()
+
+configure_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/mojo/amrex/build_config.mojo.in"
+    "${CMAKE_CURRENT_SOURCE_DIR}/mojo/amrex/build_config.mojo"
+    @ONLY
+)
+
 if(AMREX_MOJO_RESOLVED_GPU_BACKEND STREQUAL "CUDA")
     enable_language(CUDA)
 elseif(AMREX_MOJO_RESOLVED_GPU_BACKEND STREQUAL "HIP")

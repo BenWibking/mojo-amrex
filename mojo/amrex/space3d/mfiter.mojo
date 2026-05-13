@@ -26,7 +26,7 @@ from amrex.ffi import (
 )
 from amrex.ownership import require_live_handle
 from amrex.runtime import RuntimeLease, require_matching_gpu_context
-from amrex.space3d.parallelfor import ParallelFor
+from amrex.space3d.parallelfor import AMREX_MOJO_CAN_COMPILE_GPU_PARALLEL_FOR, ParallelFor, ParallelForCpu
 from std.builtin.device_passable import DevicePassable
 from std.ffi import c_int
 from std.gpu.host import DeviceContext, DeviceStream
@@ -148,8 +148,12 @@ struct MFIter(Movable):
     def parallel_for[
         body_type: (def(Int, Int, Int) register_passable -> None) & DevicePassable
     ](mut self, body: body_type, box: Box3D) raises:
+        comptime if not AMREX_MOJO_CAN_COMPILE_GPU_PARALLEL_FOR:
+            ParallelForCpu(body, box)
+            return
+
         if not self._has_gpu_backend():
-            ParallelFor(body, box)
+            ParallelForCpu(body, box)
             return
         if not self.stream_wrapper:
             self._refresh_stream_wrapper()
