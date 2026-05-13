@@ -130,18 +130,18 @@ def main() raises:
                 var bx = update_mfi.validbox()
                 var phi_old_arr = phi_old.array(update_mfi)
                 var phi_new_arr = phi_new.array(update_mfi)
-                var tile_dx = dx.copy()
+                var dx = geometry.cell_size()
 
                 def advance_cell(
                     i: Int, j: Int, k: Int
-                ) register_passable raises {var phi_new_arr^, var phi_old_arr^, var tile_dx^, var dt,}:
+                ) register_passable raises {var phi_new_arr^, var phi_old_arr^, var dx^, var dt,}:
                     phi_new_arr[i, j, k] = phi_old_arr[i, j, k] + dt * (
                         (phi_old_arr[i + 1, j, k] - 2.0 * phi_old_arr[i, j, k] + phi_old_arr[i - 1, j, k])
-                        / (tile_dx.x * tile_dx.x)
+                        / (dx.x * dx.x)
                         + (phi_old_arr[i, j + 1, k] - 2.0 * phi_old_arr[i, j, k] + phi_old_arr[i, j - 1, k])
-                        / (tile_dx.y * tile_dx.y)
+                        / (dx.y * dx.y)
                         + (phi_old_arr[i, j, k + 1] - 2.0 * phi_old_arr[i, j, k] + phi_old_arr[i, j, k - 1])
-                        / (tile_dx.z * tile_dx.z)
+                        / (dx.z * dx.z)
                     )
 
                 ParallelFor(advance_cell, bx)
