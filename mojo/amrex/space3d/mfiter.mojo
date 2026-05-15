@@ -165,16 +165,17 @@ struct MFIter(Movable):
         return self.tile_ordinal % self.num_streams
 
     def stream_handle(
-        ref self,
+        mut self,
     ) raises -> UnsafePointer[NoneType, MutExternalOrigin]:
         self._require_gpu_backend()
         self._require_valid()
+        self._activate_current_stream()
         var handle = gpu_stream(self.runtime[].lib)
         if not handle:
             raise Error(last_error_message(self.runtime[].lib))
         return handle.value()
 
-    def stream(ref self, ref ctx: DeviceContext) raises -> DeviceStream:
+    def stream(mut self, ref ctx: DeviceContext) raises -> DeviceStream:
         _ = require_matching_gpu_context(self.runtime, ctx)
         return ctx.create_external_stream(self.stream_handle())
 
