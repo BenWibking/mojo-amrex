@@ -25,5 +25,10 @@ Add new Mojo tests under `tests/mojo/` with a `_test.mojo` suffix. Add C++ ABI c
 ## Agent-Specific Instructions
 When editing Mojo code, consult the Mojo skills repo at `https://github.com/modular/skills`. Treat `mojo-syntax` as the syntax source of truth. Add `mojo-gpu-fundamentals` for GPU work and `mojo-python-interop` for Python-facing bindings or packaging.
 
+GPU detection does not work reliably inside Codex's default sandbox. If a Mojo
+command fails with GPU architecture detection, Crashpad, or accelerator
+initialization errors only inside the sandbox, rerun the same command outside
+the sandbox before treating it as a code or compatibility regression.
+
 ## Commit & Pull Request Guidelines
 Recent history uses short, imperative, lowercase commit subjects such as `update docs` and `add heat equation example`. Keep commits focused and avoid bundling refactors with behavior changes. PRs should include a brief summary, linked issue if applicable, the exact validation commands you ran, and any platform details that matter here (MPI stack, GPU backend, or AMReX source override). Screenshots are not expected for this repository.
