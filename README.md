@@ -38,7 +38,7 @@ mojo examples/Multifab/multifab.mojo
 If `pixi` was just installed, restart your shell first so it is on `PATH`.
 
 `pixi run bootstrap` configures the build, compiles the C ABI, and installs the
-shared library plus `amrex.mojopkg` into the default pixi environment.
+shared library plus `amrex.mojoc` into the default pixi environment.
 If CMake can see a HIP toolchain, `AUTO` now tries to fill
 `AMReX_AMD_ARCH=<gfx*>` from `rocminfo` before selecting HIP; otherwise it
 falls back to a CPU-only AMReX build.

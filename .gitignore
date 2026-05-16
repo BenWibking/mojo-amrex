@@ -2,6 +2,7 @@ pixi.lock
 build/
 dist/
 *.mojopkg
+*.mojoc
 *.o
 *.so
 *.dylib

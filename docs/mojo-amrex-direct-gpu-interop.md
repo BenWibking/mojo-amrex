@@ -147,13 +147,13 @@ Those methods call C accessors that explicitly require
 from amrex.runtime import AmrexRuntime
 from std.gpu.host import DeviceContext
 
-fn main() raises:
+def main() raises:
     var ctx = DeviceContext()
     var runtime = AmrexRuntime(Int(ctx.id()))
     var amrex_stream = ctx.create_external_stream(
         runtime.gpu_stream_handle(ctx)
     )
-    var kernel = ctx.compile_function[my_kernel, my_kernel]()
+    var kernel = ctx.compile_function[my_kernel]()
 
     # Borrow device views from a GPU-backed MultiFab and enqueue Mojo kernels on
     # the AMReX-owned stream while AMReX calls use that same stream.

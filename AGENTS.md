@@ -1,12 +1,12 @@
 # Repository Guidelines
 
 ## Project Structure & Module Organization
-`mojo/amrex/` contains the Mojo package exported as top-level `amrex`, with `space3d/` holding the 3D bindings and helper types. `src/capi/` contains the narrow C ABI layer backed by AMReX. `examples/Multifab/` and `examples/HeatEquation/` are the main runnable demos, including GPU and MPI variants. Tests live in `tests/capi/` and `tests/mojo/`. Keep design notes in `docs/`; treat `build/`, `.pixi/`, and `*.mojopkg` as generated artifacts.
+`mojo/amrex/` contains the Mojo package exported as top-level `amrex`, with `space3d/` holding the 3D bindings and helper types. `src/capi/` contains the narrow C ABI layer backed by AMReX. `examples/Multifab/` and `examples/HeatEquation/` are the main runnable demos, including GPU and MPI variants. Tests live in `tests/capi/` and `tests/mojo/`. Keep design notes in `docs/`; treat `build/`, `.pixi/`, and `*.mojoc` as generated artifacts.
 
 ## Build, Test, and Development Commands
 Use Pixi from the repo root.
 
-- `pixi run bootstrap`: configure CMake, build the C ABI, and install the shared library plus `amrex.mojopkg` into the default env.
+- `pixi run bootstrap`: configure CMake, build the C ABI, and install the shared library plus `amrex.mojoc` into the default env.
 - `pixi run configure`: refresh the `build/` tree with MPI enabled.
 - `pixi run build-capi`: rebuild `amrex_mojo_capi_3d`.
 - `pixi run install-amrex`: install the library and Mojo package into `.pixi/envs/default`.

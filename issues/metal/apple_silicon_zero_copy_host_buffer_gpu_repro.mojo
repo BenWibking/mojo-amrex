@@ -73,7 +73,7 @@ def fill_buffer_gpu(dst: BufferViewF32, value: Float32):
 def fill_with_gpu_zero_copy(
     ref ctx: DeviceContext, dst: BufferViewF32, value: Float32
 ) raises:
-    ctx.enqueue_function[fill_buffer_gpu, fill_buffer_gpu](
+    ctx.enqueue_function[fill_buffer_gpu](
         dst,
         value,
         grid_dim=ceildiv(Int(dst.size), BLOCK_SIZE),
@@ -90,7 +90,7 @@ def fill_with_gpu_staged(
         data=buffer.unsafe_ptr(),
         size=dst.size,
     )
-    ctx.enqueue_function[fill_buffer_gpu, fill_buffer_gpu](
+    ctx.enqueue_function[fill_buffer_gpu](
         device_view,
         value,
         grid_dim=ceildiv(Int(device_view.size), BLOCK_SIZE),

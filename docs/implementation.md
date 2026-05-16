@@ -46,7 +46,7 @@ Mojo.
 Typical install path:
 
 - `pixi run build-capi` builds the shared library
-- `pixi run install-amrex` installs the library, headers, and `amrex.mojopkg`
+- `pixi run install-amrex` installs the library, headers, and `amrex.mojoc`
 
 If library discovery fails, the loader reports the path it tried and suggests
 rebuilding or setting `AMREX_MOJO_LIBRARY_PATH`.

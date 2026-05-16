@@ -57,10 +57,10 @@ build-tests = { depends-on = ["configure"], cmd = "env OMPI_CC=cc OMPI_CXX=c++ c
 build-tests-mpi = { depends-on = ["configure-mpi"], cmd = "env OMPI_CC=cc OMPI_CXX=c++ cmake --build build --parallel 8" }
 build-tests-cray-mpich = { depends-on = ["configure-cray-mpich"], cmd = "cmake --build build-cray-mpich --parallel 8" }
 install-capi = "env OMPI_CC=cc OMPI_CXX=c++ cmake --install build"
-package-mojo = "mojo package mojo/amrex -o amrex.mojopkg"
-install-mojo-package = "mkdir -p .pixi/envs/default/lib/mojo && mojo package mojo/amrex -o .pixi/envs/default/lib/mojo/amrex.mojopkg"
-install-amrex = "env OMPI_CC=cc OMPI_CXX=c++ cmake --install build && mkdir -p .pixi/envs/default/lib/mojo && mojo package mojo/amrex -o .pixi/envs/default/lib/mojo/amrex.mojopkg"
-install-amrex-cray-mpich = "cmake --install build-cray-mpich && mkdir -p .pixi/envs/default/lib/mojo && mojo package mojo/amrex -o .pixi/envs/default/lib/mojo/amrex.mojopkg"
+package-mojo = "mojo precompile mojo/amrex -o amrex.mojoc"
+install-mojo-package = "mkdir -p .pixi/envs/default/lib/mojo && mojo precompile mojo/amrex -o .pixi/envs/default/lib/mojo/amrex.mojoc"
+install-amrex = "env OMPI_CC=cc OMPI_CXX=c++ cmake --install build && mkdir -p .pixi/envs/default/lib/mojo && mojo precompile mojo/amrex -o .pixi/envs/default/lib/mojo/amrex.mojoc"
+install-amrex-cray-mpich = "cmake --install build-cray-mpich && mkdir -p .pixi/envs/default/lib/mojo && mojo precompile mojo/amrex -o .pixi/envs/default/lib/mojo/amrex.mojoc"
 bootstrap = { depends-on = ["configure", "build-capi", "install-amrex"] }
 bootstrap-cray-mpich = { depends-on = ["configure-cray-mpich", "build-capi-cray-mpich", "install-amrex-cray-mpich"] }
 build-multifab-smoke = "mojo build examples/multifab_smoke.mojo -o build/multifab_smoke"
@@ -82,7 +82,7 @@ test = { depends-on = ["test-capi", "test-mojo"] }
 format-mojo = "mojo format -l 120 mojo/amrex examples tests/mojo"
 
 [dependencies]
-mojo = ">=1.0.0b2.dev2026051206,<2"
+mojo = ">=1.0.0b2.dev2026051606,<2"
 openmpi = ">=5.0.10,<6"
 jupyterlab = ">=4.5.6,<5"
 ipykernel = ">=7.1.0,<8"

@@ -16,26 +16,26 @@ if ! command -v pixi >/dev/null 2>&1; then
   exit 1
 fi
 
-out_path="${1:-$repo_root/.tmp/amrex-oom-repro/amrex.mojopkg}"
+out_path="${1:-$repo_root/.tmp/amrex-oom-repro/amrex.mojoc}"
 out_dir="$(dirname "$out_path")"
 mkdir -p "$out_dir"
-limited_out_path="${out_dir}/$(basename "${out_path%.*}")-ulimit-8g.mojopkg"
+limited_out_path="${out_dir}/$(basename "${out_path%.*}")-ulimit-8g.mojoc"
 
-run_package() {
+run_precompile() {
   local label="$1"
   local output_path="$2"
   shift 2
 
-  printf 'Packaging (%s) -> %s\n' "$label" "$output_path"
+  printf 'Precompiling (%s) -> %s\n' "$label" "$output_path"
   set +e
   "$@"
   local status=$?
   set -e
 
   if [ "$status" -eq 0 ]; then
-    echo "mojo package succeeded for: $label"
+    echo "mojo precompile succeeded for: $label"
   else
-    echo "mojo package failed for: $label (exit code $status)"
+    echo "mojo precompile failed for: $label (exit code $status)"
   fi
 
   return "$status"
@@ -53,19 +53,19 @@ pixi run build-capi
 printf 'Step 3/5: install native artifacts\n'
 env OMPI_CC=cc OMPI_CXX=c++ cmake --install build
 
-printf 'Step 4/5: package Mojo module with current limits\n'
+printf 'Step 4/5: precompile Mojo module with current limits\n'
 unlimited_status=0
-run_package \
+run_precompile \
   "current limits" \
   "$out_path" \
-  pixi run mojo package mojo/amrex -o "$out_path" || unlimited_status=$?
+  pixi run mojo precompile mojo/amrex -o "$out_path" || unlimited_status=$?
 
-printf 'Step 5/5: package Mojo module with ulimit -v 8388608\n'
+printf 'Step 5/5: precompile Mojo module with ulimit -v 8388608\n'
 limited_status=0
-run_package \
+run_precompile \
   "ulimit -v 8388608" \
   "$limited_out_path" \
-  bash -lc "ulimit -v 8388608 && exec pixi run mojo package mojo/amrex -o \"$limited_out_path\"" || limited_status=$?
+  bash -lc "ulimit -v 8388608 && exec pixi run mojo precompile mojo/amrex -o \"$limited_out_path\"" || limited_status=$?
 
 echo
 echo "Summary:"
