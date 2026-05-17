@@ -82,7 +82,7 @@ test = { depends-on = ["test-capi", "test-mojo"] }
 format-mojo = "mojo format -l 120 mojo/amrex examples tests/mojo"
 
 [dependencies]
-mojo = ">=1.0.0b2.dev2026051606,<2"
+mojo = ">=1.0.0b2.dev2026051706,<2"
 openmpi = ">=5.0.10,<6"
 jupyterlab = ">=4.5.6,<5"
 ipykernel = ">=7.1.0,<8"
