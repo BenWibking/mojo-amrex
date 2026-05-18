@@ -1,3 +1,4 @@
+mojo/amrex/build_config.mojo
 pixi.lock
 build/
 dist/
