@@ -7,7 +7,7 @@ version = "0.1.0"
 
 [tasks]
 mojo = "mojo"
-configure = """sh -lc '
+configure = """bash -lc '
 if [ -n "${CRAY_MPICH_DIR:-}" ] && command -v CC >/dev/null 2>&1; then
   cmake --fresh -S . -B build \
     -DAMREX_MOJO_ENABLE_MPI=ON \
