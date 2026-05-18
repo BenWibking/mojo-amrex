@@ -225,6 +225,63 @@ configure_file(
 
 if(AMREX_MOJO_RESOLVED_GPU_BACKEND STREQUAL "CUDA")
     enable_language(CUDA)
+
+    if(NOT DEFINED AMREX_MOJO_CUDA_ARCH OR AMREX_MOJO_CUDA_ARCH STREQUAL "")
+        find_program(AMREX_MOJO_NVIDIA_SMI_EXECUTABLE NAMES nvidia-smi)
+        if(AMREX_MOJO_NVIDIA_SMI_EXECUTABLE)
+            execute_process(
+                COMMAND
+                    "${AMREX_MOJO_NVIDIA_SMI_EXECUTABLE}"
+                    --query-gpu=compute_cap
+                    --format=csv,noheader
+                OUTPUT_VARIABLE AMREX_MOJO_NVIDIA_SMI_STDOUT
+                ERROR_QUIET
+                RESULT_VARIABLE AMREX_MOJO_NVIDIA_SMI_RESULT
+                OUTPUT_STRIP_TRAILING_WHITESPACE
+            )
+            if(AMREX_MOJO_NVIDIA_SMI_RESULT EQUAL 0)
+                string(
+                    REGEX MATCHALL
+                    "[0-9]+\\.[0-9]+"
+                    AMREX_MOJO_DETECTED_CUDA_ARCHES
+                    "${AMREX_MOJO_NVIDIA_SMI_STDOUT}"
+                )
+                list(REMOVE_DUPLICATES AMREX_MOJO_DETECTED_CUDA_ARCHES)
+                list(LENGTH AMREX_MOJO_DETECTED_CUDA_ARCHES AMREX_MOJO_DETECTED_CUDA_ARCH_COUNT)
+                if(AMREX_MOJO_DETECTED_CUDA_ARCH_COUNT GREATER 0)
+                    list(GET AMREX_MOJO_DETECTED_CUDA_ARCHES 0 AMREX_MOJO_DETECTED_CUDA_ARCH)
+                    string(REPLACE "." "" AMREX_MOJO_CUDA_ARCH "${AMREX_MOJO_DETECTED_CUDA_ARCH}")
+                    message(
+                        STATUS
+                        "Autodetected AMReX_CUDA_ARCH='${AMREX_MOJO_CUDA_ARCH}' from nvidia-smi."
+                    )
+                    if(AMREX_MOJO_DETECTED_CUDA_ARCH_COUNT GREATER 1)
+                        message(
+                            STATUS
+                            "nvidia-smi reported multiple CUDA architectures (${AMREX_MOJO_DETECTED_CUDA_ARCHES}); using '${AMREX_MOJO_CUDA_ARCH}'. Override with -DAMREX_MOJO_CUDA_ARCH=<sm> if needed."
+                        )
+                    endif()
+                endif()
+            endif()
+        endif()
+    endif()
+
+    if(DEFINED AMREX_MOJO_CUDA_ARCH AND NOT AMREX_MOJO_CUDA_ARCH STREQUAL "")
+        set(
+            CMAKE_CUDA_ARCHITECTURES
+            "${AMREX_MOJO_CUDA_ARCH}"
+            CACHE STRING
+            "CUDA architectures used for AMReX Mojo CUDA targets."
+            FORCE
+        )
+        set(
+            AMReX_CUDA_ARCH
+            "${AMREX_MOJO_CUDA_ARCH}"
+            CACHE STRING
+            "CUDA architecture target passed to AMReX for CUDA builds."
+            FORCE
+        )
+    endif()
 elseif(AMREX_MOJO_RESOLVED_GPU_BACKEND STREQUAL "HIP")
     enable_language(HIP)
 

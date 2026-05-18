@@ -7,24 +7,6 @@
 
 namespace
 {
-    void fill_box_arrays(const amrex::Box& box, int32_t* lo, int32_t* hi, int32_t* nodal)
-    {
-        const auto lo_vect = box.smallEnd();
-        const auto hi_vect = box.bigEnd();
-        const auto nodal_vect = box.type();
-        lo[0] = lo_vect[0];
-        lo[1] = lo_vect[1];
-        lo[2] = lo_vect[2];
-        hi[0] = hi_vect[0];
-        hi[1] = hi_vect[1];
-        hi[2] = hi_vect[2];
-        if (nodal != nullptr) {
-            nodal[0] = nodal_vect[0];
-            nodal[1] = nodal_vect[1];
-            nodal[2] = nodal_vect[2];
-        }
-    }
-
     auto multifab_has_value(const amrex_mojo_multifab_t* multifab) -> bool
     {
         if (multifab == nullptr) {

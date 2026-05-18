@@ -16,11 +16,13 @@ namespace
     std::mutex g_runtime_mutex;
     amrex_mojo::detail::runtime_state* g_runtime_state = nullptr;
 
+#if !defined(AMREX_USE_MPI)
     struct mpi_world_size_hint
     {
         const char* env_var = nullptr;
         int32_t size = 0;
     };
+#endif
 
     auto build_argv_storage(int32_t argc, const char* const* argv) -> std::vector<std::string>
     {
@@ -69,6 +71,7 @@ namespace
         pp.queryAdd("the_device_arena_init_size", device_arena_init_size);
     }
 
+#if !defined(AMREX_USE_MPI)
     auto parse_positive_env_int(const char* env_var) -> int32_t
     {
         const char* value = std::getenv(env_var);
@@ -123,6 +126,7 @@ namespace
             "or set AMREX_MOJO_LIBRARY_PATH to the rebuilt AMReX Mojo C API library.";
         return message;
     }
+#endif
 
     auto active_amrex_gpu_device_id() -> int32_t
     {
