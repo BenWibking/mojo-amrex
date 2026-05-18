@@ -1112,8 +1112,17 @@ def multifab_copy(
     ngrow: IntVect3D,
 ) raises -> Int:
     var f = lib.get_function[
-        def(MultiFabHandle, MultiFabHandle, c_int, c_int, c_int, IntVect3D) thin abi("C") -> c_int
-    ]("amrex_mojo_multifab_copy")
+        def(
+            MultiFabHandle,
+            MultiFabHandle,
+            c_int,
+            c_int,
+            c_int,
+            c_int,
+            c_int,
+            c_int,
+        ) thin abi("C") -> c_int
+    ]("amrex_mojo_multifab_copy_xyz")
     return Int(
         f(
             dst_multifab,
@@ -1121,7 +1130,9 @@ def multifab_copy(
             c_int(src_comp),
             c_int(dst_comp),
             c_int(ncomp),
-            ngrow,
+            ngrow.x,
+            ngrow.y,
+            ngrow.z,
         )
     )
 
@@ -1145,10 +1156,14 @@ def multifab_parallel_copy(
             c_int,
             c_int,
             c_int,
-            IntVect3D,
-            IntVect3D,
+            c_int,
+            c_int,
+            c_int,
+            c_int,
+            c_int,
+            c_int,
         ) thin abi("C") -> c_int
-    ]("amrex_mojo_multifab_parallel_copy")
+    ]("amrex_mojo_multifab_parallel_copy_xyz")
     return Int(
         f(
             dst_multifab,
@@ -1157,8 +1172,12 @@ def multifab_parallel_copy(
             c_int(src_comp),
             c_int(dst_comp),
             c_int(ncomp),
-            src_ngrow,
-            dst_ngrow,
+            src_ngrow.x,
+            src_ngrow.y,
+            src_ngrow.z,
+            dst_ngrow.x,
+            dst_ngrow.y,
+            dst_ngrow.z,
         )
     )
 

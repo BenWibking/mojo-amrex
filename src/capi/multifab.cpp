@@ -1321,6 +1321,28 @@ amrex_mojo_multifab_copy(
 }
 
 extern "C" amrex_mojo_status_code_t
+amrex_mojo_multifab_copy_xyz(
+    amrex_mojo_multifab_t* dst_multifab,
+    const amrex_mojo_multifab_t* src_multifab,
+    int32_t src_comp,
+    int32_t dst_comp,
+    int32_t ncomp,
+    int32_t ngrow_x,
+    int32_t ngrow_y,
+    int32_t ngrow_z
+)
+{
+    return amrex_mojo_multifab_copy(
+        dst_multifab,
+        src_multifab,
+        src_comp,
+        dst_comp,
+        ncomp,
+        amrex_mojo_intvect_3d{ngrow_x, ngrow_y, ngrow_z}
+    );
+}
+
+extern "C" amrex_mojo_status_code_t
 amrex_mojo_multifab_parallel_copy(
     amrex_mojo_multifab_t* dst_multifab,
     const amrex_mojo_multifab_t* src_multifab,
@@ -1398,6 +1420,34 @@ amrex_mojo_multifab_parallel_copy(
             "multifab_parallel_copy failed with an unknown exception."
         );
     }
+}
+
+extern "C" amrex_mojo_status_code_t
+amrex_mojo_multifab_parallel_copy_xyz(
+    amrex_mojo_multifab_t* dst_multifab,
+    const amrex_mojo_multifab_t* src_multifab,
+    const amrex_mojo_geometry_t* geometry,
+    int32_t src_comp,
+    int32_t dst_comp,
+    int32_t ncomp,
+    int32_t src_ngrow_x,
+    int32_t src_ngrow_y,
+    int32_t src_ngrow_z,
+    int32_t dst_ngrow_x,
+    int32_t dst_ngrow_y,
+    int32_t dst_ngrow_z
+)
+{
+    return amrex_mojo_multifab_parallel_copy(
+        dst_multifab,
+        src_multifab,
+        geometry,
+        src_comp,
+        dst_comp,
+        ncomp,
+        amrex_mojo_intvect_3d{src_ngrow_x, src_ngrow_y, src_ngrow_z},
+        amrex_mojo_intvect_3d{dst_ngrow_x, dst_ngrow_y, dst_ngrow_z}
+    );
 }
 
 extern "C" amrex_mojo_status_code_t
