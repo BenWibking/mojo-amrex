@@ -1,6 +1,8 @@
 from std.collections import List
 from std.builtin.device_passable import DevicePassable
 from std.ffi import OwnedDLHandle, c_char, c_double, c_float, c_int
+from layout import Coord, Idx, TileTensor
+from layout.tile_layout import Layout
 
 
 comptime RuntimeHandle = UnsafePointer[NoneType, MutExternalOrigin]
@@ -133,6 +135,111 @@ struct MultiFabMemoryInfo(Copyable):
 
 
 @fieldwise_init
+struct Array4LayoutMetadata(Copyable, TrivialRegisterPassable):
+    var lo_x: Int
+    var lo_y: Int
+    var lo_z: Int
+    var hi_x: Int
+    var hi_y: Int
+    var hi_z: Int
+    var stride_i: Int
+    var stride_j: Int
+    var stride_k: Int
+    var stride_n: Int
+    var ncomp: Int
+
+    def storage_size(self) -> Int:
+        var shape = Coord(
+            (
+                Idx(self.hi_x - self.lo_x + 1),
+                Idx(self.hi_y - self.lo_y + 1),
+                Idx(self.hi_z - self.lo_z + 1),
+                Idx(self.ncomp),
+            )
+        )
+        var stride = Coord((Idx(self.stride_i), Idx(self.stride_j), Idx(self.stride_k), Idx(self.stride_n)))
+        var layout = Layout(shape, stride)
+        return Int(layout.cosize())
+
+    def offset(self, i: Int, j: Int, k: Int, comp: Int = 0) -> Int:
+        var shape = Coord(
+            (
+                Idx(self.hi_x - self.lo_x + 1),
+                Idx(self.hi_y - self.lo_y + 1),
+                Idx(self.hi_z - self.lo_z + 1),
+                Idx(self.ncomp),
+            )
+        )
+        var stride = Coord((Idx(self.stride_i), Idx(self.stride_j), Idx(self.stride_k), Idx(self.stride_n)))
+        var layout = Layout(shape, stride)
+        return Int(layout(Coord((Idx(i - self.lo_x), Idx(j - self.lo_y), Idx(k - self.lo_z), Idx(comp)))))
+
+    def get_f64[
+        origin: Origin[mut=True]
+    ](self, data: UnsafePointer[c_double, origin], i: Int, j: Int, k: Int, comp: Int,) -> Float64:
+        var shape = Coord(
+            (
+                Idx(self.hi_x - self.lo_x + 1),
+                Idx(self.hi_y - self.lo_y + 1),
+                Idx(self.hi_z - self.lo_z + 1),
+                Idx(self.ncomp),
+            )
+        )
+        var stride = Coord((Idx(self.stride_i), Idx(self.stride_j), Idx(self.stride_k), Idx(self.stride_n)))
+        var layout = Layout(shape, stride)
+        var tensor = TileTensor(Span(ptr=data, length=Int(layout.cosize())), layout)
+        return tensor[i - self.lo_x, j - self.lo_y, k - self.lo_z, comp]
+
+    def set_f64[
+        origin: Origin[mut=True]
+    ](self, data: UnsafePointer[c_double, origin], i: Int, j: Int, k: Int, comp: Int, value: Float64,):
+        var shape = Coord(
+            (
+                Idx(self.hi_x - self.lo_x + 1),
+                Idx(self.hi_y - self.lo_y + 1),
+                Idx(self.hi_z - self.lo_z + 1),
+                Idx(self.ncomp),
+            )
+        )
+        var stride = Coord((Idx(self.stride_i), Idx(self.stride_j), Idx(self.stride_k), Idx(self.stride_n)))
+        var layout = Layout(shape, stride)
+        var tensor = TileTensor(Span(ptr=data, length=Int(layout.cosize())), layout)
+        tensor[i - self.lo_x, j - self.lo_y, k - self.lo_z, comp] = value
+
+    def get_f32[
+        origin: Origin[mut=True]
+    ](self, data: UnsafePointer[c_float, origin], i: Int, j: Int, k: Int, comp: Int,) -> Float32:
+        var shape = Coord(
+            (
+                Idx(self.hi_x - self.lo_x + 1),
+                Idx(self.hi_y - self.lo_y + 1),
+                Idx(self.hi_z - self.lo_z + 1),
+                Idx(self.ncomp),
+            )
+        )
+        var stride = Coord((Idx(self.stride_i), Idx(self.stride_j), Idx(self.stride_k), Idx(self.stride_n)))
+        var layout = Layout(shape, stride)
+        var tensor = TileTensor(Span(ptr=data, length=Int(layout.cosize())), layout)
+        return tensor[i - self.lo_x, j - self.lo_y, k - self.lo_z, comp]
+
+    def set_f32[
+        origin: Origin[mut=True]
+    ](self, data: UnsafePointer[c_float, origin], i: Int, j: Int, k: Int, comp: Int, value: Float32,):
+        var shape = Coord(
+            (
+                Idx(self.hi_x - self.lo_x + 1),
+                Idx(self.hi_y - self.lo_y + 1),
+                Idx(self.hi_z - self.lo_z + 1),
+                Idx(self.ncomp),
+            )
+        )
+        var stride = Coord((Idx(self.stride_i), Idx(self.stride_j), Idx(self.stride_k), Idx(self.stride_n)))
+        var layout = Layout(shape, stride)
+        var tensor = TileTensor(Span(ptr=data, length=Int(layout.cosize())), layout)
+        tensor[i - self.lo_x, j - self.lo_y, k - self.lo_z, comp] = value
+
+
+@fieldwise_init
 struct Array4F64View[origin: Origin[mut=True]](DevicePassable, TrivialRegisterPassable):
     comptime device_type = Array4F64View[MutAnyOrigin]
 
@@ -174,25 +281,38 @@ struct Array4F64View[origin: Origin[mut=True]](DevicePassable, TrivialRegisterPa
     def get_type_name() -> String:
         return String("Array4F64View")
 
-    def offset(self, i: Int, j: Int, k: Int, comp: Int = 0) -> Int:
-        return (
-            (i - Int(self.lo_x)) * Int(self.stride_i)
-            + (j - Int(self.lo_y)) * Int(self.stride_j)
-            + (k - Int(self.lo_z)) * Int(self.stride_k)
-            + comp * Int(self.stride_n)
+    def layout_metadata(self) -> Array4LayoutMetadata:
+        return Array4LayoutMetadata(
+            lo_x=Int(self.lo_x),
+            lo_y=Int(self.lo_y),
+            lo_z=Int(self.lo_z),
+            hi_x=Int(self.hi_x),
+            hi_y=Int(self.hi_y),
+            hi_z=Int(self.hi_z),
+            stride_i=Int(self.stride_i),
+            stride_j=Int(self.stride_j),
+            stride_k=Int(self.stride_k),
+            stride_n=Int(self.stride_n),
+            ncomp=Int(self.ncomp),
         )
 
+    def storage_size(self) -> Int:
+        return self.layout_metadata().storage_size()
+
+    def offset(self, i: Int, j: Int, k: Int, comp: Int = 0) -> Int:
+        return self.layout_metadata().offset(i, j, k, comp)
+
     def __getitem__(self, i: Int, j: Int, k: Int) -> Float64:
-        return self.data[self.offset(i, j, k)]
+        return self[i, j, k, 0]
 
     def __getitem__(self, i: Int, j: Int, k: Int, comp: Int) -> Float64:
-        return self.data[self.offset(i, j, k, comp)]
+        return self.layout_metadata().get_f64(self.data, i, j, k, comp)
 
     def __setitem__(self, i: Int, j: Int, k: Int, value: Float64):
-        self.data[self.offset(i, j, k)] = value
+        self[i, j, k, 0] = value
 
     def __setitem__(self, i: Int, j: Int, k: Int, comp: Int, value: Float64):
-        self.data[self.offset(i, j, k, comp)] = value
+        self.layout_metadata().set_f64(self.data, i, j, k, comp, value)
 
     def fill(self, box: Box3D, value: Float64, comp: Int = 0):
         for k in range(Int(box.small_end.z), Int(box.big_end.z) + 1):
@@ -243,25 +363,38 @@ struct Array4F32View[origin: Origin[mut=True]](DevicePassable, TrivialRegisterPa
     def get_type_name() -> String:
         return String("Array4F32View")
 
-    def offset(self, i: Int, j: Int, k: Int, comp: Int = 0) -> Int:
-        return (
-            (i - Int(self.lo_x)) * Int(self.stride_i)
-            + (j - Int(self.lo_y)) * Int(self.stride_j)
-            + (k - Int(self.lo_z)) * Int(self.stride_k)
-            + comp * Int(self.stride_n)
+    def layout_metadata(self) -> Array4LayoutMetadata:
+        return Array4LayoutMetadata(
+            lo_x=Int(self.lo_x),
+            lo_y=Int(self.lo_y),
+            lo_z=Int(self.lo_z),
+            hi_x=Int(self.hi_x),
+            hi_y=Int(self.hi_y),
+            hi_z=Int(self.hi_z),
+            stride_i=Int(self.stride_i),
+            stride_j=Int(self.stride_j),
+            stride_k=Int(self.stride_k),
+            stride_n=Int(self.stride_n),
+            ncomp=Int(self.ncomp),
         )
 
+    def storage_size(self) -> Int:
+        return self.layout_metadata().storage_size()
+
+    def offset(self, i: Int, j: Int, k: Int, comp: Int = 0) -> Int:
+        return self.layout_metadata().offset(i, j, k, comp)
+
     def __getitem__(self, i: Int, j: Int, k: Int) -> Float32:
-        return self.data[self.offset(i, j, k)]
+        return self[i, j, k, 0]
 
     def __getitem__(self, i: Int, j: Int, k: Int, comp: Int) -> Float32:
-        return self.data[self.offset(i, j, k, comp)]
+        return self.layout_metadata().get_f32(self.data, i, j, k, comp)
 
     def __setitem__(self, i: Int, j: Int, k: Int, value: Float32):
-        self.data[self.offset(i, j, k)] = value
+        self[i, j, k, 0] = value
 
     def __setitem__(self, i: Int, j: Int, k: Int, comp: Int, value: Float32):
-        self.data[self.offset(i, j, k, comp)] = value
+        self.layout_metadata().set_f32(self.data, i, j, k, comp, value)
 
     def fill(self, box: Box3D, value: Float32, comp: Int = 0):
         for k in range(Int(box.small_end.z), Int(box.big_end.z) + 1):

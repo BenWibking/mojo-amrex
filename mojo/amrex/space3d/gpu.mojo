@@ -9,12 +9,7 @@ from std.gpu.host import DeviceBuffer, DeviceContext
 
 
 def array4_storage_size[origin: Origin[mut=True]](array: Array4F32View[origin]) -> Int:
-    return (
-        (Int(array.hi_x) - Int(array.lo_x) + 1)
-        * (Int(array.hi_y) - Int(array.lo_y) + 1)
-        * (Int(array.hi_z) - Int(array.lo_z) + 1)
-        * Int(array.ncomp)
-    )
+    return array.storage_size()
 
 
 struct StagedArray4F32(Movable):
