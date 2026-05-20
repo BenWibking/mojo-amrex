@@ -26,7 +26,12 @@ from amrex.ffi import (
 )
 from amrex.ownership import require_live_handle
 from amrex.runtime import RuntimeLease, require_matching_gpu_context
-from amrex.space3d.parallelfor import AMREX_MOJO_CAN_COMPILE_GPU_PARALLEL_FOR, ParallelFor, ParallelForCpu
+from amrex.space3d.parallelfor import (
+    AMREX_MOJO_CAN_COMPILE_GPU_PARALLEL_FOR,
+    CompiledParallelFor,
+    ParallelFor,
+    ParallelForCpu,
+)
 from std.builtin.device_passable import DevicePassable
 from std.ffi import c_int
 from std.gpu.host import DeviceContext, DeviceStream
@@ -65,7 +70,10 @@ struct MFIter(Movable):
         self.stream_wrapper = None
         if self._has_gpu_backend():
             if not has_accelerator():
-                raise Error("AMReX has a GPU backend, but Mojo did not find a supported accelerator.")
+                raise Error(
+                    "AMReX has a GPU backend, but Mojo did not find a supported"
+                    " accelerator."
+                )
             self.ctx = Optional[DeviceContext](DeviceContext())
             _ = require_matching_gpu_context(self.runtime, self.ctx.value())
             if self.is_valid():
@@ -86,7 +94,9 @@ struct MFIter(Movable):
                 ]()
             self.runtime[].lib.call["amrex_mojo_gpu_reset_stream"]()
         if self.handle:
-            self.runtime[].lib.call["amrex_mojo_mfiter_destroy"](self.handle.value())
+            self.runtime[].lib.call["amrex_mojo_mfiter_destroy"](
+                self.handle.value()
+            )
 
     def is_valid(ref self) raises -> Bool:
         var handle = self._handle()
@@ -146,7 +156,8 @@ struct MFIter(Movable):
         return self._growntilebox_impl(self.default_ngrow.copy())
 
     def parallel_for[
-        body_type: (def(Int, Int, Int) register_passable -> None) & DevicePassable
+        body_type: (def(Int, Int, Int) register_passable -> None)
+        & DevicePassable
     ](mut self, body: body_type, box: Box3D) raises:
         comptime if not AMREX_MOJO_CAN_COMPILE_GPU_PARALLEL_FOR:
             ParallelForCpu(body, box)
@@ -158,6 +169,40 @@ struct MFIter(Movable):
         if not self.stream_wrapper:
             self._refresh_stream_wrapper()
         ParallelFor(self.ctx.value(), self.stream_wrapper.value(), body, box)
+
+    def compile_parallel_for[
+        body_type: (def(Int, Int, Int) register_passable -> None)
+        & DevicePassable
+    ](mut self, _body: body_type) raises -> CompiledParallelFor[body_type]:
+        comptime if not AMREX_MOJO_CAN_COMPILE_GPU_PARALLEL_FOR:
+            return CompiledParallelFor[body_type]()
+
+        if not self._has_gpu_backend():
+            return CompiledParallelFor[body_type]()
+        return CompiledParallelFor[body_type](self.ctx.value())
+
+    def parallel_for[
+        body_type: (def(Int, Int, Int) register_passable -> None)
+        & DevicePassable
+    ](
+        mut self,
+        ref compiled: CompiledParallelFor[body_type],
+        body: body_type,
+        box: Box3D,
+    ) raises:
+        comptime if not AMREX_MOJO_CAN_COMPILE_GPU_PARALLEL_FOR:
+            ParallelForCpu(body, box)
+            return
+
+        if not self._has_gpu_backend():
+            ParallelForCpu(body, box)
+            return
+        if not compiled.has_gpu_kernel():
+            ParallelForCpu(body, box)
+            return
+        if not self.stream_wrapper:
+            self._refresh_stream_wrapper()
+        compiled.enqueue(self.stream_wrapper.value(), body, box)
 
     def stream_index(ref self) raises -> Int:
         self._require_gpu_backend()
@@ -208,7 +253,10 @@ struct MFIter(Movable):
     def _handle(ref self) raises -> MFIterHandle:
         return require_live_handle(
             self.handle,
-            "MFIter no longer owns a live AMReX handle. The value may have been moved from.",
+            (
+                "MFIter no longer owns a live AMReX handle. The value may have"
+                " been moved from."
+            ),
         )
 
     def _activate_current_stream(mut self) raises:
@@ -216,7 +264,9 @@ struct MFIter(Movable):
             raise Error(last_error_message(self.runtime[].lib))
 
     def _refresh_stream_wrapper(mut self) raises:
-        self.stream_wrapper = Optional[DeviceStream](self.ctx.value().create_external_stream(self.stream_handle()))
+        self.stream_wrapper = Optional[DeviceStream](
+            self.ctx.value().create_external_stream(self.stream_handle())
+        )
 
     def _finalize(mut self) raises:
         if self.finalized:
@@ -236,7 +286,9 @@ struct MFIter(Movable):
 
     def _require_gpu_backend(ref self) raises:
         if not self._has_gpu_backend():
-            raise Error("The loaded AMReX library was built without GPU support.")
+            raise Error(
+                "The loaded AMReX library was built without GPU support."
+            )
 
 
 def create_mfiter(

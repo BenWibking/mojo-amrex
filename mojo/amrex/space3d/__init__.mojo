@@ -21,5 +21,5 @@ from amrex.space3d.geometry import Geometry
 from amrex.space3d.gpu import StagedArray4F32, StagedTileF32
 from amrex.space3d.mfiter import MFIter
 from amrex.space3d.multifab import MultiFab, MultiFabF32
-from amrex.space3d.parallelfor import ParallelFor
+from amrex.space3d.parallelfor import CompiledParallelFor, ParallelFor
 from amrex.space3d.parmparse import ParmParse

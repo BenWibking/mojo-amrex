@@ -13,8 +13,9 @@ from amrex.ffi import (
 from amrex.build_config import AMREX_MOJO_HAS_COMPILED_GPU_BACKEND
 from amrex.loader import load_default_library
 from std.builtin.device_passable import DevicePassable
+from std.builtin.variadics import TypeList
 from std.gpu import global_idx
-from std.gpu.host import DeviceContext, DeviceStream
+from std.gpu.host import DeviceContext, DeviceFunction, DeviceStream
 from std.math import ceildiv
 from std.sys import has_accelerator
 
@@ -36,7 +37,9 @@ def _parallel_for_cpu[
 ](body: body_type, tile_box: Box3D) raises:
     for k in range(Int(tile_box.small_end.z), Int(tile_box.big_end.z) + 1):
         for j in range(Int(tile_box.small_end.y), Int(tile_box.big_end.y) + 1):
-            for i in range(Int(tile_box.small_end.x), Int(tile_box.big_end.x) + 1):
+            for i in range(
+                Int(tile_box.small_end.x), Int(tile_box.big_end.x) + 1
+            ):
                 body(i, j, k)
 
 
@@ -69,12 +72,78 @@ def _parallel_for_kernel[
 def _gpu_context(backend: Int, device_id: Int) raises -> DeviceContext:
     var ctx = DeviceContext()
     if backend == GPU_BACKEND_CUDA and ctx.api() != "cuda":
-        raise Error("AMReX was built for CUDA, but the active Mojo device context is not CUDA.")
+        raise Error(
+            "AMReX was built for CUDA, but the active Mojo device context is"
+            " not CUDA."
+        )
     if backend == GPU_BACKEND_HIP and ctx.api() != "hip":
-        raise Error("AMReX was built for HIP, but the active Mojo device context is not HIP.")
+        raise Error(
+            "AMReX was built for HIP, but the active Mojo device context is not"
+            " HIP."
+        )
     if Int(ctx.id()) != device_id:
-        raise Error("AMReX and the active Mojo device context are using different GPU devices.")
+        raise Error(
+            "AMReX and the active Mojo device context are using different GPU"
+            " devices."
+        )
     return ctx
+
+
+struct CompiledParallelFor[
+    body_type: (def(Int, Int, Int) register_passable -> None) & DevicePassable
+](Movable):
+    """Compiled GPU launcher for one `ParallelFor` body type.
+
+    The captured body value is still provided to `enqueue`, so callers can reuse
+    one compiled kernel for multiple closure values with this same body type.
+    """
+
+    var kernel: Optional[
+        DeviceFunction[
+            _parallel_for_kernel[Self.body_type],
+            TypeList.of[Trait=AnyType, Self.body_type, Box3D].values,
+            target=DeviceContext.default_device_info.target(),
+        ]
+    ]
+
+    def __init__(out self):
+        self.kernel = None
+
+    def __init__(out self, ref ctx: DeviceContext) raises:
+        self.kernel = Optional[
+            DeviceFunction[
+                _parallel_for_kernel[Self.body_type],
+                TypeList.of[Trait=AnyType, Self.body_type, Box3D].values,
+                target=DeviceContext.default_device_info.target(),
+            ]
+        ](
+            ctx.compile_function[
+                _parallel_for_kernel[Self.body_type],
+                _parallel_for_kernel[Self.body_type],
+            ]()
+        )
+
+    def has_gpu_kernel(ref self) -> Bool:
+        if self.kernel:
+            return True
+        return False
+
+    def enqueue(
+        ref self,
+        ref stream: DeviceStream,
+        body: Self.body_type,
+        tile_box: Box3D,
+    ) raises:
+        if not self.kernel:
+            ParallelForCpu(body, tile_box)
+            return
+        stream.enqueue_function(
+            self.kernel.value(),
+            body,
+            tile_box,
+            grid_dim=ceildiv(_cell_count(tile_box), KERNEL_BLOCK_SIZE),
+            block_dim=KERNEL_BLOCK_SIZE,
+        )
 
 
 def ParallelFor[
@@ -91,11 +160,16 @@ def ParallelFor[
         return
 
     if not has_accelerator():
-        raise Error("AMReX has a GPU backend, but Mojo did not find a supported accelerator.")
+        raise Error(
+            "AMReX has a GPU backend, but Mojo did not find a supported"
+            " accelerator."
+        )
 
     var device_id = gpu_device_id(lib)
     if device_id < 0:
-        raise Error("AMReX has a GPU backend, but no active GPU device is available.")
+        raise Error(
+            "AMReX has a GPU backend, but no active GPU device is available."
+        )
 
     var handle = gpu_stream(lib)
     if not handle:
@@ -108,12 +182,11 @@ def ParallelFor[
 
 def ParallelFor[
     body_type: (def(Int, Int, Int) register_passable -> None) & DevicePassable
-](ref ctx: DeviceContext, ref stream: DeviceStream, body: body_type, tile_box: Box3D) raises:
-    var kernel = ctx.compile_function[_parallel_for_kernel[body_type]]()
-    stream.enqueue_function(
-        kernel,
-        body,
-        tile_box,
-        grid_dim=ceildiv(_cell_count(tile_box), KERNEL_BLOCK_SIZE),
-        block_dim=KERNEL_BLOCK_SIZE,
-    )
+](
+    ref ctx: DeviceContext,
+    ref stream: DeviceStream,
+    body: body_type,
+    tile_box: Box3D,
+) raises:
+    var compiled = CompiledParallelFor[body_type](ctx)
+    compiled.enqueue(stream, body, tile_box)

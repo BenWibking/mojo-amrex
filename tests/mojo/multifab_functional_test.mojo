@@ -21,7 +21,9 @@ def expect(condition: Bool, message: StringLiteral) raises:
         raise Error(message)
 
 
-def expect_equal(actual: Float64, expected: Float64, message: StringLiteral) raises:
+def expect_equal(
+    actual: Float64, expected: Float64, message: StringLiteral
+) raises:
     expect(actual == expected, message)
 
 
@@ -30,7 +32,9 @@ def main() raises:
     try:
         var domain = box3d(
             small_end=intvect3d(0, 0, 0),
-            big_end=intvect3d(DOMAIN_EXTENT - 1, DOMAIN_EXTENT - 1, DOMAIN_EXTENT - 1),
+            big_end=intvect3d(
+                DOMAIN_EXTENT - 1, DOMAIN_EXTENT - 1, DOMAIN_EXTENT - 1
+            ),
         )
 
         var boxarray = BoxArray(runtime, domain)
@@ -46,8 +50,12 @@ def main() raises:
         )
 
         var source = MultiFab(runtime, boxarray, distmap, 1, intvect3d(1, 1, 1))
-        var destination = MultiFab(runtime, boxarray, distmap, 1, intvect3d(1, 1, 1))
-        var copy_target = MultiFab(runtime, boxarray, distmap, 1, intvect3d(1, 1, 1))
+        var destination = MultiFab(
+            runtime, boxarray, distmap, 1, intvect3d(1, 1, 1)
+        )
+        var copy_target = MultiFab(
+            runtime, boxarray, distmap, 1, intvect3d(1, 1, 1)
+        )
 
         expect(source.ncomp() == 1, "source should have one component")
         var ngrow = source.ngrow()
@@ -58,7 +66,9 @@ def main() raises:
 
         var params = ParmParse(runtime, "multifab_functional_test")
         params.add_int("tile_add", 3)
-        expect(params.query_int("tile_add") == 3, "ParmParse query_int mismatch")
+        expect(
+            params.query_int("tile_add") == 3, "ParmParse query_int mismatch"
+        )
         expect(
             params.query_int_or("missing_value", 11) == 11,
             "ParmParse query_int_or mismatch",
@@ -80,7 +90,9 @@ def main() raises:
             var src_array = source.array(mfi)
             var add_value = Float64(params.query_int("tile_add"))
 
-            def add_cell(i: Int, j: Int, k: Int) register_passable {var dst_array^, var src_array^, var add_value}:
+            def add_cell(
+                i: Int, j: Int, k: Int
+            ) register_passable {var dst_array^, var src_array^, var add_value}:
                 dst_array[i, j, k] = src_array[i, j, k] + add_value
 
             mfi.parallel_for(add_cell, tile_box)
@@ -92,14 +104,63 @@ def main() raises:
             "MFIter should visit every tile",
         )
 
+        var single_tile_boxarray = BoxArray(runtime, domain)
+        single_tile_boxarray.max_size(DOMAIN_EXTENT)
+        var single_tile_distmap = DistributionMapping(
+            runtime, single_tile_boxarray
+        )
+        var compiled_source = MultiFab(
+            runtime, single_tile_boxarray, single_tile_distmap, 1
+        )
+        var compiled_destination = MultiFab(
+            runtime, single_tile_boxarray, single_tile_distmap, 1
+        )
+        compiled_source.set_val(4.0)
+        compiled_destination.set_val(0.0)
+
+        var compiled_mfi = compiled_destination.mfiter()
+        if not compiled_mfi.is_valid():
+            raise Error(
+                "multifab_functional_test requires at least one local tile."
+            )
+        var compiled_tile_box = compiled_mfi.tilebox()
+        var compiled_dst_array = compiled_destination.array(compiled_mfi)
+        var compiled_src_array = compiled_source.array(compiled_mfi)
+
+        def add_compiled_cell(
+            i: Int, j: Int, k: Int
+        ) register_passable {var compiled_dst_array^, var compiled_src_array^}:
+            compiled_dst_array[i, j, k] = compiled_src_array[i, j, k] + 1.0
+
+        var compiled_parallel_for = compiled_mfi.compile_parallel_for(
+            add_compiled_cell
+        )
+        compiled_mfi.parallel_for(
+            compiled_parallel_for, add_compiled_cell, compiled_tile_box
+        )
+        compiled_mfi.next()
+        expect(
+            not compiled_mfi.is_valid(),
+            "compiled parallel_for smoke case should use one local tile",
+        )
+        expect_equal(
+            compiled_destination.sum(0),
+            5.0 * Float64(DOMAIN_CELLS),
+            "compiled parallel_for update mismatch",
+        )
+
         if runtime.gpu_backend() != "none" and default_memory.device_accessible:
             var gpu_mfi = default_multifab.mfiter()
             var gpu_iterated_tiles = 0
             var num_gpu_streams = runtime.gpu_num_streams()
             while gpu_mfi.is_valid():
                 expect(
-                    gpu_mfi.stream_index() == gpu_iterated_tiles % num_gpu_streams,
-                    "MFIter stream index should round-robin over the active stream set",
+                    gpu_mfi.stream_index()
+                    == gpu_iterated_tiles % num_gpu_streams,
+                    (
+                        "MFIter stream index should round-robin over the active"
+                        " stream set"
+                    ),
                 )
                 _ = gpu_mfi.tilebox()
                 _ = gpu_mfi.validbox()
@@ -142,8 +203,12 @@ def main() raises:
             3.0 * Float64(DOMAIN_CELLS),
             "destination.sum after mult mismatch",
         )
-        expect_equal(destination.min(0), 3.0, "destination.min after mult mismatch")
-        expect_equal(destination.max(0), 3.0, "destination.max after mult mismatch")
+        expect_equal(
+            destination.min(0), 3.0, "destination.min after mult mismatch"
+        )
+        expect_equal(
+            destination.max(0), 3.0, "destination.max after mult mismatch"
+        )
         expect_equal(
             destination.norm1(0),
             3.0 * Float64(DOMAIN_CELLS),
@@ -156,8 +221,12 @@ def main() raises:
             "copy_target.sum mismatch",
         )
 
-        var source_f32 = MultiFabF32(runtime, boxarray, distmap, 1, intvect3d(1, 1, 1))
-        var destination_f32 = MultiFabF32(runtime, boxarray, distmap, 1, intvect3d(1, 1, 1))
+        var source_f32 = MultiFabF32(
+            runtime, boxarray, distmap, 1, intvect3d(1, 1, 1)
+        )
+        var destination_f32 = MultiFabF32(
+            runtime, boxarray, distmap, 1, intvect3d(1, 1, 1)
+        )
         source_f32.set_val(Float32(1.25))
         destination_f32.set_val(Float32(0.0))
         destination_f32.copy_from(source_f32, 0, 0, 1)
@@ -173,7 +242,9 @@ def main() raises:
             var dst_array_f32 = destination_f32.array(mfi_f32)
             var src_array_f32 = source_f32.array(mfi_f32)
 
-            def add_cell_f32(i: Int, j: Int, k: Int) register_passable {var dst_array_f32^, var src_array_f32^}:
+            def add_cell_f32(
+                i: Int, j: Int, k: Int
+            ) register_passable {var dst_array_f32^, var src_array_f32^}:
                 dst_array_f32[i, j, k] = src_array_f32[i, j, k] + Float32(0.5)
 
             mfi_f32.parallel_for(add_cell_f32, tile_box_f32)
@@ -190,15 +261,21 @@ def main() raises:
             2.0,
             "destination_f32.max after plus mismatch",
         )
-        var plotfile_path_f32 = String("build/multifab_functional_test_plotfile_f32")
+        var plotfile_path_f32 = String(
+            "build/multifab_functional_test_plotfile_f32"
+        )
         destination_f32.write_single_level_plotfile(plotfile_path_f32, geometry)
         expect(
             exists(plotfile_path_f32 + "/Header"),
             "Float32 plotfile Header was not written",
         )
 
-        var comm_source = MultiFab(runtime, boxarray, distmap, 1, intvect3d(1, 1, 1))
-        var comm_destination = MultiFab(runtime, boxarray, distmap, 1, intvect3d(1, 1, 1))
+        var comm_source = MultiFab(
+            runtime, boxarray, distmap, 1, intvect3d(1, 1, 1)
+        )
+        var comm_destination = MultiFab(
+            runtime, boxarray, distmap, 1, intvect3d(1, 1, 1)
+        )
         comm_source.set_val(0.0)
         comm_destination.set_val(0.0)
 
@@ -208,7 +285,9 @@ def main() raises:
             var comm_array = comm_source.array(comm_mfi)
             var comm_tile_box = comm_mfi.tilebox()
 
-            def fill_rank_cell(i: Int, j: Int, k: Int) register_passable {var comm_array^, var rank_value}:
+            def fill_rank_cell(
+                i: Int, j: Int, k: Int
+            ) register_passable {var comm_array^, var rank_value}:
                 comm_array[i, j, k] = rank_value
 
             comm_mfi.parallel_for(fill_rank_cell, comm_tile_box)
