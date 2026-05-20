@@ -1,5 +1,5 @@
 from std.collections import List
-from std.builtin.device_passable import DevicePassable
+from std.builtin.device_passable import DevicePassable, DeviceTypeEncoder
 from std.ffi import OwnedDLHandle, c_char, c_double, c_float, c_int
 from layout import Coord, Idx, TileTensor
 from layout.tile_layout import Layout
@@ -35,7 +35,7 @@ comptime MULTIFAB_DATATYPE_FLOAT32 = 1
 
 def init_device_passable_value[
     T: TrivialRegisterPassable,
-    mut_origin: Origin[mut=True],
+    mut_origin: MutOrigin,
 ](value: T, target: UnsafePointer[NoneType, mut_origin]):
     target.bitcast[T]().init_pointee_copy(value)
 
@@ -48,9 +48,7 @@ struct IntVect3D(DevicePassable, TrivialRegisterPassable):
     var y: c_int
     var z: c_int
 
-    def _to_device_type[
-        mut_origin: Origin[mut=True]
-    ](self, target: UnsafePointer[NoneType, mut_origin],):
+    def _to_device_type(self, mut encoder: Some[DeviceTypeEncoder], target: UnsafePointer[mut=True, NoneType, _]):
         init_device_passable_value(self, target)
 
     @staticmethod
@@ -66,9 +64,7 @@ struct Box3D(DevicePassable, TrivialRegisterPassable):
     var big_end: IntVect3D
     var nodal: IntVect3D
 
-    def _to_device_type[
-        mut_origin: Origin[mut=True]
-    ](self, target: UnsafePointer[NoneType, mut_origin],):
+    def _to_device_type(self, mut encoder: Some[DeviceTypeEncoder], target: UnsafePointer[mut=True, NoneType, _]):
         init_device_passable_value(self, target)
 
     @staticmethod
@@ -94,9 +90,7 @@ struct RealVect3D(DevicePassable, TrivialRegisterPassable):
     var y: Float64
     var z: Float64
 
-    def _to_device_type[
-        mut_origin: Origin[mut=True]
-    ](self, target: UnsafePointer[NoneType, mut_origin],):
+    def _to_device_type(self, mut encoder: Some[DeviceTypeEncoder], target: UnsafePointer[mut=True, NoneType, _]):
         init_device_passable_value(self, target)
 
     @staticmethod
@@ -272,9 +266,7 @@ struct Array4F64View[origin: Origin[mut=True]](DevicePassable, TrivialRegisterPa
             ncomp=self.ncomp,
         )
 
-    def _to_device_type[
-        mut_origin: Origin[mut=True]
-    ](self, target: UnsafePointer[NoneType, mut_origin],):
+    def _to_device_type(self, mut encoder: Some[DeviceTypeEncoder], target: UnsafePointer[mut=True, NoneType, _]):
         init_device_passable_value(self.device_view(), target)
 
     @staticmethod
@@ -354,9 +346,7 @@ struct Array4F32View[origin: Origin[mut=True]](DevicePassable, TrivialRegisterPa
             ncomp=self.ncomp,
         )
 
-    def _to_device_type[
-        mut_origin: Origin[mut=True]
-    ](self, target: UnsafePointer[NoneType, mut_origin],):
+    def _to_device_type(self, mut encoder: Some[DeviceTypeEncoder], target: UnsafePointer[mut=True, NoneType, _]):
         init_device_passable_value(self.device_view(), target)
 
     @staticmethod
@@ -418,9 +408,7 @@ struct TileF64View[origin: Origin[mut=True]](DevicePassable, TrivialRegisterPass
             array_view=self.array_view.device_view(),
         )
 
-    def _to_device_type[
-        mut_origin: Origin[mut=True]
-    ](self, target: UnsafePointer[NoneType, mut_origin],):
+    def _to_device_type(self, mut encoder: Some[DeviceTypeEncoder], target: UnsafePointer[mut=True, NoneType, _]):
         init_device_passable_value(self.device_view(), target)
 
     @staticmethod
@@ -449,9 +437,7 @@ struct TileF32View[origin: Origin[mut=True]](DevicePassable, TrivialRegisterPass
             array_view=self.array_view.device_view(),
         )
 
-    def _to_device_type[
-        mut_origin: Origin[mut=True]
-    ](self, target: UnsafePointer[NoneType, mut_origin],):
+    def _to_device_type(self, mut encoder: Some[DeviceTypeEncoder], target: UnsafePointer[mut=True, NoneType, _]):
         init_device_passable_value(self.device_view(), target)
 
     @staticmethod
