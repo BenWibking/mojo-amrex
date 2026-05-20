@@ -173,13 +173,19 @@ struct MFIter(Movable):
     def compile_parallel_for[
         body_type: (def(Int, Int, Int) register_passable -> None)
         & DevicePassable
-    ](mut self, _body: body_type) raises -> CompiledParallelFor[body_type]:
+    ](mut self,) raises -> CompiledParallelFor[body_type]:
         comptime if not AMREX_MOJO_CAN_COMPILE_GPU_PARALLEL_FOR:
             return CompiledParallelFor[body_type]()
 
         if not self._has_gpu_backend():
             return CompiledParallelFor[body_type]()
         return CompiledParallelFor[body_type](self.ctx.value())
+
+    def compile_parallel_for[
+        body_type: (def(Int, Int, Int) register_passable -> None)
+        & DevicePassable
+    ](mut self, _body: body_type) raises -> CompiledParallelFor[body_type]:
+        return self.compile_parallel_for[body_type]()
 
     def parallel_for[
         body_type: (def(Int, Int, Int) register_passable -> None)
