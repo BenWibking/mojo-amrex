@@ -81,7 +81,7 @@ def main() raises:
             _ = mfi.local_tile_index()
             var dst_array = destination.array(mfi)
             var src_array = source.array(mfi)
-            var add_value = Float64(params.query[ParmInt]("tile_add"))
+            var add_value: Float64 = Float64(params.query[ParmInt]("tile_add"))
 
             def add_cell(i: Int, j: Int, k: Int) register_passable {var dst_array^, var src_array^, var add_value}:
                 dst_array[i, j, k] = src_array[i, j, k] + add_value

@@ -28,11 +28,16 @@ def initialize_phi(mut phi_old: MultiFab[DType.float64], dx: RealVect3D) raises:
         var bx = mfi.validbox()
         var phi_old_array = phi_old.array(mfi)
         var tile_dx = dx.copy()
+        var dx_x = tile_dx.x
+        var dx_y = tile_dx.y
+        var dx_z = tile_dx.z
 
-        def initialize_cell(i: Int, j: Int, k: Int) register_passable {var phi_old_array^, var tile_dx^}:
-            var x = (Float64(i) + 0.5) * tile_dx.x
-            var y = (Float64(j) + 0.5) * tile_dx.y
-            var z = (Float64(k) + 0.5) * tile_dx.z
+        def initialize_cell(
+            i: Int, j: Int, k: Int
+        ) register_passable {var phi_old_array^, var dx_x, var dx_y, var dx_z}:
+            var x = (Float64(i) + 0.5) * dx_x
+            var y = (Float64(j) + 0.5) * dx_y
+            var z = (Float64(k) + 0.5) * dx_z
             var rsquared = ((x - 0.5) * (x - 0.5) + (y - 0.5) * (y - 0.5) + (z - 0.5) * (z - 0.5)) / 0.01
             phi_old_array[i, j, k] = 1.0 + exp(-rsquared)
 
@@ -59,10 +64,10 @@ struct HeatEquationRunner(Movable, Writable):
         var runtime = AmrexRuntime(argv, use_parmparse=True)
         try:
             var params = ParmParse(runtime)
-            var n_cell = params.get[ParmInt]("n_cell")
-            var max_grid_size = params.get[ParmInt]("max_grid_size")
-            var nsteps = params.query_or[ParmInt]("nsteps", 10)
-            var dt = params.get[ParmReal]("dt")
+            var n_cell: Int = params.get[ParmInt]("n_cell")
+            var max_grid_size: Int = params.get[ParmInt]("max_grid_size")
+            var nsteps: Int = params.query_or[ParmInt]("nsteps", 10)
+            var dt: Float64 = params.get[ParmReal]("dt")
 
             var dom_lo = intvect3d(0, 0, 0)
             var dom_hi = intvect3d(n_cell - 1, n_cell - 1, n_cell - 1)
@@ -140,18 +145,21 @@ struct HeatEquationRunner(Movable, Writable):
             var phi_old_array = self.phi_old.array(update_mfi)
             var phi_new_array = self.phi_new.array(update_mfi)
             var tile_dx = self.dx.copy()
+            var dx_x = tile_dx.x
+            var dx_y = tile_dx.y
+            var dx_z = tile_dx.z
             var dt = self.dt
 
             def advance_cell(
                 i: Int, j: Int, k: Int
-            ) register_passable {var phi_new_array^, var phi_old_array^, var tile_dx^, var dt,}:
+            ) register_passable {var phi_new_array^, var phi_old_array^, var dx_x, var dx_y, var dx_z, var dt,}:
                 phi_new_array[i, j, k] = phi_old_array[i, j, k] + dt * (
                     (phi_old_array[i + 1, j, k] - 2.0 * phi_old_array[i, j, k] + phi_old_array[i - 1, j, k])
-                    / (tile_dx.x * tile_dx.x)
+                    / (dx_x * dx_x)
                     + (phi_old_array[i, j + 1, k] - 2.0 * phi_old_array[i, j, k] + phi_old_array[i, j - 1, k])
-                    / (tile_dx.y * tile_dx.y)
+                    / (dx_y * dx_y)
                     + (phi_old_array[i, j, k + 1] - 2.0 * phi_old_array[i, j, k] + phi_old_array[i, j, k - 1])
-                    / (tile_dx.z * tile_dx.z)
+                    / (dx_z * dx_z)
                 )
 
             ParallelFor(advance_cell, bx)

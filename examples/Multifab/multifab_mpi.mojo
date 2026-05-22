@@ -133,8 +133,8 @@ def main() raises:
         )
 
         var params = ParmParse(runtime, "multifab_mpi_exchange")
-        var left_value = params.query[ParmInt]("left_value")
-        var right_value = params.query[ParmInt]("right_value")
+        var left_value: Int = params.query[ParmInt]("left_value")
+        var right_value: Int = params.query[ParmInt]("right_value")
 
         var domain = box3d(
             small_end=intvect3d(0, 0, 0),

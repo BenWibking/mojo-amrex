@@ -43,7 +43,7 @@ def main() raises:
         var params = ParmParse(runtime, parmparse_prefix)
         params.add[ParmInt](tile_fill_name, 42)
 
-        var fill_value = params.query[ParmInt](tile_fill_name)
+        var fill_value: Int = params.query[ParmInt](tile_fill_name)
         source.for_each_tile[fill_tile]()
         multifab.set_val(0.0)
 
