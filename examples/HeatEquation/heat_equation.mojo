@@ -11,7 +11,9 @@ from amrex.space3d import (
     DistributionMapping,
     Geometry,
     MultiFab,
+    ParmInt,
     ParmParse,
+    ParmReal,
     box3d,
     intvect3d,
     realbox3d,
@@ -46,11 +48,11 @@ def main() raises:
 
         var params = ParmParse(runtime)
 
-        var n_cell = params.get_int("n_cell")
-        var max_grid_size = params.get_int("max_grid_size")
-        var nsteps = params.query_int_or("nsteps", 10)
-        var plot_int = params.query_int_or("plot_int", -1)
-        var dt = params.get_real("dt")
+        var n_cell = params.get[ParmInt]("n_cell")
+        var max_grid_size = params.get[ParmInt]("max_grid_size")
+        var nsteps = params.query_or[ParmInt]("nsteps", 10)
+        var plot_int = params.query_or[ParmInt]("plot_int", -1)
+        var dt = params.get[ParmReal]("dt")
 
         # **********************************
         # DEFINE SIMULATION SETUP AND GEOMETRY
@@ -68,14 +70,14 @@ def main() raises:
         var geometry = Geometry(runtime, domain, real_box, is_periodic)
         var distmap = DistributionMapping(runtime, boxarray)
 
-        var phi_old = MultiFab(
+        var phi_old = MultiFab[DType.float64](
             runtime,
             boxarray,
             distmap,
             1,
             intvect3d(1, 1, 1),
         )
-        var phi_new = MultiFab(
+        var phi_new = MultiFab[DType.float64](
             runtime,
             boxarray,
             distmap,

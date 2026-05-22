@@ -4,15 +4,16 @@ from amrex.space3d import (
     DistributionMapping,
     Geometry,
     MultiFab,
+    ParmInt,
     ParmParse,
-    TileF64View,
+    ParallelFor,
+    TileView,
     box3d,
     intvect3d,
-    ParallelFor,
 )
 
 
-def fill_tile[owner_origin: Origin[mut=True]](tile: TileF64View[owner_origin]) raises:
+def fill_tile[owner_origin: Origin[mut=True]](tile: TileView[DType.float64, owner_origin]) raises:
     tile.fill(1.0)
 
 
@@ -33,16 +34,16 @@ def main() raises:
         var prob_domain = geometry.prob_domain()
         var cell_size = geometry.cell_size()
         var periodicity = geometry.periodicity()
-        var multifab = MultiFab(runtime, boxarray, distmap, 1, intvect3d(1, 1, 1))
-        var source = MultiFab(runtime, boxarray, distmap, 1, intvect3d(1, 1, 1))
+        var multifab = MultiFab[DType.float64](runtime, boxarray, distmap, 1, intvect3d(1, 1, 1))
+        var source = MultiFab[DType.float64](runtime, boxarray, distmap, 1, intvect3d(1, 1, 1))
 
         var parmparse_prefix = String("multifab_smoke")
         var tile_fill_name = String("tile_fill_value")
         var plotfile_path = String("build/multifab_smoke_plotfile")
         var params = ParmParse(runtime, parmparse_prefix)
-        params.add_int(tile_fill_name, 42)
+        params.add[ParmInt](tile_fill_name, 42)
 
-        var fill_value = params.query_int(tile_fill_name)
+        var fill_value = params.query[ParmInt](tile_fill_name)
         source.for_each_tile[fill_tile]()
         multifab.set_val(0.0)
 

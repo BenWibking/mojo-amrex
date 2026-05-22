@@ -1,11 +1,12 @@
 from amrex.space3d import (
     AmrexRuntime,
-    Array4F64View,
+    Array4View,
     Box3D,
     BoxArray,
     DistributionMapping,
     Geometry,
     MultiFab,
+    ParmInt,
     ParmParse,
     box3d,
     intvect3d,
@@ -37,7 +38,7 @@ def expect_close(
 
 def fill_box_value[
     owner_origin: Origin[mut=True]
-](array: Array4F64View[owner_origin], box: Box3D, value: Float64) raises:
+](array: Array4View[DType.float64, owner_origin], box: Box3D, value: Float64) raises:
     for k in range(Int(box.small_end.z), Int(box.big_end.z) + 1):
         for j in range(Int(box.small_end.y), Int(box.big_end.y) + 1):
             for i in range(Int(box.small_end.x), Int(box.big_end.x) + 1):
@@ -67,7 +68,9 @@ def box_contains(box: Box3D, i: Int, j: Int, k: Int) raises -> Bool:
     )
 
 
-def has_nonzero_ghost_cells(mut multifab: MultiFab) raises -> Bool:
+def has_nonzero_ghost_cells(
+    mut multifab: MultiFab[DType.float64],
+) raises -> Bool:
     var mfi = multifab.mfiter()
     while mfi.is_valid():
         var valid_box = mfi.validbox()
@@ -86,7 +89,9 @@ def has_nonzero_ghost_cells(mut multifab: MultiFab) raises -> Bool:
     return False
 
 
-def interface_ghost_sample(mut multifab: MultiFab) raises -> Float64:
+def interface_ghost_sample(
+    mut multifab: MultiFab[DType.float64],
+) raises -> Float64:
     var mfi = multifab.mfiter()
     while mfi.is_valid():
         var valid_box = mfi.validbox()
@@ -102,7 +107,9 @@ def interface_ghost_sample(mut multifab: MultiFab) raises -> Float64:
     raise Error("expected a local tile touching the slab interface")
 
 
-def interface_expected_value(mut multifab: MultiFab, left_value: Int, right_value: Int) raises -> Float64:
+def interface_expected_value(
+    mut multifab: MultiFab[DType.float64], left_value: Int, right_value: Int
+) raises -> Float64:
     var mfi = multifab.mfiter()
     while mfi.is_valid():
         var valid_box = mfi.validbox()
@@ -126,8 +133,8 @@ def main() raises:
         )
 
         var params = ParmParse(runtime, "multifab_mpi_exchange")
-        var left_value = params.query_int("left_value")
-        var right_value = params.query_int("right_value")
+        var left_value = params.query[ParmInt]("left_value")
+        var right_value = params.query[ParmInt]("right_value")
 
         var domain = box3d(
             small_end=intvect3d(0, 0, 0),
@@ -144,8 +151,8 @@ def main() raises:
 
         var distmap = DistributionMapping(runtime, boxarray)
         var geometry = Geometry(runtime, domain)
-        var source = MultiFab(runtime, boxarray, distmap, 1, intvect3d(1, 1, 1))
-        var destination = MultiFab(runtime, boxarray, distmap, 1, intvect3d(1, 1, 1))
+        var source = MultiFab[DType.float64](runtime, boxarray, distmap, 1, intvect3d(1, 1, 1))
+        var destination = MultiFab[DType.float64](runtime, boxarray, distmap, 1, intvect3d(1, 1, 1))
 
         source.set_val(0.0)
         destination.set_val(0.0)

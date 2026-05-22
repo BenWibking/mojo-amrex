@@ -7,7 +7,9 @@ from amrex.space3d import (
     Geometry,
     MultiFab,
     ParallelFor,
+    ParmInt,
     ParmParse,
+    ParmReal,
     RealVect3D,
     box3d,
     intvect3d,
@@ -20,7 +22,7 @@ from std.python import Python, PythonObject
 from std.python.bindings import PythonModuleBuilder
 
 
-def initialize_phi(mut phi_old: MultiFab, dx: RealVect3D) raises:
+def initialize_phi(mut phi_old: MultiFab[DType.float64], dx: RealVect3D) raises:
     var mfi = phi_old.mfiter()
     while mfi.is_valid():
         var bx = mfi.validbox()
@@ -41,8 +43,8 @@ def initialize_phi(mut phi_old: MultiFab, dx: RealVect3D) raises:
 struct HeatEquationRunner(Movable, Writable):
     var runtime: AmrexRuntime
     var geometry: Geometry
-    var phi_old: MultiFab
-    var phi_new: MultiFab
+    var phi_old: MultiFab[DType.float64]
+    var phi_new: MultiFab[DType.float64]
     var dx: RealVect3D
     var dt: Float64
     var nsteps: Int
@@ -57,10 +59,10 @@ struct HeatEquationRunner(Movable, Writable):
         var runtime = AmrexRuntime(argv, use_parmparse=True)
         try:
             var params = ParmParse(runtime)
-            var n_cell = params.get_int("n_cell")
-            var max_grid_size = params.get_int("max_grid_size")
-            var nsteps = params.query_int_or("nsteps", 10)
-            var dt = params.get_real("dt")
+            var n_cell = params.get[ParmInt]("n_cell")
+            var max_grid_size = params.get[ParmInt]("max_grid_size")
+            var nsteps = params.query_or[ParmInt]("nsteps", 10)
+            var dt = params.get[ParmReal]("dt")
 
             var dom_lo = intvect3d(0, 0, 0)
             var dom_hi = intvect3d(n_cell - 1, n_cell - 1, n_cell - 1)
@@ -78,14 +80,14 @@ struct HeatEquationRunner(Movable, Writable):
             var ncomp = 1
 
             var distmap = DistributionMapping(runtime, boxarray)
-            var phi_old = MultiFab(
+            var phi_old = MultiFab[DType.float64](
                 runtime,
                 boxarray,
                 distmap,
                 ncomp,
                 intvect3d(nghost, nghost, nghost),
             )
-            var phi_new = MultiFab(
+            var phi_new = MultiFab[DType.float64](
                 runtime,
                 boxarray,
                 distmap,

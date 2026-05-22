@@ -8,14 +8,12 @@ Expected contents in future revisions:
 """
 
 from amrex.ffi import (
-    Array4F32View,
-    Array4F64View,
+    Array4View,
     Box3D,
     IntVect3D,
     RealBox3D,
     RealVect3D,
-    TileF32View,
-    TileF64View,
+    TileView,
     box3d,
     intvect3d,
     realbox3d,

@@ -10,14 +10,14 @@ end-to-end run.
 
 `examples/Multifab/multifab_gpu.mojo` is the smaller direct CUDA/HIP interop
 example. It wraps the current AMReX stream in Mojo and launches Mojo kernels
-directly over AMReX-managed device-accessible `MultiFabF32` storage.
+directly over AMReX-managed device-accessible `MultiFab[DType.float32]` storage.
 
 `examples/HeatEquation/heat_equation_gpu.mojo` is the larger direct interop
 example. It applies the same stream-sharing path to the heat-equation update
 loop and bundled `heat_equation_gpu.inputs` driver.
 
 The portable staged path still exists in `amrex.space3d.gpu` through
-`StagedArray4F32` and `StagedTileF32`, but there is currently no dedicated
+`StagedArray4` and `StagedTile`, but there is currently no dedicated
 standalone staged-GPU example script in `examples/`.
 
 The intended smoke sequence is:

@@ -4,7 +4,7 @@ from amrex.space3d import (
     DistributionMapping,
     Geometry,
     MultiFab,
-    MultiFabF32,
+    ParmInt,
     ParmParse,
     box3d,
     intvect3d,
@@ -38,16 +38,16 @@ def main() raises:
 
         var distmap = DistributionMapping(runtime, boxarray)
         var geometry = Geometry(runtime, domain)
-        var default_multifab = MultiFab(runtime, boxarray, distmap, 1)
+        var default_multifab = MultiFab[DType.float64](runtime, boxarray, distmap, 1)
         var default_memory = default_multifab.memory_info()
         expect(
             default_memory.host_accessible or default_memory.device_accessible,
             "default multifab should expose host or device storage",
         )
 
-        var source = MultiFab(runtime, boxarray, distmap, 1, intvect3d(1, 1, 1))
-        var destination = MultiFab(runtime, boxarray, distmap, 1, intvect3d(1, 1, 1))
-        var copy_target = MultiFab(runtime, boxarray, distmap, 1, intvect3d(1, 1, 1))
+        var source = MultiFab[DType.float64](runtime, boxarray, distmap, 1, intvect3d(1, 1, 1))
+        var destination = MultiFab[DType.float64](runtime, boxarray, distmap, 1, intvect3d(1, 1, 1))
+        var copy_target = MultiFab[DType.float64](runtime, boxarray, distmap, 1, intvect3d(1, 1, 1))
 
         expect(source.ncomp() == 1, "source should have one component")
         var ngrow = source.ngrow()
@@ -57,10 +57,13 @@ def main() raises:
         )
 
         var params = ParmParse(runtime, "multifab_functional_test")
-        params.add_int("tile_add", 3)
-        expect(params.query_int("tile_add") == 3, "ParmParse query_int mismatch")
+        params.add[ParmInt]("tile_add", 3)
         expect(
-            params.query_int_or("missing_value", 11) == 11,
+            params.query[ParmInt]("tile_add") == 3,
+            "ParmParse query_int mismatch",
+        )
+        expect(
+            params.query_or[ParmInt]("missing_value", 11) == 11,
             "ParmParse query_int_or mismatch",
         )
 
@@ -78,7 +81,7 @@ def main() raises:
             _ = mfi.local_tile_index()
             var dst_array = destination.array(mfi)
             var src_array = source.array(mfi)
-            var add_value = Float64(params.query_int("tile_add"))
+            var add_value = Float64(params.query[ParmInt]("tile_add"))
 
             def add_cell(i: Int, j: Int, k: Int) register_passable {var dst_array^, var src_array^, var add_value}:
                 dst_array[i, j, k] = src_array[i, j, k] + add_value
@@ -156,8 +159,8 @@ def main() raises:
             "copy_target.sum mismatch",
         )
 
-        var source_f32 = MultiFabF32(runtime, boxarray, distmap, 1, intvect3d(1, 1, 1))
-        var destination_f32 = MultiFabF32(runtime, boxarray, distmap, 1, intvect3d(1, 1, 1))
+        var source_f32 = MultiFab[DType.float32](runtime, boxarray, distmap, 1, intvect3d(1, 1, 1))
+        var destination_f32 = MultiFab[DType.float32](runtime, boxarray, distmap, 1, intvect3d(1, 1, 1))
         source_f32.set_val(Float32(1.25))
         destination_f32.set_val(Float32(0.0))
         destination_f32.copy_from(source_f32, 0, 0, 1)
@@ -197,8 +200,8 @@ def main() raises:
             "Float32 plotfile Header was not written",
         )
 
-        var comm_source = MultiFab(runtime, boxarray, distmap, 1, intvect3d(1, 1, 1))
-        var comm_destination = MultiFab(runtime, boxarray, distmap, 1, intvect3d(1, 1, 1))
+        var comm_source = MultiFab[DType.float64](runtime, boxarray, distmap, 1, intvect3d(1, 1, 1))
+        var comm_destination = MultiFab[DType.float64](runtime, boxarray, distmap, 1, intvect3d(1, 1, 1))
         comm_source.set_val(0.0)
         comm_destination.set_val(0.0)
 

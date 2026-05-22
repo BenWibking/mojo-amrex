@@ -3,7 +3,9 @@ from amrex.space3d import (
     BoxArray,
     DistributionMapping,
     Geometry,
+    ParmInt,
     ParmParse,
+    ParmReal,
     box3d,
     intvect3d,
     realbox3d,
@@ -62,10 +64,10 @@ def main() raises:
                 raise e^
 
         var params = ParmParse(runtime, "runtime_geometry_test")
-        expect(params.get_int("answer") == 17, "ParmParse get_int mismatch")
-        expect(params.get_real("dt") == 0.125, "ParmParse get_real mismatch")
+        expect(params.get[ParmInt]("answer") == 17, "ParmParse get_int mismatch")
+        expect(params.get[ParmReal]("dt") == 0.125, "ParmParse get_real mismatch")
         expect(
-            params.query_real_or("missing_dt", 0.5) == 0.5,
+            params.query_or[ParmReal]("missing_dt", 0.5) == 0.5,
             "ParmParse query_real_or mismatch",
         )
 

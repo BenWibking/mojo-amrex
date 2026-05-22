@@ -11,6 +11,106 @@ from amrex.ffi import (
 )
 from amrex.ownership import require_live_handle
 from amrex.runtime import AmrexRuntime, RuntimeLease
+from std.ffi import OwnedDLHandle
+
+
+trait ParmValue:
+    comptime value_type: AnyType
+
+    @staticmethod
+    def add(
+        ref lib: OwnedDLHandle,
+        handle: ParmParseHandle,
+        name: String,
+        value: Self.value_type,
+    ) raises:
+        ...
+
+    @staticmethod
+    def query_required(ref lib: OwnedDLHandle, handle: ParmParseHandle, name: String) raises -> Self.value_type:
+        ...
+
+    @staticmethod
+    def query_or(
+        ref lib: OwnedDLHandle,
+        handle: ParmParseHandle,
+        name: String,
+        default_value: Self.value_type,
+    ) raises -> Self.value_type:
+        ...
+
+
+struct ParmInt(ParmValue):
+    comptime value_type = Int
+
+    @staticmethod
+    def add(
+        ref lib: OwnedDLHandle,
+        handle: ParmParseHandle,
+        name: String,
+        value: Int,
+    ) raises:
+        if parmparse_add_int(lib, handle, name, value) != 0:
+            raise Error(last_error_message(lib))
+
+    @staticmethod
+    def query_required(ref lib: OwnedDLHandle, handle: ParmParseHandle, name: String) raises -> Int:
+        var result = parmparse_query_int(lib, handle, name)
+        if result.status != 0:
+            raise Error(last_error_message(lib))
+        if not result.found:
+            raise Error("ParmParse integer value was not found.")
+        return result.value
+
+    @staticmethod
+    def query_or(
+        ref lib: OwnedDLHandle,
+        handle: ParmParseHandle,
+        name: String,
+        default_value: Int,
+    ) raises -> Int:
+        var result = parmparse_query_int(lib, handle, name)
+        if result.status != 0:
+            raise Error(last_error_message(lib))
+        if not result.found:
+            return default_value
+        return result.value
+
+
+struct ParmReal(ParmValue):
+    comptime value_type = Float64
+
+    @staticmethod
+    def add(
+        ref lib: OwnedDLHandle,
+        handle: ParmParseHandle,
+        name: String,
+        value: Float64,
+    ) raises:
+        raise Error("ParmParse real add is not supported by the C ABI.")
+
+    @staticmethod
+    def query_required(ref lib: OwnedDLHandle, handle: ParmParseHandle, name: String) raises -> Float64:
+        var result = parmparse_query_real(lib, handle, name)
+        if result.status != 0:
+            raise Error(last_error_message(lib))
+        if not result.found:
+            raise Error("ParmParse real value was not found.")
+        return result.value
+
+    @staticmethod
+    def query_or(
+        ref lib: OwnedDLHandle,
+        handle: ParmParseHandle,
+        name: String,
+        default_value: Float64,
+    ) raises -> Float64:
+        var result = parmparse_query_real(lib, handle, name)
+        if result.status != 0:
+            raise Error(last_error_message(lib))
+        if not result.found:
+            return default_value
+        return result.value
 
 
 struct ParmParse(Movable):
@@ -33,73 +133,32 @@ struct ParmParse(Movable):
         if self.handle:
             self.runtime[].lib.call["amrex_mojo_parmparse_destroy"](self.handle.value())
 
-    def add_int(mut self, name: String, value: Int) raises:
+    def add[T: ParmValue](mut self, name: String, value: T.value_type) raises:
         var handle = self._handle()
-        if parmparse_add_int(self.runtime[].lib, handle, name, value) != 0:
-            raise Error(last_error_message(self.runtime[].lib))
+        T.add(self.runtime[].lib, handle, name, value)
 
-    def add_int(mut self, name: StringLiteral, value: Int) raises:
-        self.add_int(String(name), value)
+    def add[T: ParmValue](mut self, name: StringLiteral, value: T.value_type) raises:
+        self.add[T](String(name), value)
 
-    def query_int(ref self, name: String) raises -> Int:
+    def query[T: ParmValue](ref self, name: String) raises -> T.value_type:
         var handle = self._handle()
-        var result = parmparse_query_int(self.runtime[].lib, handle, name)
-        if result.status != 0:
-            raise Error(last_error_message(self.runtime[].lib))
-        if not result.found:
-            raise Error("ParmParse integer value was not found.")
-        return result.value
+        return T.query_required(self.runtime[].lib, handle, name)
 
-    def query_int(ref self, name: StringLiteral) raises -> Int:
-        return self.query_int(String(name))
+    def query[T: ParmValue](ref self, name: StringLiteral) raises -> T.value_type:
+        return self.query[T](String(name))
 
-    def get_int(ref self, name: String) raises -> Int:
-        return self.query_int(name)
+    def get[T: ParmValue](ref self, name: String) raises -> T.value_type:
+        return self.query[T](name)
 
-    def get_int(ref self, name: StringLiteral) raises -> Int:
-        return self.get_int(String(name))
+    def get[T: ParmValue](ref self, name: StringLiteral) raises -> T.value_type:
+        return self.get[T](String(name))
 
-    def query_int_or(ref self, name: String, default_value: Int) raises -> Int:
+    def query_or[T: ParmValue](ref self, name: String, default_value: T.value_type) raises -> T.value_type:
         var handle = self._handle()
-        var result = parmparse_query_int(self.runtime[].lib, handle, name)
-        if result.status != 0:
-            raise Error(last_error_message(self.runtime[].lib))
-        if not result.found:
-            return default_value
-        return result.value
+        return T.query_or(self.runtime[].lib, handle, name, default_value)
 
-    def query_int_or(ref self, name: StringLiteral, default_value: Int) raises -> Int:
-        return self.query_int_or(String(name), default_value)
-
-    def query_real(ref self, name: String) raises -> Float64:
-        var handle = self._handle()
-        var result = parmparse_query_real(self.runtime[].lib, handle, name)
-        if result.status != 0:
-            raise Error(last_error_message(self.runtime[].lib))
-        if not result.found:
-            raise Error("ParmParse real value was not found.")
-        return result.value
-
-    def query_real(ref self, name: StringLiteral) raises -> Float64:
-        return self.query_real(String(name))
-
-    def get_real(ref self, name: String) raises -> Float64:
-        return self.query_real(name)
-
-    def get_real(ref self, name: StringLiteral) raises -> Float64:
-        return self.get_real(String(name))
-
-    def query_real_or(ref self, name: String, default_value: Float64) raises -> Float64:
-        var handle = self._handle()
-        var result = parmparse_query_real(self.runtime[].lib, handle, name)
-        if result.status != 0:
-            raise Error(last_error_message(self.runtime[].lib))
-        if not result.found:
-            return default_value
-        return result.value
-
-    def query_real_or(ref self, name: StringLiteral, default_value: Float64) raises -> Float64:
-        return self.query_real_or(String(name), default_value)
+    def query_or[T: ParmValue](ref self, name: StringLiteral, default_value: T.value_type) raises -> T.value_type:
+        return self.query_or[T](String(name), default_value)
 
     def _handle(ref self) raises -> ParmParseHandle:
         return require_live_handle(
