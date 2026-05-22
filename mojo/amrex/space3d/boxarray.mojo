@@ -15,11 +15,13 @@ from amrex.ffi import (
     intvect3d,
     last_error_message,
 )
-from amrex.ownership import require_live_handle
+from amrex.ownership import AmrexHandle, AmrexRawHandle, destroy_amrex_optional_handle
 from amrex.runtime import AmrexRuntime, RuntimeLease
 
 
-struct BoxArray(Movable):
+struct BoxArray(AmrexHandle, Movable):
+    comptime moved_from_message = "BoxArray no longer owns a live AMReX handle. The value may have been moved from."
+    comptime destroy_symbol = "amrex_mojo_boxarray_destroy"
     var runtime: RuntimeLease
     var handle: OptionalBoxArrayHandle
 
@@ -30,8 +32,10 @@ struct BoxArray(Movable):
             raise Error(last_error_message(self.runtime[].lib))
 
     def __del__(deinit self):
-        if self.handle:
-            self.runtime[].lib.call["amrex_mojo_boxarray_destroy"](self.handle.value())
+        destroy_amrex_optional_handle[Self.destroy_symbol](self.runtime[].lib, self.handle)
+
+    def _optional_handle(ref self) -> Optional[AmrexRawHandle]:
+        return self.handle
 
     def max_size(mut self, max_size: IntVect3D) raises:
         var handle = self._handle()
@@ -51,14 +55,11 @@ struct BoxArray(Movable):
             raise Error("BoxArray box index is out of range.")
         return boxarray_box(self.runtime[].lib, handle, index)
 
-    def _handle(ref self) raises -> BoxArrayHandle:
-        return require_live_handle(
-            self.handle,
-            "BoxArray no longer owns a live AMReX handle. The value may have been moved from.",
-        )
-
-
-struct DistributionMapping(Movable):
+struct DistributionMapping(AmrexHandle, Movable):
+    comptime moved_from_message = (
+        "DistributionMapping no longer owns a live AMReX handle. The value may have been moved from."
+    )
+    comptime destroy_symbol = "amrex_mojo_distmap_destroy"
     var runtime: RuntimeLease
     var handle: OptionalDistributionMappingHandle
 
@@ -69,11 +70,7 @@ struct DistributionMapping(Movable):
             raise Error(last_error_message(self.runtime[].lib))
 
     def __del__(deinit self):
-        if self.handle:
-            self.runtime[].lib.call["amrex_mojo_distmap_destroy"](self.handle.value())
+        destroy_amrex_optional_handle[Self.destroy_symbol](self.runtime[].lib, self.handle)
 
-    def _handle(ref self) raises -> DistributionMappingHandle:
-        return require_live_handle(
-            self.handle,
-            "DistributionMapping no longer owns a live AMReX handle. The value may have been moved from.",
-        )
+    def _optional_handle(ref self) -> Optional[AmrexRawHandle]:
+        return self.handle

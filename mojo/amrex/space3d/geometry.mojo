@@ -14,11 +14,13 @@ from amrex.ffi import (
     geometry_prob_domain,
     last_error_message,
 )
-from amrex.ownership import require_live_handle
+from amrex.ownership import AmrexHandle, AmrexRawHandle, destroy_amrex_optional_handle
 from amrex.runtime import AmrexRuntime, RuntimeLease
 
 
-struct Geometry(Movable):
+struct Geometry(AmrexHandle, Movable):
+    comptime moved_from_message = "Geometry no longer owns a live AMReX handle. The value may have been moved from."
+    comptime destroy_symbol = "amrex_mojo_geometry_destroy"
     var runtime: RuntimeLease
     var handle: OptionalGeometryHandle
 
@@ -47,8 +49,10 @@ struct Geometry(Movable):
             raise Error(last_error_message(self.runtime[].lib))
 
     def __del__(deinit self):
-        if self.handle:
-            self.runtime[].lib.call["amrex_mojo_geometry_destroy"](self.handle.value())
+        destroy_amrex_optional_handle[Self.destroy_symbol](self.runtime[].lib, self.handle)
+
+    def _optional_handle(ref self) -> Optional[AmrexRawHandle]:
+        return self.handle
 
     def domain(ref self) raises -> Box3D:
         var handle = self._handle()
@@ -65,9 +69,3 @@ struct Geometry(Movable):
     def periodicity(ref self) raises -> IntVect3D:
         var handle = self._handle()
         return geometry_periodicity(self.runtime[].lib, handle)
-
-    def _handle(ref self) raises -> GeometryHandle:
-        return require_live_handle(
-            self.handle,
-            "Geometry no longer owns a live AMReX handle. The value may have been moved from.",
-        )

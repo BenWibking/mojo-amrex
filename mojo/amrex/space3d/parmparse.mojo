@@ -9,7 +9,7 @@ from amrex.ffi import (
     parmparse_query_int,
     parmparse_query_real,
 )
-from amrex.ownership import require_live_handle
+from amrex.ownership import AmrexHandle, AmrexRawHandle, destroy_amrex_optional_handle
 from amrex.runtime import AmrexRuntime, RuntimeLease
 from std.ffi import OwnedDLHandle
 
@@ -113,7 +113,9 @@ struct ParmReal(ParmValue):
         return result.value
 
 
-struct ParmParse(Movable):
+struct ParmParse(AmrexHandle, Movable):
+    comptime moved_from_message = "ParmParse no longer owns a live AMReX handle. The value may have been moved from."
+    comptime destroy_symbol = "amrex_mojo_parmparse_destroy"
     var runtime: RuntimeLease
     var handle: OptionalParmParseHandle
 
@@ -130,8 +132,10 @@ struct ParmParse(Movable):
             raise Error(last_error_message(self.runtime[].lib))
 
     def __del__(deinit self):
-        if self.handle:
-            self.runtime[].lib.call["amrex_mojo_parmparse_destroy"](self.handle.value())
+        destroy_amrex_optional_handle[Self.destroy_symbol](self.runtime[].lib, self.handle)
+
+    def _optional_handle(ref self) -> Optional[AmrexRawHandle]:
+        return self.handle
 
     def add[T: ParmValue](mut self, name: String, value: T.value_type) raises:
         var handle = self._handle()
@@ -159,9 +163,3 @@ struct ParmParse(Movable):
 
     def query_or[T: ParmValue](ref self, name: StringLiteral, default_value: T.value_type) raises -> T.value_type:
         return self.query_or[T](String(name), default_value)
-
-    def _handle(ref self) raises -> ParmParseHandle:
-        return require_live_handle(
-            self.handle,
-            "ParmParse no longer owns a live AMReX handle. The value may have been moved from.",
-        )

@@ -37,7 +37,7 @@ from amrex.ffi import (
     multifab_valid_box,
     multifab_write_single_level_plotfile,
 )
-from amrex.ownership import require_live_handle
+from amrex.ownership import AmrexHandle, AmrexRawHandle, destroy_amrex_optional_handle
 from amrex.runtime import AmrexRuntime, RuntimeLease
 from amrex.space3d.boxarray import BoxArray, DistributionMapping
 from amrex.space3d.geometry import Geometry
@@ -48,8 +48,10 @@ from amrex.space3d.mfiter import (
 )
 
 
-struct MultiFab[dtype: DType](Movable):
+struct MultiFab[dtype: DType](AmrexHandle, Movable):
     comptime value_type = Scalar[Self.dtype]
+    comptime moved_from_message = "MultiFab no longer owns a live AMReX handle. The value may have been moved from."
+    comptime destroy_symbol = "amrex_mojo_multifab_destroy"
 
     var runtime: RuntimeLease
     var handle: OptionalMultiFabHandle
@@ -87,8 +89,10 @@ struct MultiFab[dtype: DType](Movable):
             raise Error(last_error_message(self.runtime[].lib))
 
     def __del__(deinit self):
-        if self.handle:
-            self.runtime[].lib.call["amrex_mojo_multifab_destroy"](self.handle.value())
+        destroy_amrex_optional_handle[Self.destroy_symbol](self.runtime[].lib, self.handle)
+
+    def _optional_handle(ref self) -> Optional[AmrexRawHandle]:
+        return self.handle
 
     def ncomp(ref self) raises -> Int:
         var handle = self._handle()
@@ -374,9 +378,3 @@ struct MultiFab[dtype: DType](Movable):
     def _require_tile_index(ref self, tile_index: Int) raises:
         if tile_index < 0 or tile_index >= self.tile_count():
             raise Error("tile index is out of range.")
-
-    def _handle(ref self) raises -> MultiFabHandle:
-        return require_live_handle(
-            self.handle,
-            "MultiFab no longer owns a live AMReX handle. The value may have been moved from.",
-        )

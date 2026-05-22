@@ -24,7 +24,7 @@ from amrex.ffi import (
     mfiter_tile_box,
     mfiter_valid_box,
 )
-from amrex.ownership import require_live_handle
+from amrex.ownership import AmrexHandle, AmrexRawHandle, destroy_amrex_optional_handle
 from amrex.runtime import RuntimeLease, require_matching_gpu_context
 from amrex.space3d.parallelfor import AMREX_MOJO_CAN_COMPILE_GPU_PARALLEL_FOR, ParallelFor, ParallelForCpu
 from std.builtin.device_passable import DevicePassable
@@ -33,7 +33,9 @@ from std.gpu.host import DeviceContext, DeviceStream
 from std.sys import has_accelerator
 
 
-struct MFIter(Movable):
+struct MFIter(AmrexHandle, Movable):
+    comptime moved_from_message = "MFIter no longer owns a live AMReX handle. The value may have been moved from."
+    comptime destroy_symbol = "amrex_mojo_mfiter_destroy"
     var runtime: RuntimeLease
     var handle: OptionalMFIterHandle
     var default_ngrow: IntVect3D
@@ -85,8 +87,10 @@ struct MFIter(Movable):
                     c_int,
                 ]()
             self.runtime[].lib.call["amrex_mojo_gpu_reset_stream"]()
-        if self.handle:
-            self.runtime[].lib.call["amrex_mojo_mfiter_destroy"](self.handle.value())
+        destroy_amrex_optional_handle[Self.destroy_symbol](self.runtime[].lib, self.handle)
+
+    def _optional_handle(ref self) -> Optional[AmrexRawHandle]:
+        return self.handle
 
     def is_valid(ref self) raises -> Bool:
         var handle = self._handle()
@@ -204,12 +208,6 @@ struct MFIter(Movable):
     def _require_valid(ref self) raises:
         if not self.is_valid():
             raise Error("MFIter is not positioned on a valid tile.")
-
-    def _handle(ref self) raises -> MFIterHandle:
-        return require_live_handle(
-            self.handle,
-            "MFIter no longer owns a live AMReX handle. The value may have been moved from.",
-        )
 
     def _activate_current_stream(mut self) raises:
         if gpu_set_stream_index(self.runtime[].lib, self.stream_index()) != 0:
