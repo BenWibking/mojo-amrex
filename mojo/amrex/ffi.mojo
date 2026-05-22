@@ -3,6 +3,14 @@ from std.builtin.device_passable import DevicePassable, DeviceTypeEncoder
 from std.ffi import OwnedDLHandle, c_char, c_double, c_float, c_int
 from layout import Coord, Idx
 from layout.tile_layout import Layout
+from amrex.floating_dtype import (
+    AmrexFloat32,
+    AmrexFloat64,
+    MULTIFAB_DATATYPE_FLOAT32,
+    MULTIFAB_DATATYPE_FLOAT64,
+    array4_view_type_name_for,
+    tile_view_type_name_for,
+)
 
 
 comptime RuntimeHandle = UnsafePointer[NoneType, MutExternalOrigin]
@@ -28,9 +36,6 @@ comptime OptionalCStringArrayHandle = Optional[CStringArrayHandle]
 comptime GPU_BACKEND_NONE = 0
 comptime GPU_BACKEND_CUDA = 1
 comptime GPU_BACKEND_HIP = 2
-
-comptime MULTIFAB_DATATYPE_FLOAT64 = 0
-comptime MULTIFAB_DATATYPE_FLOAT32 = 1
 
 
 def init_device_passable_value[
@@ -259,12 +264,7 @@ struct Array4View[dtype: DType, origin: Origin[mut=True]](DevicePassable, Trivia
 
     @staticmethod
     def get_type_name() -> String:
-        comptime if Self.dtype == DType.float64:
-            return String("Array4View[DType.float64]")
-        elif Self.dtype == DType.float32:
-            return String("Array4View[DType.float32]")
-        else:
-            return String("Array4View")
+        return String(array4_view_type_name_for[Self.dtype]())
 
     def layout_metadata(self) -> Array4LayoutMetadata:
         return Array4LayoutMetadata(
@@ -331,12 +331,7 @@ struct TileView[dtype: DType, origin: Origin[mut=True]](DevicePassable, TrivialR
 
     @staticmethod
     def get_type_name() -> String:
-        comptime if Self.dtype == DType.float64:
-            return String("TileView[DType.float64]")
-        elif Self.dtype == DType.float32:
-            return String("TileView[DType.float32]")
-        else:
-            return String("TileView")
+        return String(tile_view_type_name_for[Self.dtype]())
 
     def array(self) -> Array4View[Self.dtype, Self.origin]:
         return self.array_view.copy()
@@ -706,79 +701,6 @@ def mfiter_local_tile_index(ref lib: OwnedDLHandle, mfiter: MFIterHandle) raises
     return Int(lib.call["amrex_mojo_mfiter_local_tile_index", c_int](mfiter))
 
 
-def mfiter_tile_box(ref lib: OwnedDLHandle, mfiter: MFIterHandle) raises -> Box3DResult:
-    var small_end = List[c_int](length=3, fill=0)
-    var big_end = List[c_int](length=3, fill=0)
-    var nodal = List[c_int](length=3, fill=0)
-    var status = Int(
-        lib.call["amrex_mojo_mfiter_tile_box_metadata", c_int](
-            mfiter,
-            small_end.unsafe_ptr(),
-            big_end.unsafe_ptr(),
-            nodal.unsafe_ptr(),
-        )
-    )
-    return Box3DResult(
-        status=status,
-        value=box_from_parts(small_end, big_end, nodal),
-    )
-
-
-def mfiter_valid_box(ref lib: OwnedDLHandle, mfiter: MFIterHandle) raises -> Box3DResult:
-    var small_end = List[c_int](length=3, fill=0)
-    var big_end = List[c_int](length=3, fill=0)
-    var nodal = List[c_int](length=3, fill=0)
-    var status = Int(
-        lib.call["amrex_mojo_mfiter_valid_box_metadata", c_int](
-            mfiter,
-            small_end.unsafe_ptr(),
-            big_end.unsafe_ptr(),
-            nodal.unsafe_ptr(),
-        )
-    )
-    return Box3DResult(
-        status=status,
-        value=box_from_parts(small_end, big_end, nodal),
-    )
-
-
-def mfiter_fab_box(ref lib: OwnedDLHandle, mfiter: MFIterHandle) raises -> Box3DResult:
-    var small_end = List[c_int](length=3, fill=0)
-    var big_end = List[c_int](length=3, fill=0)
-    var nodal = List[c_int](length=3, fill=0)
-    var status = Int(
-        lib.call["amrex_mojo_mfiter_fab_box_metadata", c_int](
-            mfiter,
-            small_end.unsafe_ptr(),
-            big_end.unsafe_ptr(),
-            nodal.unsafe_ptr(),
-        )
-    )
-    return Box3DResult(
-        status=status,
-        value=box_from_parts(small_end, big_end, nodal),
-    )
-
-
-def mfiter_growntile_box(ref lib: OwnedDLHandle, mfiter: MFIterHandle, ngrow: IntVect3D) raises -> Box3DResult:
-    var small_end = List[c_int](length=3, fill=0)
-    var big_end = List[c_int](length=3, fill=0)
-    var nodal = List[c_int](length=3, fill=0)
-    var status = Int(
-        lib.call["amrex_mojo_mfiter_growntile_box_metadata", c_int](
-            mfiter,
-            ngrow,
-            small_end.unsafe_ptr(),
-            big_end.unsafe_ptr(),
-            nodal.unsafe_ptr(),
-        )
-    )
-    return Box3DResult(
-        status=status,
-        value=box_from_parts(small_end, big_end, nodal),
-    )
-
-
 def box_from_bounds(lo_raw: List[c_int], hi_raw: List[c_int]) raises -> Box3D:
     return box3d(
         small_end=intvect3d(Int(lo_raw[0]), Int(lo_raw[1]), Int(lo_raw[2])),
@@ -794,8 +716,96 @@ def box_from_parts(lo_raw: List[c_int], hi_raw: List[c_int], nodal_raw: List[c_i
     )
 
 
-def _array4_view_from_mfiter[
-    dtype: DType, owner_origin: Origin[mut=True]
+def _mfiter_box_query[func_name: StringLiteral](ref lib: OwnedDLHandle, mfiter: MFIterHandle) raises -> Box3DResult:
+    var small_end = List[c_int](length=3, fill=0)
+    var big_end = List[c_int](length=3, fill=0)
+    var nodal = List[c_int](length=3, fill=0)
+    var status = Int(
+        lib.call[func_name, c_int](
+            mfiter,
+            small_end.unsafe_ptr(),
+            big_end.unsafe_ptr(),
+            nodal.unsafe_ptr(),
+        )
+    )
+    return Box3DResult(
+        status=status,
+        value=box_from_parts(small_end, big_end, nodal),
+    )
+
+
+def _mfiter_box_query_with_ngrow[
+    func_name: StringLiteral
+](ref lib: OwnedDLHandle, mfiter: MFIterHandle, ngrow: IntVect3D) raises -> Box3DResult:
+    var small_end = List[c_int](length=3, fill=0)
+    var big_end = List[c_int](length=3, fill=0)
+    var nodal = List[c_int](length=3, fill=0)
+    var status = Int(
+        lib.call[func_name, c_int](
+            mfiter,
+            ngrow,
+            small_end.unsafe_ptr(),
+            big_end.unsafe_ptr(),
+            nodal.unsafe_ptr(),
+        )
+    )
+    return Box3DResult(
+        status=status,
+        value=box_from_parts(small_end, big_end, nodal),
+    )
+
+
+def mfiter_tile_box(ref lib: OwnedDLHandle, mfiter: MFIterHandle) raises -> Box3DResult:
+    return _mfiter_box_query["amrex_mojo_mfiter_tile_box_metadata"](lib, mfiter)
+
+
+def mfiter_valid_box(ref lib: OwnedDLHandle, mfiter: MFIterHandle) raises -> Box3DResult:
+    return _mfiter_box_query["amrex_mojo_mfiter_valid_box_metadata"](lib, mfiter)
+
+
+def mfiter_fab_box(ref lib: OwnedDLHandle, mfiter: MFIterHandle) raises -> Box3DResult:
+    return _mfiter_box_query["amrex_mojo_mfiter_fab_box_metadata"](lib, mfiter)
+
+
+def mfiter_growntile_box(ref lib: OwnedDLHandle, mfiter: MFIterHandle, ngrow: IntVect3D) raises -> Box3DResult:
+    return _mfiter_box_query_with_ngrow["amrex_mojo_mfiter_growntile_box_metadata"](lib, mfiter, ngrow)
+
+
+def _mfiter_scalar_data_ptr[
+    ptr_symbol: StringLiteral,
+    dtype: DType,
+    owner_origin: Origin[mut=True],
+](
+    ref lib: OwnedDLHandle,
+    multifab: MultiFabHandle,
+    mfiter: MFIterHandle,
+) raises -> UnsafePointer[
+    Scalar[dtype], owner_origin
+]:
+    comptime if dtype == DType.float32:
+        var data = lib.call[
+            ptr_symbol,
+            Optional[UnsafePointer[c_float, owner_origin]],
+        ](multifab, mfiter)
+        if not data:
+            raise Error(last_error_message(lib))
+        return rebind[UnsafePointer[Scalar[dtype], owner_origin]](data.value())
+    elif dtype == DType.float64:
+        var data = lib.call[
+            ptr_symbol,
+            Optional[UnsafePointer[c_double, owner_origin]],
+        ](multifab, mfiter)
+        if not data:
+            raise Error(last_error_message(lib))
+        return rebind[UnsafePointer[Scalar[dtype], owner_origin]](data.value())
+    else:
+        comptime assert False, "AMReX only supports DType.float32 and DType.float64"
+
+
+def _array4_view_from_mfiter_impl[
+    ptr_symbol: StringLiteral,
+    dtype: DType,
+    owner_origin: Origin[mut=True],
 ](ref lib: OwnedDLHandle, multifab: MultiFabHandle, mfiter: MFIterHandle,) raises -> Array4View[dtype, owner_origin]:
     var data_lo = List[c_int](length=3, fill=0)
     var data_hi = List[c_int](length=3, fill=0)
@@ -811,47 +821,34 @@ def _array4_view_from_mfiter[
         ncomp_raw.unsafe_ptr(),
     )
 
+    var data = _mfiter_scalar_data_ptr[ptr_symbol, dtype, owner_origin](lib, multifab, mfiter)
+
+    return Array4View[dtype, owner_origin](
+        data=data,
+        lo_x=data_lo[0],
+        lo_y=data_lo[1],
+        lo_z=data_lo[2],
+        hi_x=data_hi[0],
+        hi_y=data_hi[1],
+        hi_z=data_hi[2],
+        stride_i=stride[0],
+        stride_j=stride[1],
+        stride_k=stride[2],
+        stride_n=stride[3],
+        ncomp=ncomp_raw[0],
+    )
+
+
+def _array4_view_from_mfiter[
+    dtype: DType, owner_origin: Origin[mut=True]
+](ref lib: OwnedDLHandle, multifab: MultiFabHandle, mfiter: MFIterHandle,) raises -> Array4View[dtype, owner_origin]:
     comptime if dtype == DType.float32:
-        var data = lib.call[
-            "amrex_mojo_multifab_data_ptr_for_mfiter_f32",
-            Optional[UnsafePointer[c_float, owner_origin]],
-        ](multifab, mfiter)
-        if not data:
-            raise Error(last_error_message(lib))
-        return Array4View[dtype, owner_origin](
-            data=rebind[UnsafePointer[Scalar[dtype], owner_origin]](data.value()),
-            lo_x=data_lo[0],
-            lo_y=data_lo[1],
-            lo_z=data_lo[2],
-            hi_x=data_hi[0],
-            hi_y=data_hi[1],
-            hi_z=data_hi[2],
-            stride_i=stride[0],
-            stride_j=stride[1],
-            stride_k=stride[2],
-            stride_n=stride[3],
-            ncomp=ncomp_raw[0],
+        return _array4_view_from_mfiter_impl[AmrexFloat32.mfiter_host_ptr_symbol, dtype, owner_origin](
+            lib, multifab, mfiter
         )
     elif dtype == DType.float64:
-        var data = lib.call[
-            "amrex_mojo_multifab_data_ptr_for_mfiter",
-            Optional[UnsafePointer[c_double, owner_origin]],
-        ](multifab, mfiter)
-        if not data:
-            raise Error(last_error_message(lib))
-        return Array4View[dtype, owner_origin](
-            data=rebind[UnsafePointer[Scalar[dtype], owner_origin]](data.value()),
-            lo_x=data_lo[0],
-            lo_y=data_lo[1],
-            lo_z=data_lo[2],
-            hi_x=data_hi[0],
-            hi_y=data_hi[1],
-            hi_z=data_hi[2],
-            stride_i=stride[0],
-            stride_j=stride[1],
-            stride_k=stride[2],
-            stride_n=stride[3],
-            ncomp=ncomp_raw[0],
+        return _array4_view_from_mfiter_impl[AmrexFloat64.mfiter_host_ptr_symbol, dtype, owner_origin](
+            lib, multifab, mfiter
         )
     else:
         comptime assert False, "Array4View only supports DType.float32 and DType.float64"
@@ -860,61 +857,13 @@ def _array4_view_from_mfiter[
 def _device_array4_view_from_mfiter[
     dtype: DType, owner_origin: Origin[mut=True]
 ](ref lib: OwnedDLHandle, multifab: MultiFabHandle, mfiter: MFIterHandle,) raises -> Array4View[dtype, owner_origin]:
-    var data_lo = List[c_int](length=3, fill=0)
-    var data_hi = List[c_int](length=3, fill=0)
-    var stride = List[Int64](length=4, fill=0)
-    var ncomp_raw = List[c_int](length=1, fill=0)
-
-    _ = lib.call["amrex_mojo_multifab_array4_metadata_for_mfiter", c_int](
-        multifab,
-        mfiter,
-        data_lo.unsafe_ptr(),
-        data_hi.unsafe_ptr(),
-        stride.unsafe_ptr(),
-        ncomp_raw.unsafe_ptr(),
-    )
-
     comptime if dtype == DType.float32:
-        var data = lib.call[
-            "amrex_mojo_multifab_data_ptr_for_mfiter_device_f32",
-            Optional[UnsafePointer[c_float, owner_origin]],
-        ](multifab, mfiter)
-        if not data:
-            raise Error(last_error_message(lib))
-        return Array4View[dtype, owner_origin](
-            data=rebind[UnsafePointer[Scalar[dtype], owner_origin]](data.value()),
-            lo_x=data_lo[0],
-            lo_y=data_lo[1],
-            lo_z=data_lo[2],
-            hi_x=data_hi[0],
-            hi_y=data_hi[1],
-            hi_z=data_hi[2],
-            stride_i=stride[0],
-            stride_j=stride[1],
-            stride_k=stride[2],
-            stride_n=stride[3],
-            ncomp=ncomp_raw[0],
+        return _array4_view_from_mfiter_impl[AmrexFloat32.mfiter_device_ptr_symbol, dtype, owner_origin](
+            lib, multifab, mfiter
         )
     elif dtype == DType.float64:
-        var data = lib.call[
-            "amrex_mojo_multifab_data_ptr_for_mfiter_device",
-            Optional[UnsafePointer[c_double, owner_origin]],
-        ](multifab, mfiter)
-        if not data:
-            raise Error(last_error_message(lib))
-        return Array4View[dtype, owner_origin](
-            data=rebind[UnsafePointer[Scalar[dtype], owner_origin]](data.value()),
-            lo_x=data_lo[0],
-            lo_y=data_lo[1],
-            lo_z=data_lo[2],
-            hi_x=data_hi[0],
-            hi_y=data_hi[1],
-            hi_z=data_hi[2],
-            stride_i=stride[0],
-            stride_j=stride[1],
-            stride_k=stride[2],
-            stride_n=stride[3],
-            ncomp=ncomp_raw[0],
+        return _array4_view_from_mfiter_impl[AmrexFloat64.mfiter_device_ptr_symbol, dtype, owner_origin](
+            lib, multifab, mfiter
         )
     else:
         comptime assert False, "Array4View only supports DType.float32 and DType.float64"

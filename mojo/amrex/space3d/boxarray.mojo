@@ -55,6 +55,7 @@ struct BoxArray(AmrexHandle, Movable):
             raise Error("BoxArray box index is out of range.")
         return boxarray_box(self.runtime[].lib, handle, index)
 
+
 struct DistributionMapping(AmrexHandle, Movable):
     comptime moved_from_message = (
         "DistributionMapping no longer owns a live AMReX handle. The value may have been moved from."

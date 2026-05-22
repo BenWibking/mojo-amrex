@@ -6,8 +6,6 @@ from amrex.ffi import (
     GPU_BACKEND_NONE,
     IntVect3D,
     MFIterHandle,
-    MULTIFAB_DATATYPE_FLOAT32,
-    MULTIFAB_DATATYPE_FLOAT64,
     MultiFabMemoryInfo,
     MultiFabHandle,
     OptionalMultiFabHandle,
@@ -37,6 +35,7 @@ from amrex.ffi import (
     multifab_valid_box,
     multifab_write_single_level_plotfile,
 )
+from amrex.floating_dtype import multifab_datatype_id_for
 from amrex.ownership import AmrexHandle, AmrexRawHandle, destroy_amrex_optional_handle
 from amrex.runtime import AmrexRuntime, RuntimeLease
 from amrex.space3d.boxarray import BoxArray, DistributionMapping
@@ -59,12 +58,7 @@ struct MultiFab[dtype: DType](AmrexHandle, Movable):
 
     @staticmethod
     def _datatype_id() -> Int:
-        comptime if Self.dtype == DType.float32:
-            return MULTIFAB_DATATYPE_FLOAT32
-        elif Self.dtype == DType.float64:
-            return MULTIFAB_DATATYPE_FLOAT64
-        else:
-            comptime assert False, "MultiFab only supports DType.float32 and DType.float64"
+        return multifab_datatype_id_for[Self.dtype]()
 
     def __init__(
         out self,
