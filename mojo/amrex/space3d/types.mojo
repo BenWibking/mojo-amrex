@@ -1,11 +1,4 @@
-"""Small value-type wrappers for the 3D binding layer.
-
-Expected contents in future revisions:
-
-- `IntVect3D`
-- `RealBox3D`
-- shared status and ownership helpers
-"""
+"""Shared 3D index-space helpers and re-exports for the binding layer."""
 
 from amrex.ffi import (
     Array4View,
@@ -14,8 +7,12 @@ from amrex.ffi import (
     RealBox3D,
     RealVect3D,
     TileView,
+    BOX_DIM,
     box3d,
+    box_cell_count,
+    for_each_box_cell,
     intvect3d,
     realbox3d,
     zero_intvect3d,
 )
+from amrex.space3d.tile_loop import TileLoopBody

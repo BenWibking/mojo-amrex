@@ -14,6 +14,7 @@ from amrex.ffi import (
     distmap_create_from_boxarray,
     intvect3d,
     last_error_message,
+    raise_on_error,
 )
 from amrex.ownership import AmrexHandle, AmrexRawHandle, destroy_amrex_optional_handle
 from amrex.runtime import AmrexRuntime, RuntimeLease
@@ -39,8 +40,7 @@ struct BoxArray(AmrexHandle, Movable):
 
     def max_size(mut self, max_size: IntVect3D) raises:
         var handle = self._handle()
-        if boxarray_max_size(self.runtime[].lib, handle, max_size) != 0:
-            raise Error(last_error_message(self.runtime[].lib))
+        raise_on_error(self.runtime[].lib, boxarray_max_size(self.runtime[].lib, handle, max_size))
 
     def max_size(mut self, max_size: Int) raises:
         self.max_size(intvect3d(max_size, max_size, max_size))

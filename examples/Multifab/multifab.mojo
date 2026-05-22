@@ -1,4 +1,5 @@
 from amrex.space3d import (
+    AmrexFloat64,
     AmrexRuntime,
     BoxArray,
     DistributionMapping,
@@ -13,7 +14,7 @@ from amrex.space3d import (
 )
 
 
-def fill_tile[owner_origin: Origin[mut=True]](tile: TileView[DType.float64, owner_origin]) raises:
+def fill_tile[owner_origin: Origin[mut=True]](tile: TileView[AmrexFloat64, owner_origin]) raises:
     tile.fill(1.0)
 
 
@@ -34,8 +35,8 @@ def main() raises:
         var prob_domain = geometry.prob_domain()
         var cell_size = geometry.cell_size()
         var periodicity = geometry.periodicity()
-        var multifab = MultiFab[DType.float64](runtime, boxarray, distmap, 1, intvect3d(1, 1, 1))
-        var source = MultiFab[DType.float64](runtime, boxarray, distmap, 1, intvect3d(1, 1, 1))
+        var multifab = MultiFab[AmrexFloat64](runtime, boxarray, distmap, 1, intvect3d(1, 1, 1))
+        var source = MultiFab[AmrexFloat64](runtime, boxarray, distmap, 1, intvect3d(1, 1, 1))
 
         var parmparse_prefix = String("multifab_smoke")
         var tile_fill_name = String("tile_fill_value")

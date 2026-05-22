@@ -1,15 +1,12 @@
 from std.collections import List
 from std.builtin.device_passable import DevicePassable, DeviceTypeEncoder
-from std.ffi import OwnedDLHandle, c_char, c_double, c_float, c_int
+from std.ffi import OwnedDLHandle, c_char, c_double, c_int
 from layout import Coord, Idx
 from layout.tile_layout import Layout
 from amrex.floating_dtype import (
-    AmrexFloat32,
-    AmrexFloat64,
+    AmrexFloatingDtype,
     MULTIFAB_DATATYPE_FLOAT32,
     MULTIFAB_DATATYPE_FLOAT64,
-    array4_view_type_name_for,
-    tile_view_type_name_for,
 )
 
 
@@ -146,7 +143,9 @@ struct MultiFabMemoryInfo(Copyable):
 
 
 @fieldwise_init
-struct Array4LayoutMetadata(Copyable, TrivialRegisterPassable):
+struct Array4LayoutMetadata(Copyable, DevicePassable, TrivialRegisterPassable):
+    comptime device_type = Self
+
     var lo_x: Int
     var lo_y: Int
     var lo_z: Int
@@ -158,6 +157,17 @@ struct Array4LayoutMetadata(Copyable, TrivialRegisterPassable):
     var stride_k: Int
     var stride_n: Int
     var ncomp: Int
+
+    def _to_device_type(
+        self,
+        mut encoder: Some[DeviceTypeEncoder],
+        target: UnsafePointer[mut=True, NoneType, _],
+    ):
+        init_device_passable_value(self, target)
+
+    @staticmethod
+    def get_type_name() -> String:
+        return String("Array4LayoutMetadata")
 
     def storage_size(self) -> Int:
         var shape = Coord(
@@ -222,37 +232,18 @@ struct Array4LayoutMetadata(Copyable, TrivialRegisterPassable):
 
 
 @fieldwise_init
-struct Array4View[dtype: DType, origin: Origin[mut=True]](DevicePassable, TrivialRegisterPassable):
-    comptime device_type = Array4View[Self.dtype, MutAnyOrigin]
+struct Array4View[T: AmrexFloatingDtype, origin: Origin[mut=True]](DevicePassable, TrivialRegisterPassable):
+    comptime dtype = Self.T.dtype
+    comptime device_type = Array4View[Self.T, MutAnyOrigin]
     comptime value_type = Scalar[Self.dtype]
 
     var data: UnsafePointer[Self.value_type, Self.origin]
-    var lo_x: c_int
-    var lo_y: c_int
-    var lo_z: c_int
-    var hi_x: c_int
-    var hi_y: c_int
-    var hi_z: c_int
-    var stride_i: Int64
-    var stride_j: Int64
-    var stride_k: Int64
-    var stride_n: Int64
-    var ncomp: c_int
+    var layout: Array4LayoutMetadata
 
     def device_view(self) -> Self.device_type:
         return Self.device_type(
             data=UnsafePointer[Self.value_type, MutAnyOrigin](self.data),
-            lo_x=self.lo_x,
-            lo_y=self.lo_y,
-            lo_z=self.lo_z,
-            hi_x=self.hi_x,
-            hi_y=self.hi_y,
-            hi_z=self.hi_z,
-            stride_i=self.stride_i,
-            stride_j=self.stride_j,
-            stride_k=self.stride_k,
-            stride_n=self.stride_n,
-            ncomp=self.ncomp,
+            layout=self.layout.copy(),
         )
 
     def _to_device_type(
@@ -264,40 +255,28 @@ struct Array4View[dtype: DType, origin: Origin[mut=True]](DevicePassable, Trivia
 
     @staticmethod
     def get_type_name() -> String:
-        return String(array4_view_type_name_for[Self.dtype]())
+        return String(Self.T.array4_view_type_name)
 
     def layout_metadata(self) -> Array4LayoutMetadata:
-        return Array4LayoutMetadata(
-            lo_x=Int(self.lo_x),
-            lo_y=Int(self.lo_y),
-            lo_z=Int(self.lo_z),
-            hi_x=Int(self.hi_x),
-            hi_y=Int(self.hi_y),
-            hi_z=Int(self.hi_z),
-            stride_i=Int(self.stride_i),
-            stride_j=Int(self.stride_j),
-            stride_k=Int(self.stride_k),
-            stride_n=Int(self.stride_n),
-            ncomp=Int(self.ncomp),
-        )
+        return self.layout.copy()
 
     def storage_size(self) -> Int:
-        return self.layout_metadata().storage_size()
+        return self.layout.storage_size()
 
     def offset(self, i: Int, j: Int, k: Int, comp: Int = 0) -> Int:
-        return self.layout_metadata().offset(i, j, k, comp)
+        return self.layout.offset(i, j, k, comp)
 
     def __getitem__(self, i: Int, j: Int, k: Int) -> Self.value_type:
         return self[i, j, k, 0]
 
     def __getitem__(self, i: Int, j: Int, k: Int, comp: Int) -> Self.value_type:
-        return self.layout_metadata().get[Self.dtype, Self.origin](self.data, i, j, k, comp)
+        return self.layout.get[Self.dtype, Self.origin](self.data, i, j, k, comp)
 
     def __setitem__(self, i: Int, j: Int, k: Int, value: Self.value_type):
         self[i, j, k, 0] = value
 
     def __setitem__(self, i: Int, j: Int, k: Int, comp: Int, value: Self.value_type):
-        self.layout_metadata().set[Self.dtype, Self.origin](self.data, i, j, k, comp, value)
+        self.layout.set[Self.dtype, Self.origin](self.data, i, j, k, comp, value)
 
     def fill(self, box: Box3D, value: Self.value_type, comp: Int = 0):
         for k in range(Int(box.small_end.z), Int(box.big_end.z) + 1):
@@ -307,13 +286,14 @@ struct Array4View[dtype: DType, origin: Origin[mut=True]](DevicePassable, Trivia
 
 
 @fieldwise_init
-struct TileView[dtype: DType, origin: Origin[mut=True]](DevicePassable, TrivialRegisterPassable):
-    comptime device_type = TileView[Self.dtype, MutAnyOrigin]
+struct TileView[T: AmrexFloatingDtype, origin: Origin[mut=True]](DevicePassable, TrivialRegisterPassable):
+    comptime dtype = Self.T.dtype
+    comptime device_type = TileView[Self.T, MutAnyOrigin]
     comptime value_type = Scalar[Self.dtype]
 
     var tile_box: Box3D
     var valid_box: Box3D
-    var array_view: Array4View[Self.dtype, Self.origin]
+    var array_view: Array4View[Self.T, Self.origin]
 
     def device_view(self) -> Self.device_type:
         return Self.device_type(
@@ -331,9 +311,9 @@ struct TileView[dtype: DType, origin: Origin[mut=True]](DevicePassable, TrivialR
 
     @staticmethod
     def get_type_name() -> String:
-        return String(tile_view_type_name_for[Self.dtype]())
+        return String(Self.T.tile_view_type_name)
 
-    def array(self) -> Array4View[Self.dtype, Self.origin]:
+    def array(self) -> Array4View[Self.T, Self.origin]:
         return self.array_view.copy()
 
     def fill(self, value: Self.value_type, comp: Int = 0):
@@ -378,6 +358,26 @@ def box3d(
     )
 
 
+comptime BOX_DIM = 3
+
+
+def box_cell_count(box: Box3D) -> Int:
+    return (
+        (Int(box.big_end.x) - Int(box.small_end.x) + 1)
+        * (Int(box.big_end.y) - Int(box.small_end.y) + 1)
+        * (Int(box.big_end.z) - Int(box.small_end.z) + 1)
+    )
+
+
+def for_each_box_cell[
+    body_type: (def(Int, Int, Int) register_passable -> None) & DevicePassable
+](box: Box3D, body: body_type):
+    for k in range(Int(box.small_end.z), Int(box.big_end.z) + 1):
+        for j in range(Int(box.small_end.y), Int(box.big_end.y) + 1):
+            for i in range(Int(box.small_end.x), Int(box.big_end.x) + 1):
+                body(i, j, k)
+
+
 def last_error_message(ref lib: OwnedDLHandle) raises -> String:
     var message = lib.call[
         "amrex_mojo_last_error_message",
@@ -386,6 +386,11 @@ def last_error_message(ref lib: OwnedDLHandle) raises -> String:
     if not message:
         return String("AMReX call failed.")
     return String(unsafe_from_utf8_ptr=message.value())
+
+
+def raise_on_error(ref lib: OwnedDLHandle, status: Int) raises:
+    if status != 0:
+        raise Error(last_error_message(lib))
 
 
 def abi_version(ref lib: OwnedDLHandle) raises -> Int:
@@ -701,14 +706,16 @@ def mfiter_local_tile_index(ref lib: OwnedDLHandle, mfiter: MFIterHandle) raises
     return Int(lib.call["amrex_mojo_mfiter_local_tile_index", c_int](mfiter))
 
 
-def box_from_bounds(lo_raw: List[c_int], hi_raw: List[c_int]) raises -> Box3D:
+def box_from_bounds(lo_raw: InlineArray[c_int, 3], hi_raw: InlineArray[c_int, 3]) raises -> Box3D:
     return box3d(
         small_end=intvect3d(Int(lo_raw[0]), Int(lo_raw[1]), Int(lo_raw[2])),
         big_end=intvect3d(Int(hi_raw[0]), Int(hi_raw[1]), Int(hi_raw[2])),
     )
 
 
-def box_from_parts(lo_raw: List[c_int], hi_raw: List[c_int], nodal_raw: List[c_int]) raises -> Box3D:
+def box_from_parts(
+    lo_raw: InlineArray[c_int, 3], hi_raw: InlineArray[c_int, 3], nodal_raw: InlineArray[c_int, 3]
+) raises -> Box3D:
     return box3d(
         small_end=intvect3d(Int(lo_raw[0]), Int(lo_raw[1]), Int(lo_raw[2])),
         big_end=intvect3d(Int(hi_raw[0]), Int(hi_raw[1]), Int(hi_raw[2])),
@@ -717,9 +724,9 @@ def box_from_parts(lo_raw: List[c_int], hi_raw: List[c_int], nodal_raw: List[c_i
 
 
 def _mfiter_box_query[func_name: StringLiteral](ref lib: OwnedDLHandle, mfiter: MFIterHandle) raises -> Box3DResult:
-    var small_end = List[c_int](length=3, fill=0)
-    var big_end = List[c_int](length=3, fill=0)
-    var nodal = List[c_int](length=3, fill=0)
+    var small_end = InlineArray[c_int, 3](fill=0)
+    var big_end = InlineArray[c_int, 3](fill=0)
+    var nodal = InlineArray[c_int, 3](fill=0)
     var status = Int(
         lib.call[func_name, c_int](
             mfiter,
@@ -737,9 +744,9 @@ def _mfiter_box_query[func_name: StringLiteral](ref lib: OwnedDLHandle, mfiter: 
 def _mfiter_box_query_with_ngrow[
     func_name: StringLiteral
 ](ref lib: OwnedDLHandle, mfiter: MFIterHandle, ngrow: IntVect3D) raises -> Box3DResult:
-    var small_end = List[c_int](length=3, fill=0)
-    var big_end = List[c_int](length=3, fill=0)
-    var nodal = List[c_int](length=3, fill=0)
+    var small_end = InlineArray[c_int, 3](fill=0)
+    var big_end = InlineArray[c_int, 3](fill=0)
+    var nodal = InlineArray[c_int, 3](fill=0)
     var status = Int(
         lib.call[func_name, c_int](
             mfiter,
@@ -772,45 +779,35 @@ def mfiter_growntile_box(ref lib: OwnedDLHandle, mfiter: MFIterHandle, ngrow: In
 
 
 def _mfiter_scalar_data_ptr[
-    ptr_symbol: StringLiteral,
-    dtype: DType,
+    T: AmrexFloatingDtype,
+    use_device_ptr: Bool,
     owner_origin: Origin[mut=True],
 ](
     ref lib: OwnedDLHandle,
     multifab: MultiFabHandle,
     mfiter: MFIterHandle,
 ) raises -> UnsafePointer[
-    Scalar[dtype], owner_origin
+    Scalar[T.dtype], owner_origin
 ]:
-    comptime if dtype == DType.float32:
-        var data = lib.call[
-            ptr_symbol,
-            Optional[UnsafePointer[c_float, owner_origin]],
-        ](multifab, mfiter)
-        if not data:
-            raise Error(last_error_message(lib))
-        return rebind[UnsafePointer[Scalar[dtype], owner_origin]](data.value())
-    elif dtype == DType.float64:
-        var data = lib.call[
-            ptr_symbol,
-            Optional[UnsafePointer[c_double, owner_origin]],
-        ](multifab, mfiter)
-        if not data:
-            raise Error(last_error_message(lib))
-        return rebind[UnsafePointer[Scalar[dtype], owner_origin]](data.value())
+    var data: Optional[UnsafePointer[T.c_type, owner_origin]]
+    comptime if use_device_ptr:
+        data = T.mfiter_device_data_ptr[owner_origin](lib, multifab, mfiter)
     else:
-        comptime assert False, "AMReX only supports DType.float32 and DType.float64"
+        data = T.mfiter_host_data_ptr[owner_origin](lib, multifab, mfiter)
+    if not data:
+        raise Error(last_error_message(lib))
+    return rebind[UnsafePointer[Scalar[T.dtype], owner_origin]](data.value())
 
 
 def _array4_view_from_mfiter_impl[
-    ptr_symbol: StringLiteral,
-    dtype: DType,
+    T: AmrexFloatingDtype,
+    use_device_ptr: Bool,
     owner_origin: Origin[mut=True],
-](ref lib: OwnedDLHandle, multifab: MultiFabHandle, mfiter: MFIterHandle,) raises -> Array4View[dtype, owner_origin]:
-    var data_lo = List[c_int](length=3, fill=0)
-    var data_hi = List[c_int](length=3, fill=0)
-    var stride = List[Int64](length=4, fill=0)
-    var ncomp_raw = List[c_int](length=1, fill=0)
+](ref lib: OwnedDLHandle, multifab: MultiFabHandle, mfiter: MFIterHandle,) raises -> Array4View[T, owner_origin]:
+    var data_lo = InlineArray[c_int, 3](fill=0)
+    var data_hi = InlineArray[c_int, 3](fill=0)
+    var stride = InlineArray[Int64, 4](fill=0)
+    var ncomp_raw = InlineArray[c_int, 1](fill=0)
 
     _ = lib.call["amrex_mojo_multifab_array4_metadata_for_mfiter", c_int](
         multifab,
@@ -821,72 +818,56 @@ def _array4_view_from_mfiter_impl[
         ncomp_raw.unsafe_ptr(),
     )
 
-    var data = _mfiter_scalar_data_ptr[ptr_symbol, dtype, owner_origin](lib, multifab, mfiter)
+    var data = _mfiter_scalar_data_ptr[T, use_device_ptr, owner_origin](lib, multifab, mfiter)
 
-    return Array4View[dtype, owner_origin](
+    return Array4View[T, owner_origin](
         data=data,
-        lo_x=data_lo[0],
-        lo_y=data_lo[1],
-        lo_z=data_lo[2],
-        hi_x=data_hi[0],
-        hi_y=data_hi[1],
-        hi_z=data_hi[2],
-        stride_i=stride[0],
-        stride_j=stride[1],
-        stride_k=stride[2],
-        stride_n=stride[3],
-        ncomp=ncomp_raw[0],
+        layout=Array4LayoutMetadata(
+            lo_x=Int(data_lo[0]),
+            lo_y=Int(data_lo[1]),
+            lo_z=Int(data_lo[2]),
+            hi_x=Int(data_hi[0]),
+            hi_y=Int(data_hi[1]),
+            hi_z=Int(data_hi[2]),
+            stride_i=Int(stride[0]),
+            stride_j=Int(stride[1]),
+            stride_k=Int(stride[2]),
+            stride_n=Int(stride[3]),
+            ncomp=Int(ncomp_raw[0]),
+        ),
     )
 
 
 def _array4_view_from_mfiter[
-    dtype: DType, owner_origin: Origin[mut=True]
-](ref lib: OwnedDLHandle, multifab: MultiFabHandle, mfiter: MFIterHandle,) raises -> Array4View[dtype, owner_origin]:
-    comptime if dtype == DType.float32:
-        return _array4_view_from_mfiter_impl[AmrexFloat32.mfiter_host_ptr_symbol, dtype, owner_origin](
-            lib, multifab, mfiter
-        )
-    elif dtype == DType.float64:
-        return _array4_view_from_mfiter_impl[AmrexFloat64.mfiter_host_ptr_symbol, dtype, owner_origin](
-            lib, multifab, mfiter
-        )
-    else:
-        comptime assert False, "Array4View only supports DType.float32 and DType.float64"
+    T: AmrexFloatingDtype, owner_origin: Origin[mut=True]
+](ref lib: OwnedDLHandle, multifab: MultiFabHandle, mfiter: MFIterHandle,) raises -> Array4View[T, owner_origin]:
+    return _array4_view_from_mfiter_impl[T, False, owner_origin](lib, multifab, mfiter)
 
 
 def _device_array4_view_from_mfiter[
-    dtype: DType, owner_origin: Origin[mut=True]
-](ref lib: OwnedDLHandle, multifab: MultiFabHandle, mfiter: MFIterHandle,) raises -> Array4View[dtype, owner_origin]:
-    comptime if dtype == DType.float32:
-        return _array4_view_from_mfiter_impl[AmrexFloat32.mfiter_device_ptr_symbol, dtype, owner_origin](
-            lib, multifab, mfiter
-        )
-    elif dtype == DType.float64:
-        return _array4_view_from_mfiter_impl[AmrexFloat64.mfiter_device_ptr_symbol, dtype, owner_origin](
-            lib, multifab, mfiter
-        )
-    else:
-        comptime assert False, "Array4View only supports DType.float32 and DType.float64"
+    T: AmrexFloatingDtype, owner_origin: Origin[mut=True]
+](ref lib: OwnedDLHandle, multifab: MultiFabHandle, mfiter: MFIterHandle,) raises -> Array4View[T, owner_origin]:
+    return _array4_view_from_mfiter_impl[T, True, owner_origin](lib, multifab, mfiter)
 
 
 def array4_view_from_mfiter[
-    dtype: DType,
+    T: AmrexFloatingDtype,
     owner_origin: Origin[mut=True],
-](ref lib: OwnedDLHandle, multifab: MultiFabHandle, mfiter: MFIterHandle,) raises -> Array4View[dtype, owner_origin]:
-    return _array4_view_from_mfiter[dtype, owner_origin](lib, multifab, mfiter)
+](ref lib: OwnedDLHandle, multifab: MultiFabHandle, mfiter: MFIterHandle,) raises -> Array4View[T, owner_origin]:
+    return _array4_view_from_mfiter[T, owner_origin](lib, multifab, mfiter)
 
 
 def device_array4_view_from_mfiter[
-    dtype: DType
-](ref lib: OwnedDLHandle, multifab: MultiFabHandle, mfiter: MFIterHandle,) raises -> Array4View[dtype, MutAnyOrigin]:
-    return _device_array4_view_from_mfiter[dtype, MutAnyOrigin](lib, multifab, mfiter)
+    T: AmrexFloatingDtype
+](ref lib: OwnedDLHandle, multifab: MultiFabHandle, mfiter: MFIterHandle,) raises -> Array4View[T, MutAnyOrigin]:
+    return _device_array4_view_from_mfiter[T, MutAnyOrigin](lib, multifab, mfiter)
 
 
 def device_array4_view_from_mfiter_as_origin[
-    dtype: DType,
+    T: AmrexFloatingDtype,
     owner_origin: Origin[mut=True],
-](ref lib: OwnedDLHandle, multifab: MultiFabHandle, mfiter: MFIterHandle,) raises -> Array4View[dtype, owner_origin]:
-    return _device_array4_view_from_mfiter[dtype, owner_origin](lib, multifab, mfiter)
+](ref lib: OwnedDLHandle, multifab: MultiFabHandle, mfiter: MFIterHandle,) raises -> Array4View[T, owner_origin]:
+    return _device_array4_view_from_mfiter[T, owner_origin](lib, multifab, mfiter)
 
 
 def multifab_sum(ref lib: OwnedDLHandle, multifab: MultiFabHandle, comp: Int) raises -> Float64:
@@ -1158,8 +1139,8 @@ def parmparse_query_int(
     ref lib: OwnedDLHandle, parmparse: ParmParseHandle, name: String
 ) raises -> ParmParseIntQueryResult:
     var name_owned = name
-    var out_value = List[c_int](length=1, fill=0)
-    var out_found = List[c_int](length=1, fill=0)
+    var out_value = InlineArray[c_int, 1](fill=0)
+    var out_found = InlineArray[c_int, 1](fill=0)
     var status = Int(
         lib.call["amrex_mojo_parmparse_query_int", c_int](
             parmparse,
@@ -1178,8 +1159,8 @@ def parmparse_query_int(
 def parmparse_query_int(
     ref lib: OwnedDLHandle, parmparse: ParmParseHandle, name: StringLiteral
 ) raises -> ParmParseIntQueryResult:
-    var out_value = List[c_int](length=1, fill=0)
-    var out_found = List[c_int](length=1, fill=0)
+    var out_value = InlineArray[c_int, 1](fill=0)
+    var out_found = InlineArray[c_int, 1](fill=0)
     var status = Int(
         lib.call["amrex_mojo_parmparse_query_int", c_int](
             parmparse,
@@ -1199,8 +1180,8 @@ def parmparse_query_real(
     ref lib: OwnedDLHandle, parmparse: ParmParseHandle, name: String
 ) raises -> ParmParseRealQueryResult:
     var name_owned = name
-    var out_value = List[c_double](length=1, fill=0.0)
-    var out_found = List[c_int](length=1, fill=0)
+    var out_value = InlineArray[c_double, 1](fill=0.0)
+    var out_found = InlineArray[c_int, 1](fill=0)
     var status = Int(
         lib.call["amrex_mojo_parmparse_query_real", c_int](
             parmparse,
@@ -1219,8 +1200,8 @@ def parmparse_query_real(
 def parmparse_query_real(
     ref lib: OwnedDLHandle, parmparse: ParmParseHandle, name: StringLiteral
 ) raises -> ParmParseRealQueryResult:
-    var out_value = List[c_double](length=1, fill=0.0)
-    var out_found = List[c_int](length=1, fill=0)
+    var out_value = InlineArray[c_double, 1](fill=0.0)
+    var out_found = InlineArray[c_int, 1](fill=0)
     var status = Int(
         lib.call["amrex_mojo_parmparse_query_real", c_int](
             parmparse,

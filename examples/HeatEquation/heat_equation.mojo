@@ -6,6 +6,7 @@ Run from the repo root so the bundled inputs file is found:
 """
 
 from amrex.space3d import (
+    AmrexFloat64,
     AmrexRuntime,
     BoxArray,
     DistributionMapping,
@@ -70,14 +71,14 @@ def main() raises:
         var geometry = Geometry(runtime, domain, real_box, is_periodic)
         var distmap = DistributionMapping(runtime, boxarray)
 
-        var phi_old = MultiFab[DType.float64](
+        var phi_old = MultiFab[AmrexFloat64](
             runtime,
             boxarray,
             distmap,
             1,
             intvect3d(1, 1, 1),
         )
-        var phi_new = MultiFab[DType.float64](
+        var phi_new = MultiFab[AmrexFloat64](
             runtime,
             boxarray,
             distmap,

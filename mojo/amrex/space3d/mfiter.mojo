@@ -23,6 +23,7 @@ from amrex.ffi import (
     mfiter_next,
     mfiter_tile_box,
     mfiter_valid_box,
+    raise_on_error,
 )
 from amrex.ownership import AmrexHandle, AmrexRawHandle, destroy_amrex_optional_handle
 from amrex.runtime import RuntimeLease, require_matching_gpu_context
@@ -33,7 +34,37 @@ from std.gpu.host import DeviceContext, DeviceStream
 from std.sys import has_accelerator
 
 
-struct MFIter(AmrexHandle, Movable):
+@fieldwise_init
+struct MFIterTile(Copyable, Movable):
+    var index: Int
+    var local_tile_index: Int
+    var tile_box: Box3D
+    var valid_box: Box3D
+    var fab_box: Box3D
+
+
+@fieldwise_init
+struct MFIterRange(Movable):
+    var iter: MFIter
+
+    def __iter__(deinit self) -> MFIter:
+        return self.iter^
+
+
+def _box_from_raw_parts(
+    small_end: InlineArray[c_int, 3],
+    big_end: InlineArray[c_int, 3],
+    nodal: InlineArray[c_int, 3],
+) -> Box3D:
+    return Box3D(
+        small_end=IntVect3D(x=small_end[0], y=small_end[1], z=small_end[2]),
+        big_end=IntVect3D(x=big_end[0], y=big_end[1], z=big_end[2]),
+        nodal=IntVect3D(x=nodal[0], y=nodal[1], z=nodal[2]),
+    )
+
+
+struct MFIter(AmrexHandle, Iterator, Movable):
+    comptime Element = MFIterTile
     comptime moved_from_message = "MFIter no longer owns a live AMReX handle. The value may have been moved from."
     comptime destroy_symbol = "amrex_mojo_mfiter_destroy"
     var runtime: RuntimeLease
@@ -98,8 +129,7 @@ struct MFIter(AmrexHandle, Movable):
 
     def next(mut self) raises:
         var handle = self._handle()
-        if mfiter_next(self.runtime[].lib, handle) != 0:
-            raise Error(last_error_message(self.runtime[].lib))
+        raise_on_error(self.runtime[].lib, mfiter_next(self.runtime[].lib, handle))
         self.tile_ordinal += 1
         if self._has_gpu_backend():
             if self.is_valid():
@@ -107,6 +137,69 @@ struct MFIter(AmrexHandle, Movable):
                 self._refresh_stream_wrapper()
             else:
                 self._finalize()
+
+    def __next__(mut self) raises StopIteration -> Self.Element:
+        if not self.handle:
+            raise StopIteration()
+        var raw_handle = self.handle.value()
+        if self.runtime[].lib.call["amrex_mojo_mfiter_is_valid", c_int](raw_handle) == 0:
+            self._finalize_no_error()
+            raise StopIteration()
+
+        var tile_small_end = InlineArray[c_int, 3](fill=0)
+        var tile_big_end = InlineArray[c_int, 3](fill=0)
+        var tile_nodal = InlineArray[c_int, 3](fill=0)
+        var valid_small_end = InlineArray[c_int, 3](fill=0)
+        var valid_big_end = InlineArray[c_int, 3](fill=0)
+        var valid_nodal = InlineArray[c_int, 3](fill=0)
+        var fab_small_end = InlineArray[c_int, 3](fill=0)
+        var fab_big_end = InlineArray[c_int, 3](fill=0)
+        var fab_nodal = InlineArray[c_int, 3](fill=0)
+
+        var tile_status = self.runtime[].lib.call["amrex_mojo_mfiter_tile_box_metadata", c_int](
+            raw_handle,
+            tile_small_end.unsafe_ptr(),
+            tile_big_end.unsafe_ptr(),
+            tile_nodal.unsafe_ptr(),
+        )
+        var valid_status = self.runtime[].lib.call["amrex_mojo_mfiter_valid_box_metadata", c_int](
+            raw_handle,
+            valid_small_end.unsafe_ptr(),
+            valid_big_end.unsafe_ptr(),
+            valid_nodal.unsafe_ptr(),
+        )
+        var fab_status = self.runtime[].lib.call["amrex_mojo_mfiter_fab_box_metadata", c_int](
+            raw_handle,
+            fab_small_end.unsafe_ptr(),
+            fab_big_end.unsafe_ptr(),
+            fab_nodal.unsafe_ptr(),
+        )
+        if tile_status != 0 or valid_status != 0 or fab_status != 0:
+            self._finalize_no_error()
+            raise StopIteration()
+
+        var tile = MFIterTile(
+            index=Int(self.runtime[].lib.call["amrex_mojo_mfiter_index", c_int](raw_handle)),
+            local_tile_index=Int(self.runtime[].lib.call["amrex_mojo_mfiter_local_tile_index", c_int](raw_handle)),
+            tile_box=_box_from_raw_parts(tile_small_end, tile_big_end, tile_nodal),
+            valid_box=_box_from_raw_parts(valid_small_end, valid_big_end, valid_nodal),
+            fab_box=_box_from_raw_parts(fab_small_end, fab_big_end, fab_nodal),
+        )
+        var next_status = self.runtime[].lib.call["amrex_mojo_mfiter_next", c_int](raw_handle)
+        if next_status != 0:
+            self._finalize_no_error()
+            raise StopIteration()
+        self.tile_ordinal += 1
+        if self._has_gpu_backend():
+            if self.runtime[].lib.call["amrex_mojo_mfiter_is_valid", c_int](raw_handle) != 0:
+                _ = self.runtime[].lib.call[
+                    "amrex_mojo_gpu_set_stream_index",
+                    c_int,
+                    c_int,
+                ](c_int(self.tile_ordinal % self.num_streams))
+            else:
+                self._finalize_no_error()
+        return tile^
 
     def index(ref self) raises -> Int:
         self._require_valid()
@@ -120,24 +213,21 @@ struct MFIter(AmrexHandle, Movable):
         self._require_valid()
         var handle = self._handle()
         var result = mfiter_tile_box(self.runtime[].lib, handle)
-        if result.status != 0:
-            raise Error(last_error_message(self.runtime[].lib))
+        raise_on_error(self.runtime[].lib, result.status)
         return result.value.copy()
 
     def validbox(ref self) raises -> Box3D:
         self._require_valid()
         var handle = self._handle()
         var result = mfiter_valid_box(self.runtime[].lib, handle)
-        if result.status != 0:
-            raise Error(last_error_message(self.runtime[].lib))
+        raise_on_error(self.runtime[].lib, result.status)
         return result.value.copy()
 
     def fabbox(ref self) raises -> Box3D:
         self._require_valid()
         var handle = self._handle()
         var result = mfiter_fab_box(self.runtime[].lib, handle)
-        if result.status != 0:
-            raise Error(last_error_message(self.runtime[].lib))
+        raise_on_error(self.runtime[].lib, result.status)
         return result.value.copy()
 
     def growntilebox(ref self, ngrow: IntVect3D) raises -> Box3D:
@@ -210,8 +300,7 @@ struct MFIter(AmrexHandle, Movable):
             raise Error("MFIter is not positioned on a valid tile.")
 
     def _activate_current_stream(mut self) raises:
-        if gpu_set_stream_index(self.runtime[].lib, self.stream_index()) != 0:
-            raise Error(last_error_message(self.runtime[].lib))
+        raise_on_error(self.runtime[].lib, gpu_set_stream_index(self.runtime[].lib, self.stream_index()))
 
     def _refresh_stream_wrapper(mut self) raises:
         self.stream_wrapper = Optional[DeviceStream](self.ctx.value().create_external_stream(self.stream_handle()))
@@ -222,11 +311,25 @@ struct MFIter(AmrexHandle, Movable):
         # Tile kernels are round-robined over AMReX streams, so fence every
         # stream before later AMReX operations consume the tile results.
         for stream_index in range(self.num_streams):
-            if gpu_set_stream_index(self.runtime[].lib, stream_index) != 0:
-                raise Error(last_error_message(self.runtime[].lib))
-            if gpu_stream_synchronize_active(self.runtime[].lib) != 0:
-                raise Error(last_error_message(self.runtime[].lib))
+            raise_on_error(self.runtime[].lib, gpu_set_stream_index(self.runtime[].lib, stream_index))
+            raise_on_error(self.runtime[].lib, gpu_stream_synchronize_active(self.runtime[].lib))
         gpu_reset_stream(self.runtime[].lib)
+        self.finalized = True
+
+    def _finalize_no_error(mut self):
+        if self.finalized or not self._has_gpu_backend():
+            return
+        for stream_index in range(self.num_streams):
+            _ = self.runtime[].lib.call[
+                "amrex_mojo_gpu_set_stream_index",
+                c_int,
+                c_int,
+            ](c_int(stream_index))
+            _ = self.runtime[].lib.call[
+                "amrex_mojo_gpu_stream_synchronize_active",
+                c_int,
+            ]()
+        self.runtime[].lib.call["amrex_mojo_gpu_reset_stream"]()
         self.finalized = True
 
     def _has_gpu_backend(ref self) -> Bool:
@@ -247,6 +350,15 @@ def create_mfiter(
     if not handle:
         raise Error(last_error_message(runtime[].lib))
     return MFIter(runtime, handle.value(), default_ngrow, use_gpu_parallel)
+
+
+def create_mfiter_range(
+    runtime: RuntimeLease,
+    multifab: MultiFabHandle,
+    default_ngrow: IntVect3D,
+    use_gpu_parallel: Bool,
+) raises -> MFIterRange:
+    return MFIterRange(iter=create_mfiter(runtime, multifab, default_ngrow, use_gpu_parallel))
 
 
 def create_gpu_mfiter(

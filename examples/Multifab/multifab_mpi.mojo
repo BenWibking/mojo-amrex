@@ -1,4 +1,5 @@
 from amrex.space3d import (
+    AmrexFloat64,
     AmrexRuntime,
     Array4View,
     Box3D,
@@ -38,7 +39,7 @@ def expect_close(
 
 def fill_box_value[
     owner_origin: Origin[mut=True]
-](array: Array4View[DType.float64, owner_origin], box: Box3D, value: Float64) raises:
+](array: Array4View[AmrexFloat64, owner_origin], box: Box3D, value: Float64) raises:
     for k in range(Int(box.small_end.z), Int(box.big_end.z) + 1):
         for j in range(Int(box.small_end.y), Int(box.big_end.y) + 1):
             for i in range(Int(box.small_end.x), Int(box.big_end.x) + 1):
@@ -69,7 +70,7 @@ def box_contains(box: Box3D, i: Int, j: Int, k: Int) raises -> Bool:
 
 
 def has_nonzero_ghost_cells(
-    mut multifab: MultiFab[DType.float64],
+    mut multifab: MultiFab[AmrexFloat64],
 ) raises -> Bool:
     var mfi = multifab.mfiter()
     while mfi.is_valid():
@@ -90,7 +91,7 @@ def has_nonzero_ghost_cells(
 
 
 def interface_ghost_sample(
-    mut multifab: MultiFab[DType.float64],
+    mut multifab: MultiFab[AmrexFloat64],
 ) raises -> Float64:
     var mfi = multifab.mfiter()
     while mfi.is_valid():
@@ -107,9 +108,7 @@ def interface_ghost_sample(
     raise Error("expected a local tile touching the slab interface")
 
 
-def interface_expected_value(
-    mut multifab: MultiFab[DType.float64], left_value: Int, right_value: Int
-) raises -> Float64:
+def interface_expected_value(mut multifab: MultiFab[AmrexFloat64], left_value: Int, right_value: Int) raises -> Float64:
     var mfi = multifab.mfiter()
     while mfi.is_valid():
         var valid_box = mfi.validbox()
@@ -151,8 +150,8 @@ def main() raises:
 
         var distmap = DistributionMapping(runtime, boxarray)
         var geometry = Geometry(runtime, domain)
-        var source = MultiFab[DType.float64](runtime, boxarray, distmap, 1, intvect3d(1, 1, 1))
-        var destination = MultiFab[DType.float64](runtime, boxarray, distmap, 1, intvect3d(1, 1, 1))
+        var source = MultiFab[AmrexFloat64](runtime, boxarray, distmap, 1, intvect3d(1, 1, 1))
+        var destination = MultiFab[AmrexFloat64](runtime, boxarray, distmap, 1, intvect3d(1, 1, 1))
 
         source.set_val(0.0)
         destination.set_val(0.0)

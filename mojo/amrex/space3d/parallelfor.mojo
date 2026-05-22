@@ -1,10 +1,17 @@
-"""`ParallelFor` helpers for 3D tile boxes."""
+"""`ParallelFor` helpers for 3D tile boxes.
+
+Tile kernels use the `TileLoopBody` constraint from `amrex.space3d.tile_loop`.
+Parametric functions in this module spell that constraint inline so kernels can
+be invoked from shared helpers such as `for_each_box_cell`.
+"""
 
 from amrex.ffi import (
     Box3D,
     GPU_BACKEND_CUDA,
     GPU_BACKEND_HIP,
     GPU_BACKEND_NONE,
+    box_cell_count,
+    for_each_box_cell,
     gpu_backend,
     gpu_device_id,
     gpu_stream,
@@ -23,21 +30,10 @@ comptime KERNEL_BLOCK_SIZE = 256
 comptime AMREX_MOJO_CAN_COMPILE_GPU_PARALLEL_FOR = AMREX_MOJO_HAS_COMPILED_GPU_BACKEND and has_accelerator()
 
 
-def _cell_count(tile_box: Box3D) -> Int:
-    return (
-        (Int(tile_box.big_end.x) - Int(tile_box.small_end.x) + 1)
-        * (Int(tile_box.big_end.y) - Int(tile_box.small_end.y) + 1)
-        * (Int(tile_box.big_end.z) - Int(tile_box.small_end.z) + 1)
-    )
-
-
 def _parallel_for_cpu[
     body_type: (def(Int, Int, Int) register_passable -> None) & DevicePassable
 ](body: body_type, tile_box: Box3D) raises:
-    for k in range(Int(tile_box.small_end.z), Int(tile_box.big_end.z) + 1):
-        for j in range(Int(tile_box.small_end.y), Int(tile_box.big_end.y) + 1):
-            for i in range(Int(tile_box.small_end.x), Int(tile_box.big_end.x) + 1):
-                body(i, j, k)
+    for_each_box_cell(tile_box, body)
 
 
 def ParallelForCpu[
@@ -55,7 +51,7 @@ def _parallel_for_kernel[
     var lo_z = Int(tile_box.small_end.z)
     var nx = Int(tile_box.big_end.x) - lo_x + 1
     var ny = Int(tile_box.big_end.y) - lo_y + 1
-    var active_cells = _cell_count(tile_box)
+    var active_cells = box_cell_count(tile_box)
     if tid < active_cells:
         var linear_index = Int(tid)
         var cells_per_plane = nx * ny
@@ -114,6 +110,6 @@ def ParallelFor[
         kernel,
         body,
         tile_box,
-        grid_dim=ceildiv(_cell_count(tile_box), KERNEL_BLOCK_SIZE),
+        grid_dim=ceildiv(box_cell_count(tile_box), KERNEL_BLOCK_SIZE),
         block_dim=KERNEL_BLOCK_SIZE,
     )

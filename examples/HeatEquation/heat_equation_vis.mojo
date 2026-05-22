@@ -1,6 +1,7 @@
 """Notebook-friendly heat equation runner with step-wise Python control."""
 
 from amrex.space3d import (
+    AmrexFloat64,
     AmrexRuntime,
     BoxArray,
     DistributionMapping,
@@ -22,7 +23,7 @@ from std.python import Python, PythonObject
 from std.python.bindings import PythonModuleBuilder
 
 
-def initialize_phi(mut phi_old: MultiFab[DType.float64], dx: RealVect3D) raises:
+def initialize_phi(mut phi_old: MultiFab[AmrexFloat64], dx: RealVect3D) raises:
     var mfi = phi_old.mfiter()
     while mfi.is_valid():
         var bx = mfi.validbox()
@@ -48,8 +49,8 @@ def initialize_phi(mut phi_old: MultiFab[DType.float64], dx: RealVect3D) raises:
 struct HeatEquationRunner(Movable, Writable):
     var runtime: AmrexRuntime
     var geometry: Geometry
-    var phi_old: MultiFab[DType.float64]
-    var phi_new: MultiFab[DType.float64]
+    var phi_old: MultiFab[AmrexFloat64]
+    var phi_new: MultiFab[AmrexFloat64]
     var dx: RealVect3D
     var dt: Float64
     var nsteps: Int
@@ -85,14 +86,14 @@ struct HeatEquationRunner(Movable, Writable):
             var ncomp = 1
 
             var distmap = DistributionMapping(runtime, boxarray)
-            var phi_old = MultiFab[DType.float64](
+            var phi_old = MultiFab[AmrexFloat64](
                 runtime,
                 boxarray,
                 distmap,
                 ncomp,
                 intvect3d(nghost, nghost, nghost),
             )
-            var phi_new = MultiFab[DType.float64](
+            var phi_new = MultiFab[AmrexFloat64](
                 runtime,
                 boxarray,
                 distmap,
