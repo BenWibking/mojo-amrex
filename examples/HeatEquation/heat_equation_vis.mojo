@@ -29,14 +29,11 @@ def initialize_phi(mut phi_old: MultiFab[AmrexFloat64], dx: RealVect3D) raises:
         var bx = tile.valid_box
         var phi_old_array = phi_old.array(mfi)
         var tile_dx = dx.copy()
-        var dx_x = tile_dx.x
-        var dx_y = tile_dx.y
-        var dx_z = tile_dx.z
 
-        def initialize_cell(i: Int, j: Int, k: Int) {var phi_old_array^, var dx_x, var dx_y, var dx_z}:
-            var x = (Float64(i) + 0.5) * dx_x
-            var y = (Float64(j) + 0.5) * dx_y
-            var z = (Float64(k) + 0.5) * dx_z
+        def initialize_cell(i: Int, j: Int, k: Int) {var phi_old_array^, var tile_dx}:
+            var x = (Float64(i) + 0.5) * tile_dx.x
+            var y = (Float64(j) + 0.5) * tile_dx.y
+            var z = (Float64(k) + 0.5) * tile_dx.z
             var rsquared = ((x - 0.5) * (x - 0.5) + (y - 0.5) * (y - 0.5) + (z - 0.5) * (z - 0.5)) / 0.01
             phi_old_array[i, j, k] = 1.0 + exp(-rsquared)
 
@@ -142,21 +139,18 @@ struct HeatEquationRunner(Movable, Writable):
             var phi_old_array = self.phi_old.array(update_mfi)
             var phi_new_array = self.phi_new.array(update_mfi)
             var tile_dx = self.dx.copy()
-            var dx_x = tile_dx.x
-            var dx_y = tile_dx.y
-            var dx_z = tile_dx.z
             var dt = self.dt
 
             def advance_cell(
                 i: Int, j: Int, k: Int
-            ) {var phi_new_array^, var phi_old_array^, var dx_x, var dx_y, var dx_z, var dt,}:
+            ) {var phi_new_array^, var phi_old_array^, var tile_dx, var dt,}:
                 phi_new_array[i, j, k] = phi_old_array[i, j, k] + dt * (
                     (phi_old_array[i + 1, j, k] - 2.0 * phi_old_array[i, j, k] + phi_old_array[i - 1, j, k])
-                    / (dx_x * dx_x)
+                    / (tile_dx.x * tile_dx.x)
                     + (phi_old_array[i, j + 1, k] - 2.0 * phi_old_array[i, j, k] + phi_old_array[i, j - 1, k])
-                    / (dx_y * dx_y)
+                    / (tile_dx.y * tile_dx.y)
                     + (phi_old_array[i, j, k + 1] - 2.0 * phi_old_array[i, j, k] + phi_old_array[i, j, k - 1])
-                    / (dx_z * dx_z)
+                    / (tile_dx.z * tile_dx.z)
                 )
 
             ParallelFor(advance_cell, bx)

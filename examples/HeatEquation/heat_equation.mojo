@@ -97,14 +97,11 @@ def main() raises:
             var bx = tile.valid_box
             var phi_old_arr = phi_old.array(mfi)
             var dx = geometry.cell_size()
-            var dx_x = dx.x
-            var dx_y = dx.y
-            var dx_z = dx.z
 
-            def initialize_cell(i: Int, j: Int, k: Int) {var phi_old_arr^, var dx_x, var dx_y, var dx_z}:
-                var x = (Float64(i) + 0.5) * dx_x
-                var y = (Float64(j) + 0.5) * dx_y
-                var z = (Float64(k) + 0.5) * dx_z
+            def initialize_cell(i: Int, j: Int, k: Int) {var phi_old_arr^, var dx}:
+                var x = (Float64(i) + 0.5) * dx.x
+                var y = (Float64(j) + 0.5) * dx.y
+                var z = (Float64(k) + 0.5) * dx.z
                 var rsquared = ((x - 0.5) * (x - 0.5) + (y - 0.5) * (y - 0.5) + (z - 0.5) * (z - 0.5)) / 0.01
                 phi_old_arr[i, j, k] = 1.0 + exp(-rsquared)
 
@@ -135,20 +132,17 @@ def main() raises:
                 var phi_old_arr = phi_old.array(update_mfi)
                 var phi_new_arr = phi_new.array(update_mfi)
                 var dx = geometry.cell_size()
-                var dx_x = dx.x
-                var dx_y = dx.y
-                var dx_z = dx.z
 
                 def advance_cell(
                     i: Int, j: Int, k: Int
-                ) {var phi_new_arr^, var phi_old_arr^, var dx_x, var dx_y, var dx_z, var dt,}:
+                ) {var phi_new_arr^, var phi_old_arr^, var dx, var dt,}:
                     phi_new_arr[i, j, k] = phi_old_arr[i, j, k] + dt * (
                         (phi_old_arr[i + 1, j, k] - 2.0 * phi_old_arr[i, j, k] + phi_old_arr[i - 1, j, k])
-                        / (dx_x * dx_x)
+                        / (dx.x * dx.x)
                         + (phi_old_arr[i, j + 1, k] - 2.0 * phi_old_arr[i, j, k] + phi_old_arr[i, j - 1, k])
-                        / (dx_y * dx_y)
+                        / (dx.y * dx.y)
                         + (phi_old_arr[i, j, k + 1] - 2.0 * phi_old_arr[i, j, k] + phi_old_arr[i, j, k - 1])
-                        / (dx_z * dx_z)
+                        / (dx.z * dx.z)
                     )
 
                 update_mfi.parallel_for(advance_cell, bx)
