@@ -31,19 +31,19 @@ comptime AMREX_MOJO_CAN_COMPILE_GPU_PARALLEL_FOR = AMREX_MOJO_HAS_COMPILED_GPU_B
 
 
 def _parallel_for_cpu[
-    body_type: (def(Int, Int, Int) register_passable -> None) & DevicePassable
+    body_type: (def(Int, Int, Int) -> None) & DevicePassable
 ](body: body_type, tile_box: Box3D) raises:
     for_each_box_cell(tile_box, body)
 
 
 def ParallelForCpu[
-    body_type: (def(Int, Int, Int) register_passable -> None) & DevicePassable
+    body_type: (def(Int, Int, Int) -> None) & DevicePassable
 ](body: body_type, tile_box: Box3D) raises:
     _parallel_for_cpu(body, tile_box)
 
 
 def _parallel_for_kernel[
-    body_type: (def(Int, Int, Int) register_passable -> None) & DevicePassable
+    body_type: (def(Int, Int, Int) -> None) & DevicePassable
 ](body: body_type, tile_box: Box3D):
     var tid = global_idx.x
     var lo_x = Int(tile_box.small_end.x)
@@ -74,7 +74,7 @@ def _gpu_context(backend: Int, device_id: Int) raises -> DeviceContext:
 
 
 def ParallelFor[
-    body_type: (def(Int, Int, Int) register_passable -> None) & DevicePassable
+    body_type: (def(Int, Int, Int) -> None) & DevicePassable
 ](body: body_type, tile_box: Box3D) raises:
     comptime if not AMREX_MOJO_CAN_COMPILE_GPU_PARALLEL_FOR:
         _parallel_for_cpu(body, tile_box)
@@ -103,7 +103,7 @@ def ParallelFor[
 
 
 def ParallelFor[
-    body_type: (def(Int, Int, Int) register_passable -> None) & DevicePassable
+    body_type: (def(Int, Int, Int) -> None) & DevicePassable
 ](ref ctx: DeviceContext, ref stream: DeviceStream, body: body_type, tile_box: Box3D) raises:
     var kernel = ctx.compile_function[_parallel_for_kernel[body_type]]()
     stream.enqueue_function(

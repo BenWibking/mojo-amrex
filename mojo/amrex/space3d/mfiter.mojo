@@ -240,7 +240,7 @@ struct MFIter(AmrexHandle, Iterator, Movable):
         return self._growntilebox_impl(self.default_ngrow.copy())
 
     def parallel_for[
-        body_type: (def(Int, Int, Int) register_passable -> None) & DevicePassable
+        body_type: (def(Int, Int, Int) -> None) & DevicePassable
     ](mut self, body: body_type, box: Box3D) raises:
         comptime if not AMREX_MOJO_CAN_COMPILE_GPU_PARALLEL_FOR:
             ParallelForCpu(body, box)

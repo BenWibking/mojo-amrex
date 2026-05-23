@@ -25,6 +25,9 @@ Add new Mojo tests under `tests/mojo/` with a `_test.mojo` suffix. Add C++ ABI c
 ## Agent-Specific Instructions
 When editing Mojo code, consult the Mojo skills repo at `https://github.com/modular/skills`. Treat `mojo-syntax` as the syntax source of truth. Add `mojo-gpu-fundamentals` for GPU work and `mojo-python-interop` for Python-facing bindings or packaging.
 
+Mojo computes register passability for functions implicitly. Do not include
+`register_passable` as an explicit function effect or trait constraint.
+
 GPU detection does not work reliably inside Codex's default sandbox. If a Mojo
 command fails with GPU architecture detection, Crashpad, or accelerator
 initialization errors only inside the sandbox, rerun the same command outside

@@ -1,8 +1,6 @@
 from std.collections import List
 from std.builtin.device_passable import DevicePassable, DeviceTypeEncoder
 from std.ffi import OwnedDLHandle, c_char, c_double, c_int
-from layout import Coord, Idx
-from layout.tile_layout import Layout
 from amrex.floating_dtype import (
     AmrexFloatingDtype,
     MULTIFAB_DATATYPE_FLOAT32,
@@ -170,54 +168,23 @@ struct Array4LayoutMetadata(Copyable, DevicePassable, TrivialRegisterPassable):
         return String("Array4LayoutMetadata")
 
     def storage_size(self) -> Int:
-        var shape = Coord(
-            (
-                Idx(self.hi_x - self.lo_x + 1),
-                Idx(self.hi_y - self.lo_y + 1),
-                Idx(self.hi_z - self.lo_z + 1),
-                Idx(self.ncomp),
-            )
+        var nx = self.hi_x - self.lo_x + 1
+        var ny = self.hi_y - self.lo_y + 1
+        var nz = self.hi_z - self.lo_z + 1
+        return (
+            (nx - 1) * self.stride_i
+            + (ny - 1) * self.stride_j
+            + (nz - 1) * self.stride_k
+            + (self.ncomp - 1) * self.stride_n
+            + 1
         )
-        var stride = Coord(
-            (
-                Idx(self.stride_i),
-                Idx(self.stride_j),
-                Idx(self.stride_k),
-                Idx(self.stride_n),
-            )
-        )
-        var layout = Layout(shape, stride)
-        return Int(layout.cosize())
 
     def offset(self, i: Int, j: Int, k: Int, comp: Int = 0) -> Int:
-        var shape = Coord(
-            (
-                Idx(self.hi_x - self.lo_x + 1),
-                Idx(self.hi_y - self.lo_y + 1),
-                Idx(self.hi_z - self.lo_z + 1),
-                Idx(self.ncomp),
-            )
-        )
-        var stride = Coord(
-            (
-                Idx(self.stride_i),
-                Idx(self.stride_j),
-                Idx(self.stride_k),
-                Idx(self.stride_n),
-            )
-        )
-        var layout = Layout(shape, stride)
-        return Int(
-            layout(
-                Coord(
-                    (
-                        Idx(i - self.lo_x),
-                        Idx(j - self.lo_y),
-                        Idx(k - self.lo_z),
-                        Idx(comp),
-                    )
-                )
-            )
+        return (
+            (i - self.lo_x) * self.stride_i
+            + (j - self.lo_y) * self.stride_j
+            + (k - self.lo_z) * self.stride_k
+            + comp * self.stride_n
         )
 
     def get[
@@ -370,7 +337,7 @@ def box_cell_count(box: Box3D) -> Int:
 
 
 def for_each_box_cell[
-    body_type: (def(Int, Int, Int) register_passable -> None) & DevicePassable
+    body_type: (def(Int, Int, Int) -> None) & DevicePassable
 ](box: Box3D, body: body_type):
     for k in range(Int(box.small_end.z), Int(box.big_end.z) + 1):
         for j in range(Int(box.small_end.y), Int(box.big_end.y) + 1):

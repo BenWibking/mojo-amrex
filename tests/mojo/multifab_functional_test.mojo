@@ -85,7 +85,7 @@ def main() raises:
             var src_array = source.array(mfi)
             var add_value: Float64 = Float64(params.query[ParmInt]("tile_add"))
 
-            def add_cell(i: Int, j: Int, k: Int) register_passable {var dst_array^, var src_array^, var add_value}:
+            def add_cell(i: Int, j: Int, k: Int) {var dst_array^, var src_array^, var add_value}:
                 dst_array[i, j, k] = src_array[i, j, k] + add_value
 
             mfi.parallel_for(add_cell, tile_box)
@@ -199,7 +199,7 @@ def main() raises:
             var dst_array_f32 = destination_f32.array(mfi_f32)
             var src_array_f32 = source_f32.array(mfi_f32)
 
-            def add_cell_f32(i: Int, j: Int, k: Int) register_passable {var dst_array_f32^, var src_array_f32^}:
+            def add_cell_f32(i: Int, j: Int, k: Int) {var dst_array_f32^, var src_array_f32^}:
                 dst_array_f32[i, j, k] = src_array_f32[i, j, k] + Float32(0.5)
 
             mfi_f32.parallel_for(add_cell_f32, tile_box_f32)
@@ -234,7 +234,7 @@ def main() raises:
             var comm_array = comm_source.array(comm_mfi)
             var comm_tile_box = comm_mfi.tilebox()
 
-            def fill_rank_cell(i: Int, j: Int, k: Int) register_passable {var comm_array^, var rank_value}:
+            def fill_rank_cell(i: Int, j: Int, k: Int) {var comm_array^, var rank_value}:
                 comm_array[i, j, k] = rank_value
 
             comm_mfi.parallel_for(fill_rank_cell, comm_tile_box)
