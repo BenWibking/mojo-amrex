@@ -74,10 +74,10 @@ def main() raises:
 
         var mfi = destination.mfiter()
         var iterated_tiles = 0
-        while mfi.is_valid():
-            var tile_box = mfi.tilebox()
-            _ = mfi.validbox()
-            _ = mfi.fabbox()
+        for tile in mfi:
+            var tile_box = tile.tile_box
+            _ = tile.valid_box
+            _ = tile.fab_box
             _ = mfi.growntilebox()
             _ = mfi.index()
             _ = mfi.local_tile_index()
@@ -90,7 +90,6 @@ def main() raises:
 
             mfi.parallel_for(add_cell, tile_box)
             iterated_tiles += 1
-            mfi.next()
 
         expect(
             iterated_tiles == destination.tile_count(),
@@ -122,19 +121,18 @@ def main() raises:
             var gpu_mfi = default_multifab.mfiter()
             var gpu_iterated_tiles = 0
             var num_gpu_streams = runtime.gpu_num_streams()
-            while gpu_mfi.is_valid():
+            for tile in gpu_mfi:
                 expect(
                     gpu_mfi.stream_index() == gpu_iterated_tiles % num_gpu_streams,
                     "MFIter stream index should round-robin over the active stream set",
                 )
-                _ = gpu_mfi.tilebox()
-                _ = gpu_mfi.validbox()
-                _ = gpu_mfi.fabbox()
+                _ = tile.tile_box
+                _ = tile.valid_box
+                _ = tile.fab_box
                 _ = gpu_mfi.growntilebox()
                 _ = gpu_mfi.index()
                 _ = gpu_mfi.local_tile_index()
                 gpu_iterated_tiles += 1
-                gpu_mfi.next()
 
             expect(
                 gpu_iterated_tiles == default_multifab.tile_count(),
@@ -194,8 +192,8 @@ def main() raises:
         )
 
         var mfi_f32 = destination_f32.mfiter()
-        while mfi_f32.is_valid():
-            var tile_box_f32 = mfi_f32.tilebox()
+        for tile in mfi_f32:
+            var tile_box_f32 = tile.tile_box
             var dst_array_f32 = destination_f32.array(mfi_f32)
             var src_array_f32 = source_f32.array(mfi_f32)
 
@@ -203,7 +201,6 @@ def main() raises:
                 dst_array_f32[i, j, k] = src_array_f32[i, j, k] + Float32(0.5)
 
             mfi_f32.parallel_for(add_cell_f32, tile_box_f32)
-            mfi_f32.next()
 
         expect_equal(
             destination_f32.sum(0),
@@ -230,15 +227,14 @@ def main() raises:
 
         var comm_mfi = comm_source.mfiter()
         var rank_value = Float64(runtime.myproc() + 1)
-        while comm_mfi.is_valid():
+        for tile in comm_mfi:
             var comm_array = comm_source.array(comm_mfi)
-            var comm_tile_box = comm_mfi.tilebox()
+            var comm_tile_box = tile.tile_box
 
             def fill_rank_cell(i: Int, j: Int, k: Int) {var comm_array^, var rank_value}:
                 comm_array[i, j, k] = rank_value
 
             comm_mfi.parallel_for(fill_rank_cell, comm_tile_box)
-            comm_mfi.next()
 
         comm_source.fill_boundary(geometry)
 

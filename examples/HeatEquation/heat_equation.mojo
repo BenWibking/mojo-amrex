@@ -93,17 +93,15 @@ def main() raises:
         # **********************************
 
         var mfi = phi_old.mfiter()
-        while mfi.is_valid():
-            var bx = mfi.validbox()
+        for tile in mfi:
+            var bx = tile.valid_box
             var phi_old_arr = phi_old.array(mfi)
             var dx = geometry.cell_size()
             var dx_x = dx.x
             var dx_y = dx.y
             var dx_z = dx.z
 
-            def initialize_cell(
-                i: Int, j: Int, k: Int
-            ) {var phi_old_arr^, var dx_x, var dx_y, var dx_z}:
+            def initialize_cell(i: Int, j: Int, k: Int) {var phi_old_arr^, var dx_x, var dx_y, var dx_z}:
                 var x = (Float64(i) + 0.5) * dx_x
                 var y = (Float64(j) + 0.5) * dx_y
                 var z = (Float64(k) + 0.5) * dx_z
@@ -111,7 +109,6 @@ def main() raises:
                 phi_old_arr[i, j, k] = 1.0 + exp(-rsquared)
 
             mfi.parallel_for(initialize_cell, bx)
-            mfi.next()
 
         # **********************************
         # WRITE INITIAL PLOT FILE
@@ -133,8 +130,8 @@ def main() raises:
             phi_old.fill_boundary(geometry)
 
             var update_mfi = phi_old.mfiter()
-            while update_mfi.is_valid():
-                var bx = update_mfi.validbox()
+            for tile in update_mfi:
+                var bx = tile.valid_box
                 var phi_old_arr = phi_old.array(update_mfi)
                 var phi_new_arr = phi_new.array(update_mfi)
                 var dx = geometry.cell_size()
@@ -155,7 +152,6 @@ def main() raises:
                     )
 
                 update_mfi.parallel_for(advance_cell, bx)
-                update_mfi.next()
 
             time = time + dt
             var phi_swap = phi_old^

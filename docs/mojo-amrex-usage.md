@@ -19,8 +19,8 @@ failure.
 
 ## Borrowing Rules
 
-- `MultiFab.for_each_tile` yields a temporary `TileF64View` borrow for each
-  tile, and `MultiFabF32.for_each_tile` yields `TileF32View`.
+- Tile iteration is done directly with `MFIter`; bind the iterator to a local
+  variable, then use `for tile in mfi`.
 - `MultiFab.array(mfi)`, `MultiFab.tile(mfi)`, `MultiFabF32.array(mfi)`, and
   `MultiFabF32.tile(mfi)` borrow through both the owning multifab and the
   current `MFIter` position.

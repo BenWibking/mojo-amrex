@@ -14,8 +14,8 @@ Status: fixed in `mojo/amrex/space3d/mfiter.mojo`.
 `MFIter.stream()` returned a `DeviceStream` by reading the current
 `amrex::Gpu::gpuStream()` through the C ABI. AMReX stream selection is global,
 so another iterator or a direct `runtime.gpu_set_stream_index(...)` call could
-change the active stream between `mfi.next()` and `mfi.stream(ctx)`. In that
-case, a tile kernel could be enqueued onto the wrong AMReX stream.
+change the active stream between MFIter advancement and `mfi.stream(ctx)`. In
+that case, a tile kernel could be enqueued onto the wrong AMReX stream.
 
 The fix makes `MFIter.stream_handle()` and `MFIter.stream()` mutating accessors
 and calls `_activate_current_stream()` immediately before reading
@@ -28,7 +28,7 @@ Status: open.
 AMReX's native `MFIter` synchronizes the current stream before switching into
 round-robin stream assignment when more than one stream and more than one
 box/tile are active. The Mojo `MFIter` wrapper assigns tile streams directly in
-`__init__`, `next()`, and `stream_handle()` without an equivalent pre-fence.
+`__init__`, `__next__()`, and `stream_handle()` without an equivalent pre-fence.
 
 That is safe only if all earlier work that produces data for the tile loop has
 already completed or if that work is on the same per-tile stream. It is risky
@@ -44,9 +44,8 @@ var stream = ctx.create_external_stream(runtime.gpu_stream_handle(ctx))
 stream.enqueue_function(produce_data, ...)
 
 var mfi = mf.gpu_mfiter()
-while mfi.is_valid():
-    mfi.parallel_for(consume_data, mfi.tilebox())  # later tiles may use other streams
-    mfi.next()
+for tile in mfi:
+    mfi.parallel_for(consume_data, tile.tile_box)  # later tiles may use other streams
 ```
 
 Recommended follow-up options:
@@ -74,12 +73,14 @@ Example of sensitive composition:
 
 ```mojo
 var mfi = mf.gpu_mfiter()
-mfi.parallel_for(first_kernel, mfi.tilebox())
-mfi.synchronize()
-
-mfi.next()
-mfi.parallel_for(second_kernel, mfi.tilebox())
-mfi.next()  # reaching invalid state no longer fences second_kernel
+var launched_first = False
+for tile in mfi:
+    if not launched_first:
+        mfi.parallel_for(first_kernel, tile.tile_box)
+        mfi.synchronize()
+        launched_first = True
+    else:
+        mfi.parallel_for(second_kernel, tile.tile_box)
 
 mf.sum(0)  # may observe stale data from second_kernel
 ```
@@ -112,8 +113,8 @@ Examples of sensitive composition:
 
 ```mojo
 var mfi = mf.gpu_mfiter()
-while mfi.is_valid():
-    mfi.parallel_for(update_cell, mfi.tilebox())
+for tile in mfi:
+    mfi.parallel_for(update_cell, tile.tile_box)
     break
 
 mf.fill_boundary(geometry)  # may run before update_cell completes

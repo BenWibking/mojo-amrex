@@ -26,7 +26,7 @@ The intended smoke sequence is:
 2. install the shared library and Mojo package into the active pixi env
 3. initialize the runtime
 4. construct `BoxArray`, `DistributionMapping`, `Geometry`, `MultiFab`, and `ParmParse`
-5. iterate tiles from Mojo through both `MultiFab.for_each_tile` and `MFIter`
+5. iterate tiles from Mojo through `MFIter`
 6. update one `MultiFab` while reading from another through `MultiFab.array(mfi)`
 7. write a single-level plotfile from Mojo
 8. shut down cleanly

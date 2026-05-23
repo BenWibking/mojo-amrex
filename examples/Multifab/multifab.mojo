@@ -45,15 +45,17 @@ def main() raises:
         params.add[ParmInt](tile_fill_name, 42)
 
         var fill_value: Int = params.query[ParmInt](tile_fill_name)
-        source.for_each_tile[fill_tile]()
+        var source_mfi = source.mfiter()
+        for _ in source_mfi:
+            fill_tile(source.tile(source_mfi))
         multifab.set_val(0.0)
 
         var mfi = multifab.mfiter()
-        while mfi.is_valid():
-            var tile_box = mfi.tilebox()
-            var valid_box = mfi.validbox()
-            var fab_box = mfi.fabbox()
-            var grown_box = mfi.growntilebox()
+        for tile in mfi:
+            var tile_box = tile.tile_box
+            _ = tile.valid_box
+            _ = tile.fab_box
+            _ = mfi.growntilebox()
             var dst_array = multifab.array(mfi)
             var src_array = source.array(mfi)
 
@@ -61,7 +63,6 @@ def main() raises:
                 dst_array[i, j, k] = src_array[i, j, k] + Float64(fill_value - 1)
 
             ParallelFor(update_tile, tile_box)
-            mfi.next()
 
         var ntile = multifab.tile_count()
         multifab.write_single_level_plotfile(

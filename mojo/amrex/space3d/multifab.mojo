@@ -242,14 +242,6 @@ struct MultiFab[T: AmrexFloatingDtype](AmrexHandle, Movable):
             array_view=array_view.copy(),
         )
 
-    def for_each_tile[
-        tile_func: def[borrow_origin: Origin[mut=True]](TileView[Self.T, borrow_origin]) raises thin -> None
-    ](mut self) raises:
-        var mfi = self.mfiter()
-        while mfi.is_valid():
-            tile_func(self.tile(mfi))
-            mfi.next()
-
     def _array_for_mfiter[
         owner_origin: Origin[mut=True]
     ](ref self, handle: MultiFabHandle, mfiter_handle: MFIterHandle) raises -> Array4View[Self.T, owner_origin]:

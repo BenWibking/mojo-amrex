@@ -20,7 +20,6 @@ from amrex.ffi import (
     mfiter_index,
     mfiter_is_valid,
     mfiter_local_tile_index,
-    mfiter_next,
     mfiter_tile_box,
     mfiter_valid_box,
     raise_on_error,
@@ -51,6 +50,16 @@ struct MFIterRange(Movable):
         return self.iter^
 
 
+@fieldwise_init
+struct MFIterIterator[origin: Origin[mut=True]](Iterator):
+    comptime Element = MFIterTile
+
+    var iter: UnsafePointer[MFIter, MutAnyOrigin]
+
+    def __next__(mut self) raises StopIteration -> Self.Element:
+        return self.iter[].__next__()
+
+
 def _box_from_raw_parts(
     small_end: InlineArray[c_int, 3],
     big_end: InlineArray[c_int, 3],
@@ -73,6 +82,7 @@ struct MFIter(AmrexHandle, Iterator, Movable):
     var gpu_backend_code: Int
     var num_streams: Int
     var tile_ordinal: Int
+    var started: Bool
     var finalized: Bool
     var ctx: Optional[DeviceContext]
     var stream_wrapper: Optional[DeviceStream]
@@ -93,6 +103,7 @@ struct MFIter(AmrexHandle, Iterator, Movable):
             self.gpu_backend_code = GPU_BACKEND_NONE
         self.num_streams = gpu_num_streams(self.runtime[].lib)
         self.tile_ordinal = 0
+        self.started = False
         self.finalized = False
         self.ctx = None
         self.stream_wrapper = None
@@ -101,7 +112,7 @@ struct MFIter(AmrexHandle, Iterator, Movable):
                 raise Error("AMReX has a GPU backend, but Mojo did not find a supported accelerator.")
             self.ctx = Optional[DeviceContext](DeviceContext())
             _ = require_matching_gpu_context(self.runtime, self.ctx.value())
-            if self.is_valid():
+            if self._is_valid():
                 self._activate_current_stream()
                 self._refresh_stream_wrapper()
 
@@ -123,25 +134,33 @@ struct MFIter(AmrexHandle, Iterator, Movable):
     def _optional_handle(ref self) -> Optional[AmrexRawHandle]:
         return self.handle
 
-    def is_valid(ref self) raises -> Bool:
+    def _is_valid(ref self) raises -> Bool:
         var handle = self._handle()
         return mfiter_is_valid(self.runtime[].lib, handle)
-
-    def next(mut self) raises:
-        var handle = self._handle()
-        raise_on_error(self.runtime[].lib, mfiter_next(self.runtime[].lib, handle))
-        self.tile_ordinal += 1
-        if self._has_gpu_backend():
-            if self.is_valid():
-                self._activate_current_stream()
-                self._refresh_stream_wrapper()
-            else:
-                self._finalize()
 
     def __next__(mut self) raises StopIteration -> Self.Element:
         if not self.handle:
             raise StopIteration()
         var raw_handle = self.handle.value()
+
+        if self.started:
+            var next_status = self.runtime[].lib.call["amrex_mojo_mfiter_next", c_int](raw_handle)
+            if next_status != 0:
+                self._finalize_no_error()
+                raise StopIteration()
+            self.tile_ordinal += 1
+            if self._has_gpu_backend():
+                if self.runtime[].lib.call["amrex_mojo_mfiter_is_valid", c_int](raw_handle) != 0:
+                    _ = self.runtime[].lib.call[
+                        "amrex_mojo_gpu_set_stream_index",
+                        c_int,
+                        c_int,
+                    ](c_int(self.tile_ordinal % self.num_streams))
+                else:
+                    self._finalize_no_error()
+        else:
+            self.started = True
+
         if self.runtime[].lib.call["amrex_mojo_mfiter_is_valid", c_int](raw_handle) == 0:
             self._finalize_no_error()
             raise StopIteration()
@@ -185,21 +204,10 @@ struct MFIter(AmrexHandle, Iterator, Movable):
             valid_box=_box_from_raw_parts(valid_small_end, valid_big_end, valid_nodal),
             fab_box=_box_from_raw_parts(fab_small_end, fab_big_end, fab_nodal),
         )
-        var next_status = self.runtime[].lib.call["amrex_mojo_mfiter_next", c_int](raw_handle)
-        if next_status != 0:
-            self._finalize_no_error()
-            raise StopIteration()
-        self.tile_ordinal += 1
-        if self._has_gpu_backend():
-            if self.runtime[].lib.call["amrex_mojo_mfiter_is_valid", c_int](raw_handle) != 0:
-                _ = self.runtime[].lib.call[
-                    "amrex_mojo_gpu_set_stream_index",
-                    c_int,
-                    c_int,
-                ](c_int(self.tile_ordinal % self.num_streams))
-            else:
-                self._finalize_no_error()
         return tile^
+
+    def __iter__(mut self) -> MFIterIterator[origin_of(self)]:
+        return MFIterIterator[origin_of(self)](UnsafePointer[MFIter, MutAnyOrigin](to=self))
 
     def index(ref self) raises -> Int:
         self._require_valid()
@@ -249,8 +257,8 @@ struct MFIter(AmrexHandle, Iterator, Movable):
         if not self._has_gpu_backend():
             ParallelForCpu(body, box)
             return
-        if not self.stream_wrapper:
-            self._refresh_stream_wrapper()
+        self._activate_current_stream()
+        self._refresh_stream_wrapper()
         ParallelFor(self.ctx.value(), self.stream_wrapper.value(), body, box)
 
     def stream_index(ref self) raises -> Int:
@@ -296,7 +304,7 @@ struct MFIter(AmrexHandle, Iterator, Movable):
         return box
 
     def _require_valid(ref self) raises:
-        if not self.is_valid():
+        if not self._is_valid():
             raise Error("MFIter is not positioned on a valid tile.")
 
     def _activate_current_stream(mut self) raises:

@@ -324,7 +324,9 @@ def main() raises:
     let geom = Geometry(rt, domain)
     var mf = MultiFab(rt, ba, dm, n_comp=1, n_grow=1)
 
-    mf.for_each_tile[fill_tile]()
+    var mfi = mf.mfiter()
+    for _ in mfi:
+        fill_tile(mf.tile(mfi))
 ```
 
 This should be the user experience target for the first milestone.
@@ -398,8 +400,8 @@ Concrete API guidance:
 - `MultiFab.array(...)` should return an `Array4F64View` whose lifetime is tied
   to the owning `MultiFab` and, if necessary, any iterator state used to compute
   the tile
-- first-milestone tile access should prefer a callback-style API such as
-  `for_each_tile` so the tile borrow cannot escape its valid scope
+- first-milestone tile access should prefer direct `MFIter` iteration, with
+  tile views borrowed from the iterator position inside the loop body
 
 It is better to copy small objects than to export tricky borrowed references
 without type-enforced lifetime guarantees.

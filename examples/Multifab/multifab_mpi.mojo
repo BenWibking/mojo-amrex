@@ -73,9 +73,9 @@ def has_nonzero_ghost_cells(
     mut multifab: MultiFab[AmrexFloat64],
 ) raises -> Bool:
     var mfi = multifab.mfiter()
-    while mfi.is_valid():
-        var valid_box = mfi.validbox()
-        var fab_box = mfi.fabbox()
+    for tile in mfi:
+        var valid_box = tile.valid_box
+        var fab_box = tile.fab_box
         var array = multifab.array(mfi)
         for k in range(Int(fab_box.small_end.z), Int(fab_box.big_end.z) + 1):
             for j in range(Int(fab_box.small_end.y), Int(fab_box.big_end.y) + 1):
@@ -85,7 +85,6 @@ def has_nonzero_ghost_cells(
                 ):
                     if not box_contains(valid_box, i, j, k) and array[i, j, k] != 0.0:
                         return True
-        mfi.next()
 
     return False
 
@@ -94,8 +93,8 @@ def interface_ghost_sample(
     mut multifab: MultiFab[AmrexFloat64],
 ) raises -> Float64:
     var mfi = multifab.mfiter()
-    while mfi.is_valid():
-        var valid_box = mfi.validbox()
+    for tile in mfi:
+        var valid_box = tile.valid_box
         var array = multifab.array(mfi)
         var j = Int(valid_box.small_end.y)
         var k = Int(valid_box.small_end.z)
@@ -103,18 +102,16 @@ def interface_ghost_sample(
             return array[Int(valid_box.big_end.x) + 1, j, k]
         if Int(valid_box.big_end.x) == DOMAIN_EXTENT - 1:
             return array[Int(valid_box.small_end.x) - 1, j, k]
-        mfi.next()
 
     raise Error("expected a local tile touching the slab interface")
 
 
 def interface_expected_value(mut multifab: MultiFab[AmrexFloat64], left_value: Int, right_value: Int) raises -> Float64:
     var mfi = multifab.mfiter()
-    while mfi.is_valid():
-        var valid_box = mfi.validbox()
+    for tile in mfi:
+        var valid_box = tile.valid_box
         if Int(valid_box.small_end.x) == 0 or Int(valid_box.big_end.x) == DOMAIN_EXTENT - 1:
             return slab_neighbor_value(valid_box, left_value, right_value)
-        mfi.next()
 
     raise Error("expected a local tile touching the slab interface")
 
@@ -158,14 +155,13 @@ def main() raises:
         expect(source.tile_count() > 0, "each rank should own at least one tile")
 
         var mfi = source.mfiter()
-        while mfi.is_valid():
-            var valid_box = mfi.validbox()
+        for tile in mfi:
+            var valid_box = tile.valid_box
             fill_box_value(
                 source.array(mfi),
                 valid_box,
                 slab_fill_value(valid_box, left_value, right_value),
             )
-            mfi.next()
 
         source.fill_boundary(geometry)
         var expected_ghost = interface_expected_value(source, left_value, right_value)

@@ -25,17 +25,15 @@ from std.python.bindings import PythonModuleBuilder
 
 def initialize_phi(mut phi_old: MultiFab[AmrexFloat64], dx: RealVect3D) raises:
     var mfi = phi_old.mfiter()
-    while mfi.is_valid():
-        var bx = mfi.validbox()
+    for tile in mfi:
+        var bx = tile.valid_box
         var phi_old_array = phi_old.array(mfi)
         var tile_dx = dx.copy()
         var dx_x = tile_dx.x
         var dx_y = tile_dx.y
         var dx_z = tile_dx.z
 
-        def initialize_cell(
-            i: Int, j: Int, k: Int
-        ) {var phi_old_array^, var dx_x, var dx_y, var dx_z}:
+        def initialize_cell(i: Int, j: Int, k: Int) {var phi_old_array^, var dx_x, var dx_y, var dx_z}:
             var x = (Float64(i) + 0.5) * dx_x
             var y = (Float64(j) + 0.5) * dx_y
             var z = (Float64(k) + 0.5) * dx_z
@@ -43,7 +41,6 @@ def initialize_phi(mut phi_old: MultiFab[AmrexFloat64], dx: RealVect3D) raises:
             phi_old_array[i, j, k] = 1.0 + exp(-rsquared)
 
         ParallelFor(initialize_cell, bx)
-        mfi.next()
 
 
 struct HeatEquationRunner(Movable, Writable):
@@ -124,14 +121,13 @@ struct HeatEquationRunner(Movable, Writable):
         var np = Python.import_module("numpy")
         var output_slice = np.zeros(shape=Python.tuple(self.n_cell, self.n_cell))
         var slice_mfi = self.phi_old.mfiter()
-        while slice_mfi.is_valid():
-            var bx = slice_mfi.validbox()
+        for tile in slice_mfi:
+            var bx = tile.valid_box
             if self.mid_plane >= Int(bx.small_end.z) and self.mid_plane <= Int(bx.big_end.z):
                 var phi_src = self.phi_old.array(slice_mfi)
                 for j in range(Int(bx.small_end.y), Int(bx.big_end.y) + 1):
                     for i in range(Int(bx.small_end.x), Int(bx.big_end.x) + 1):
                         output_slice[i, j] = phi_src[i, j, self.mid_plane]
-            slice_mfi.next()
         return output_slice
 
     def step(mut self) raises -> Bool:
@@ -141,8 +137,8 @@ struct HeatEquationRunner(Movable, Writable):
         self.phi_old.fill_boundary(self.geometry)
 
         var update_mfi = self.phi_old.mfiter()
-        while update_mfi.is_valid():
-            var bx = update_mfi.validbox()
+        for tile in update_mfi:
+            var bx = tile.valid_box
             var phi_old_array = self.phi_old.array(update_mfi)
             var phi_new_array = self.phi_new.array(update_mfi)
             var tile_dx = self.dx.copy()
@@ -164,7 +160,6 @@ struct HeatEquationRunner(Movable, Writable):
                 )
 
             ParallelFor(advance_cell, bx)
-            update_mfi.next()
 
         self.phi_old.copy_from(self.phi_new, 0, 0, 1)
         self.current_step += 1
