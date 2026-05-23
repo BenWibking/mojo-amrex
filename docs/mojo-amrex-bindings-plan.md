@@ -721,11 +721,11 @@ expansion steps.
 
 ## References
 
-- Mojo FFI documentation: <https://docs.modular.com/mojo/std/ffi/>
-- Mojo value creation: <https://docs.modular.com/mojo/manual/lifecycle/life/>
-- Mojo value destruction: <https://docs.modular.com/mojo/manual/lifecycle/death/>
+- Mojo FFI documentation: <https://mojolang.org/nightly/docs/std/ffi/>
+- Mojo value creation: <https://mojolang.org/nightly/docs/manual/lifecycle/life/>
+- Mojo value destruction: <https://mojolang.org/nightly/docs/manual/lifecycle/death/>
 - Mojo lifetimes and origins:
-  <https://docs.modular.com/mojo/manual/values/lifetimes/>
+  <https://mojolang.org/nightly/docs/manual/values/lifetimes/>
 - `pyamrex` entry point: `../pyamrex/src/pyAMReX.cpp`
 - `pyamrex` public API guide: `../pyamrex/docs/source/usage/api.rst`
 - AMReX Fortran-interface C++ wrappers:
