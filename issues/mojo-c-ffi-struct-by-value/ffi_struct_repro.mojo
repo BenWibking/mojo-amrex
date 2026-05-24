@@ -1,4 +1,4 @@
-from std.builtin.device_passable import DevicePassable
+from std.builtin.device_passable import DevicePassable, DeviceTypeEncoder
 from std.ffi import OwnedDLHandle, c_int
 from std.os.path import exists
 
@@ -8,7 +8,7 @@ comptime Token = UnsafePointer[NoneType, MutExternalOrigin]
 
 def init_device_passable_value[
     T: TrivialRegisterPassable,
-    mut_origin: Origin[mut=True],
+    mut_origin: MutOrigin,
 ](value: T, target: UnsafePointer[NoneType, mut_origin]):
     target.bitcast[T]().init_pointee_copy(value)
 
@@ -21,9 +21,11 @@ struct Int3(DevicePassable, TrivialRegisterPassable):
     var y: c_int
     var z: c_int
 
-    def _to_device_type[
-        mut_origin: Origin[mut=True]
-    ](self, target: UnsafePointer[NoneType, mut_origin]):
+    def _to_device_type(
+        self,
+        mut encoder: Some[DeviceTypeEncoder],
+        target: UnsafePointer[mut=True, NoneType, _],
+    ):
         init_device_passable_value(self, target)
 
     @staticmethod
@@ -64,23 +66,21 @@ def last_arg_z(ref lib: OwnedDLHandle) raises -> Int:
 
 
 def check_struct_early(ref lib: OwnedDLHandle, p0: Token, p1: Token, value: Int3) raises -> Int:
-    var f = lib.get_function[
-        def(Token, Token, Int3) thin abi("C") -> c_int
-    ]("check_struct_early")
+    var f = lib.get_function[def(Token, Token, Int3) thin abi("C") -> c_int]("check_struct_early")
     return Int(f(p0, p1, value))
 
 
 def check_struct_after_five(ref lib: OwnedDLHandle, p0: Token, p1: Token, value: Int3) raises -> Int:
-    var f = lib.get_function[
-        def(Token, Token, c_int, c_int, c_int, Int3) thin abi("C") -> c_int
-    ]("check_struct_after_five")
+    var f = lib.get_function[def(Token, Token, c_int, c_int, c_int, Int3) thin abi("C") -> c_int](
+        "check_struct_after_five"
+    )
     return Int(f(p0, p1, c_int(101), c_int(202), c_int(303), value))
 
 
 def check_scalars_after_five(ref lib: OwnedDLHandle, p0: Token, p1: Token, value: Int3) raises -> Int:
-    var f = lib.get_function[
-        def(Token, Token, c_int, c_int, c_int, c_int, c_int, c_int) thin abi("C") -> c_int
-    ]("check_scalars_after_five")
+    var f = lib.get_function[def(Token, Token, c_int, c_int, c_int, c_int, c_int, c_int) thin abi("C") -> c_int](
+        "check_scalars_after_five"
+    )
     return Int(
         f(
             p0,

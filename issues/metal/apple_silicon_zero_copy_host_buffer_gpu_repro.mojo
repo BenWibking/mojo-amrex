@@ -6,7 +6,7 @@ unchanged. The same kernel works when launched against a staged `DeviceBuffer`
 and copied back to the host.
 """
 
-from std.builtin.device_passable import DevicePassable
+from std.builtin.device_passable import DevicePassable, DeviceTypeEncoder
 from std.collections import List
 from std.ffi import c_float
 from std.gpu import global_idx
@@ -22,7 +22,7 @@ comptime FILL_VALUE = Float32(42.0)
 
 def init_device_passable_value[
     T: TrivialRegisterPassable,
-    mut_origin: Origin[mut=True],
+    mut_origin: MutOrigin,
 ](value: T, target: UnsafePointer[NoneType, mut_origin]):
     target.bitcast[T]().init_pointee_copy(value)
 
@@ -34,9 +34,11 @@ struct BufferViewF32(DevicePassable, TrivialRegisterPassable):
     var data: UnsafePointer[c_float, MutAnyOrigin]
     var size: Int64
 
-    def _to_device_type[
-        mut_origin: Origin[mut=True]
-    ](self, target: UnsafePointer[NoneType, mut_origin],):
+    def _to_device_type(
+        self,
+        mut encoder: Some[DeviceTypeEncoder],
+        target: UnsafePointer[mut=True, NoneType, _],
+    ):
         init_device_passable_value(self, target)
 
     @staticmethod
@@ -70,9 +72,7 @@ def fill_buffer_gpu(dst: BufferViewF32, value: Float32):
         dst[Int(tid)] = value
 
 
-def fill_with_gpu_zero_copy(
-    ref ctx: DeviceContext, dst: BufferViewF32, value: Float32
-) raises:
+def fill_with_gpu_zero_copy(ref ctx: DeviceContext, dst: BufferViewF32, value: Float32) raises:
     ctx.enqueue_function[fill_buffer_gpu](
         dst,
         value,
@@ -82,9 +82,7 @@ def fill_with_gpu_zero_copy(
     ctx.synchronize()
 
 
-def fill_with_gpu_staged(
-    ref ctx: DeviceContext, dst: BufferViewF32, value: Float32
-) raises:
+def fill_with_gpu_staged(ref ctx: DeviceContext, dst: BufferViewF32, value: Float32) raises:
     var buffer = ctx.enqueue_create_buffer[DType.float32](Int(dst.size))
     var device_view = BufferViewF32(
         data=buffer.unsafe_ptr(),
@@ -102,10 +100,7 @@ def fill_with_gpu_staged(
 
 def main() raises:
     if not has_accelerator():
-        raise Error(
-            "issues/apple_silicon_zero_copy_host_buffer_gpu_repro.mojo requires"
-            " a Mojo-supported accelerator."
-        )
+        raise Error("issues/apple_silicon_zero_copy_host_buffer_gpu_repro.mojo requires a Mojo-supported accelerator.")
 
     var zero_copy_storage = List[c_float](length=ELEMENT_COUNT, fill=0.0)
     var staged_storage = List[c_float](length=ELEMENT_COUNT, fill=0.0)
