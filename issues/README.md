@@ -11,7 +11,7 @@ linked upstream issues were still open.
 
 | Local repro | Upstream issue | Local result |
 | --- | --- | --- |
-| [`mojo-c-ffi-struct-by-value/`](mojo-c-ffi-struct-by-value/) | [modular/modular#6567](https://github.com/modular/modular/issues/6567) | After updating the repro for the current `DevicePassable` API, `pixi run make -C issues/mojo-c-ffi-struct-by-value run-mojo` passes, including the formerly failing `struct_after_five` case. |
+| [`mojo-c-ffi-struct-by-value/`](mojo-c-ffi-struct-by-value/) | [modular/modular#6567](https://github.com/modular/modular/issues/6567) | After updating the repro for the current `DevicePassable` API, `pixi run make -C issues/mojo-c-ffi-struct-by-value run-mojo` passes locally, including the formerly failing `struct_after_five` case. The original bug appeared on x86-64 Linux, so it still needs confirmation on that platform before treating it as fully fixed. |
 
 ## Still open locally
 
