@@ -11,12 +11,12 @@ linked upstream issues were still open.
 
 | Local repro | Upstream issue | Local result |
 | --- | --- | --- |
-| [`mojo-c-ffi-struct-by-value/`](mojo-c-ffi-struct-by-value/) | [modular/modular#6567](https://github.com/modular/modular/issues/6567) | After updating the repro for the current `DevicePassable` API, `pixi run make -C issues/mojo-c-ffi-struct-by-value run-mojo` passes locally, including the formerly failing `struct_after_five` case. The original bug appeared on x86-64 Linux, so it still needs confirmation on that platform before treating it as fully fixed. |
 
 ## Still open locally
 
 | Local repro | Upstream issue | Local result |
 | --- | --- | --- |
+| [`mojo-c-ffi-struct-by-value/`](mojo-c-ffi-struct-by-value/) | [modular/modular#6567](https://github.com/modular/modular/issues/6567) | Still fails on x86-64 Linux with the current repro: `struct_early` and `scalars_after_five` return status 0 with the expected values, but `struct_after_five` returns status 30 and observes `x=33, y=0, z=1006639754`, then raises `struct_after_five failed`. |
 | [`closures/associated_type_register_passable_capture_repro.mojo`](closures/associated_type_register_passable_capture_repro.mojo) | [modular/modular#6592](https://github.com/modular/modular/issues/6592) | Still fails with a missing `ImplicitlyDestructible.__del__` witness when capturing an associated-type return value in a `DevicePassable` closure. |
 | [`metal/apple_silicon_zero_copy_host_buffer_gpu_repro.mojo`](metal/apple_silicon_zero_copy_host_buffer_gpu_repro.mojo) | [modular/modular#6145](https://github.com/modular/modular/issues/6145) | Not confirmed fixed. After updating the repro for the current `DevicePassable` API and running outside the sandbox, Mojo fails earlier with `Metal Compiler failed to compile metallib`. |
 
