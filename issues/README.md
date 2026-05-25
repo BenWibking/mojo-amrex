@@ -11,7 +11,6 @@ linked upstream issues were still open.
 
 | Local repro | Upstream issue | Local result |
 | --- | --- | --- |
-| [`closures/mojo_unified_closure_devicepassable_trait_crash_repro.mojo`](closures/mojo_unified_closure_devicepassable_trait_crash_repro.mojo) | [modular/modular#6499](https://github.com/modular/modular/issues/6499) | `mojo build --target-accelerator sm_80 ...` succeeds, and the built binary exits successfully. |
 | [`mojo-c-ffi-struct-by-value/`](mojo-c-ffi-struct-by-value/) | [modular/modular#6567](https://github.com/modular/modular/issues/6567) | After updating the repro for the current `DevicePassable` API, `pixi run make -C issues/mojo-c-ffi-struct-by-value run-mojo` passes, including the formerly failing `struct_after_five` case. |
 
 ## Still open locally
