@@ -22,7 +22,7 @@ def get_value[T: ValueTag]() -> T.value_type:
 
 
 def use_closure[
-    body_type: (def(Int) register_passable -> None) & DevicePassable
+    body_type: (def(Int) -> None) & DevicePassable
 ](body: body_type):
     body(0)
 
@@ -30,7 +30,7 @@ def use_closure[
 def main():
     var dt = get_value[RealTag]()
 
-    def body(i: Int) register_passable {var dt}:
+    def body(i: Int) {var dt}:
         _ = Float64(i) + dt
 
     use_closure(body)
