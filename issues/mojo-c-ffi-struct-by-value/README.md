@@ -39,7 +39,7 @@ From the repo root with this Pixi environment:
 
 ```sh
 pixi run make -C issues/mojo-c-ffi-struct-by-value
-pixi run -x mojo issues/mojo-c-ffi-struct-by-value/ffi_struct_repro.mojo
+pixi run mojo issues/mojo-c-ffi-struct-by-value/ffi_struct_repro.mojo
 ```
 
 Expected native C output:
