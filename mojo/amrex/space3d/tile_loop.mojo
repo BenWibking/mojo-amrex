@@ -10,4 +10,4 @@ another generic function (see `for_each_box_cell` and `_parallel_for_cpu`).
 from std.builtin.device_passable import DevicePassable
 
 
-comptime TileLoopBody = (def(Int, Int, Int) -> None) & DevicePassable
+comptime TileLoopBody = (def(Int, Int, Int) -> None) & DevicePassable & ImplicitlyCopyable

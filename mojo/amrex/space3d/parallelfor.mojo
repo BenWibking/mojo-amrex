@@ -31,35 +31,15 @@ comptime AMREX_MOJO_CAN_COMPILE_GPU_PARALLEL_FOR = AMREX_MOJO_HAS_COMPILED_GPU_B
 
 
 def _parallel_for_cpu[
-    body_type: (def(Int, Int, Int) -> None) & DevicePassable
+    body_type: (def(Int, Int, Int) -> None) & DevicePassable & ImplicitlyCopyable
 ](body: body_type, tile_box: Box3D) raises:
     for_each_box_cell(tile_box, body)
 
 
 def ParallelForCpu[
-    body_type: (def(Int, Int, Int) -> None) & DevicePassable
+    body_type: (def(Int, Int, Int) -> None) & DevicePassable & ImplicitlyCopyable
 ](body: body_type, tile_box: Box3D) raises:
     _parallel_for_cpu(body, tile_box)
-
-
-def _parallel_for_kernel[
-    body_type: (def(Int, Int, Int) -> None) & DevicePassable
-](body: body_type, tile_box: Box3D):
-    var tid = global_idx.x
-    var lo_x = Int(tile_box.small_end.x)
-    var lo_y = Int(tile_box.small_end.y)
-    var lo_z = Int(tile_box.small_end.z)
-    var nx = Int(tile_box.big_end.x) - lo_x + 1
-    var ny = Int(tile_box.big_end.y) - lo_y + 1
-    var active_cells = box_cell_count(tile_box)
-    if tid < active_cells:
-        var linear_index = Int(tid)
-        var cells_per_plane = nx * ny
-        var k = lo_z + linear_index // cells_per_plane
-        var plane_index = linear_index % cells_per_plane
-        var j = lo_y + plane_index // nx
-        var i = lo_x + plane_index % nx
-        body(i, j, k)
 
 
 def _gpu_context(backend: Int, device_id: Int) raises -> DeviceContext:
@@ -74,7 +54,7 @@ def _gpu_context(backend: Int, device_id: Int) raises -> DeviceContext:
 
 
 def ParallelFor[
-    body_type: (def(Int, Int, Int) -> None) & DevicePassable
+    body_type: (def(Int, Int, Int) -> None) & DevicePassable & ImplicitlyCopyable
 ](body: body_type, tile_box: Box3D) raises:
     comptime if not AMREX_MOJO_CAN_COMPILE_GPU_PARALLEL_FOR:
         _parallel_for_cpu(body, tile_box)
@@ -103,13 +83,29 @@ def ParallelFor[
 
 
 def ParallelFor[
-    body_type: (def(Int, Int, Int) -> None) & DevicePassable
+    body_type: (def(Int, Int, Int) -> None) & DevicePassable & ImplicitlyCopyable
 ](ref ctx: DeviceContext, ref stream: DeviceStream, body: body_type, tile_box: Box3D) raises:
-    var kernel = ctx.compile_function[_parallel_for_kernel[body_type]]()
+    var grid_size = ceildiv(box_cell_count(tile_box), KERNEL_BLOCK_SIZE)
+
+    def kernel() {var body, var tile_box}:
+        var tid = global_idx.x
+        var lo_x = Int(tile_box.small_end.x)
+        var lo_y = Int(tile_box.small_end.y)
+        var lo_z = Int(tile_box.small_end.z)
+        var nx = Int(tile_box.big_end.x) - lo_x + 1
+        var ny = Int(tile_box.big_end.y) - lo_y + 1
+        var active_cells = box_cell_count(tile_box)
+        if tid < active_cells:
+            var linear_index = Int(tid)
+            var cells_per_plane = nx * ny
+            var k = lo_z + linear_index // cells_per_plane
+            var plane_index = linear_index % cells_per_plane
+            var j = lo_y + plane_index // nx
+            var i = lo_x + plane_index % nx
+            body(i, j, k)
+
     stream.enqueue_function(
         kernel,
-        body,
-        tile_box,
-        grid_dim=ceildiv(box_cell_count(tile_box), KERNEL_BLOCK_SIZE),
+        grid_dim=grid_size,
         block_dim=KERNEL_BLOCK_SIZE,
     )

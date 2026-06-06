@@ -337,7 +337,7 @@ def box_cell_count(box: Box3D) -> Int:
 
 
 def for_each_box_cell[
-    body_type: (def(Int, Int, Int) -> None) & DevicePassable
+    body_type: (def(Int, Int, Int) -> None) & DevicePassable & ImplicitlyCopyable
 ](box: Box3D, body: body_type):
     for k in range(Int(box.small_end.z), Int(box.big_end.z) + 1):
         for j in range(Int(box.small_end.y), Int(box.big_end.y) + 1):
