@@ -82,30 +82,36 @@ def ParallelFor[
     ParallelFor(ctx, stream, body, tile_box)
 
 
+def _parallel_for_kernel[
+    body_type: (def(Int, Int, Int) -> None) & DevicePassable & ImplicitlyCopyable
+](body: body_type, tile_box: Box3D):
+    var tid = global_idx.x
+    var lo_x = Int(tile_box.small_end.x)
+    var lo_y = Int(tile_box.small_end.y)
+    var lo_z = Int(tile_box.small_end.z)
+    var nx = Int(tile_box.big_end.x) - lo_x + 1
+    var ny = Int(tile_box.big_end.y) - lo_y + 1
+    var active_cells = box_cell_count(tile_box)
+    if tid < active_cells:
+        var linear_index = Int(tid)
+        var cells_per_plane = nx * ny
+        var k = lo_z + linear_index // cells_per_plane
+        var plane_index = linear_index % cells_per_plane
+        var j = lo_y + plane_index // nx
+        var i = lo_x + plane_index % nx
+        body(i, j, k)
+
+
 def ParallelFor[
     body_type: (def(Int, Int, Int) -> None) & DevicePassable & ImplicitlyCopyable
 ](ref ctx: DeviceContext, ref stream: DeviceStream, body: body_type, tile_box: Box3D) raises:
     var grid_size = ceildiv(box_cell_count(tile_box), KERNEL_BLOCK_SIZE)
-
-    def kernel() {var body, var tile_box}:
-        var tid = global_idx.x
-        var lo_x = Int(tile_box.small_end.x)
-        var lo_y = Int(tile_box.small_end.y)
-        var lo_z = Int(tile_box.small_end.z)
-        var nx = Int(tile_box.big_end.x) - lo_x + 1
-        var ny = Int(tile_box.big_end.y) - lo_y + 1
-        var active_cells = box_cell_count(tile_box)
-        if tid < active_cells:
-            var linear_index = Int(tid)
-            var cells_per_plane = nx * ny
-            var k = lo_z + linear_index // cells_per_plane
-            var plane_index = linear_index % cells_per_plane
-            var j = lo_y + plane_index // nx
-            var i = lo_x + plane_index % nx
-            body(i, j, k)
-
+    comptime kernel = _parallel_for_kernel[body_type]
+    var compiled_kernel = ctx.compile_function[kernel]()
     stream.enqueue_function(
-        kernel,
+        compiled_kernel,
+        body,
+        tile_box,
         grid_dim=grid_size,
         block_dim=KERNEL_BLOCK_SIZE,
     )

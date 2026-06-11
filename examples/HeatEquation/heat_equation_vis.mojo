@@ -170,21 +170,25 @@ struct HeatEquationRunner(Movable, Writable):
         self = Self()
 
     @staticmethod
-    def step_py(self_ptr: UnsafePointer[Self, MutAnyOrigin]) raises -> PythonObject:
+    def step_py(py_self: PythonObject) raises -> PythonObject:
+        var self_ptr = py_self.downcast_value_ptr[Self]()
         return PythonObject(self_ptr[].step())
 
     @staticmethod
     def slice_array_py(
-        self_ptr: UnsafePointer[Self, MutAnyOrigin],
+        py_self: PythonObject,
     ) raises -> PythonObject:
+        var self_ptr = py_self.downcast_value_ptr[Self]()
         return self_ptr[].slice_array()
 
     @staticmethod
-    def current_step_py(self_ptr: UnsafePointer[Self, MutAnyOrigin]) -> PythonObject:
+    def current_step_py(py_self: PythonObject) raises -> PythonObject:
+        var self_ptr = py_self.downcast_value_ptr[Self]()
         return PythonObject(self_ptr[].current_step)
 
     @staticmethod
-    def nsteps_py(self_ptr: UnsafePointer[Self, MutAnyOrigin]) -> PythonObject:
+    def nsteps_py(py_self: PythonObject) raises -> PythonObject:
+        var self_ptr = py_self.downcast_value_ptr[Self]()
         return PythonObject(self_ptr[].nsteps)
 
     def write_to(self, mut writer: Some[Writer]):
@@ -201,7 +205,7 @@ struct HeatEquationRunner(Movable, Writable):
 
 
 @export
-def PyInit_heat_equation_vis() -> PythonObject:
+def PyInit_heat_equation_vis() abi("C") -> PythonObject:
     try:
         var module = PythonModuleBuilder("heat_equation_vis")
         _ = (

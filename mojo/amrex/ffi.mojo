@@ -8,14 +8,14 @@ from amrex.floating_dtype import (
 )
 
 
-comptime RuntimeHandle = UnsafePointer[NoneType, MutExternalOrigin]
-comptime BoxArrayHandle = UnsafePointer[NoneType, MutExternalOrigin]
-comptime DistributionMappingHandle = UnsafePointer[NoneType, MutExternalOrigin]
-comptime GeometryHandle = UnsafePointer[NoneType, MutExternalOrigin]
-comptime MultiFabHandle = UnsafePointer[NoneType, MutExternalOrigin]
-comptime MFIterHandle = UnsafePointer[NoneType, MutExternalOrigin]
-comptime ParmParseHandle = UnsafePointer[NoneType, MutExternalOrigin]
-comptime GpuStreamHandle = UnsafePointer[NoneType, MutExternalOrigin]
+comptime RuntimeHandle = UnsafePointer[NoneType, MutUntrackedOrigin]
+comptime BoxArrayHandle = UnsafePointer[NoneType, MutUntrackedOrigin]
+comptime DistributionMappingHandle = UnsafePointer[NoneType, MutUntrackedOrigin]
+comptime GeometryHandle = UnsafePointer[NoneType, MutUntrackedOrigin]
+comptime MultiFabHandle = UnsafePointer[NoneType, MutUntrackedOrigin]
+comptime MFIterHandle = UnsafePointer[NoneType, MutUntrackedOrigin]
+comptime ParmParseHandle = UnsafePointer[NoneType, MutUntrackedOrigin]
+comptime GpuStreamHandle = UnsafePointer[NoneType, MutUntrackedOrigin]
 
 comptime OptionalRuntimeHandle = Optional[RuntimeHandle]
 comptime OptionalBoxArrayHandle = Optional[BoxArrayHandle]
@@ -25,7 +25,7 @@ comptime OptionalMultiFabHandle = Optional[MultiFabHandle]
 comptime OptionalMFIterHandle = Optional[MFIterHandle]
 comptime OptionalParmParseHandle = Optional[ParmParseHandle]
 comptime OptionalGpuStreamHandle = Optional[GpuStreamHandle]
-comptime CStringArrayHandle = UnsafePointer[UnsafePointer[c_char, MutAnyOrigin], MutAnyOrigin]
+comptime CStringArrayHandle = UnsafePointer[UnsafePointer[c_char, ImmutUntrackedOrigin], MutUntrackedOrigin]
 comptime OptionalCStringArrayHandle = Optional[CStringArrayHandle]
 
 comptime GPU_BACKEND_NONE = 0
@@ -348,7 +348,7 @@ def for_each_box_cell[
 def last_error_message(ref lib: OwnedDLHandle) raises -> String:
     var message = lib.call[
         "amrex_mojo_last_error_message",
-        Optional[UnsafePointer[c_char, ImmutExternalOrigin]],
+        Optional[UnsafePointer[c_char, ImmutUntrackedOrigin]],
     ]()
     if not message:
         return String("AMReX call failed.")
