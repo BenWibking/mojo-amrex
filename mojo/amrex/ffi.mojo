@@ -209,7 +209,7 @@ struct Array4View[T: AmrexFloatingDtype, origin: Origin[mut=True]](DevicePassabl
 
     def device_view(self) -> Self.device_type:
         return Self.device_type(
-            data=UnsafePointer[Self.value_type, MutAnyOrigin](self.data),
+            data=self.data.as_unsafe_any_origin(),
             layout=self.layout.copy(),
         )
 

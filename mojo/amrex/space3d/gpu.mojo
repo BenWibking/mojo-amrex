@@ -27,7 +27,7 @@ struct StagedArray4[T: AmrexFloatingDtype](Movable):
     ](out self, ref ctx: DeviceContext, array: Array4View[Self.T, origin],) raises:
         self.buffer = ctx.enqueue_create_buffer[Self.dtype](array4_storage_size(array))
         self.device_view_ = Array4View[Self.T, MutAnyOrigin](
-            data=self.buffer.unsafe_ptr(),
+            data=self.buffer.unsafe_ptr().as_unsafe_any_origin(),
             layout=array.layout_metadata(),
         )
 
