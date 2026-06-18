@@ -2,23 +2,9 @@
 
 The repository now also has automated tests under `tests/README.md`, but the
 manual example paths in `examples/Multifab/multifab.mojo`,
-`examples/Multifab/multifab_gpu.mojo`,
 `examples/HeatEquation/heat_equation.mojo`,
-`examples/HeatEquation/heat_equation_gpu.mojo`, and
 `examples/Multifab/multifab_mpi.mojo` are still useful for an interactive
 end-to-end run.
-
-`examples/Multifab/multifab_gpu.mojo` is the smaller direct CUDA/HIP interop
-example. It wraps the current AMReX stream in Mojo and launches Mojo kernels
-directly over AMReX-managed device-accessible `MultiFab[AmrexFloat32]` storage.
-
-`examples/HeatEquation/heat_equation_gpu.mojo` is the larger direct interop
-example. It applies the same stream-sharing path to the heat-equation update
-loop and bundled `heat_equation_gpu.inputs` driver.
-
-The portable staged path still exists in `amrex.space3d.gpu` through
-`StagedArray4` and `StagedTile`, but there is currently no dedicated
-standalone staged-GPU example script in `examples/`.
 
 The intended smoke sequence is:
 
@@ -38,9 +24,7 @@ pixi run configure
 pixi run build-capi
 pixi run install-amrex
 mojo examples/Multifab/multifab.mojo
-mojo examples/Multifab/multifab_gpu.mojo
 mojo examples/HeatEquation/heat_equation.mojo
-mojo examples/HeatEquation/heat_equation_gpu.mojo
 mpiexec --oversubscribe --map-by slot -n 2 mojo examples/Multifab/multifab_mpi.mojo
 ```
 

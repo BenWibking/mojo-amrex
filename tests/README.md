@@ -26,7 +26,5 @@ stale installed shared library.
 Useful manual entry points:
 
 - `mojo examples/Multifab/multifab.mojo`
-- `mojo examples/Multifab/multifab_gpu.mojo`
 - `mojo examples/HeatEquation/heat_equation.mojo`
-- `mojo examples/HeatEquation/heat_equation_gpu.mojo`
 - `mpiexec --oversubscribe --map-by slot -n 2 mojo examples/Multifab/multifab_mpi.mojo`

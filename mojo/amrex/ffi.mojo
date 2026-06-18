@@ -8,14 +8,14 @@ from amrex.floating_dtype import (
 )
 
 
-comptime RuntimeHandle = UnsafePointer[NoneType, MutExternalOrigin]
-comptime BoxArrayHandle = UnsafePointer[NoneType, MutExternalOrigin]
-comptime DistributionMappingHandle = UnsafePointer[NoneType, MutExternalOrigin]
-comptime GeometryHandle = UnsafePointer[NoneType, MutExternalOrigin]
-comptime MultiFabHandle = UnsafePointer[NoneType, MutExternalOrigin]
-comptime MFIterHandle = UnsafePointer[NoneType, MutExternalOrigin]
-comptime ParmParseHandle = UnsafePointer[NoneType, MutExternalOrigin]
-comptime GpuStreamHandle = UnsafePointer[NoneType, MutExternalOrigin]
+comptime RuntimeHandle = UnsafePointer[NoneType, MutUntrackedOrigin]
+comptime BoxArrayHandle = UnsafePointer[NoneType, MutUntrackedOrigin]
+comptime DistributionMappingHandle = UnsafePointer[NoneType, MutUntrackedOrigin]
+comptime GeometryHandle = UnsafePointer[NoneType, MutUntrackedOrigin]
+comptime MultiFabHandle = UnsafePointer[NoneType, MutUntrackedOrigin]
+comptime MFIterHandle = UnsafePointer[NoneType, MutUntrackedOrigin]
+comptime ParmParseHandle = UnsafePointer[NoneType, MutUntrackedOrigin]
+comptime GpuStreamHandle = UnsafePointer[NoneType, MutUntrackedOrigin]
 
 comptime OptionalRuntimeHandle = Optional[RuntimeHandle]
 comptime OptionalBoxArrayHandle = Optional[BoxArrayHandle]
@@ -25,7 +25,7 @@ comptime OptionalMultiFabHandle = Optional[MultiFabHandle]
 comptime OptionalMFIterHandle = Optional[MFIterHandle]
 comptime OptionalParmParseHandle = Optional[ParmParseHandle]
 comptime OptionalGpuStreamHandle = Optional[GpuStreamHandle]
-comptime CStringArrayHandle = UnsafePointer[UnsafePointer[c_char, MutAnyOrigin], MutAnyOrigin]
+comptime CStringArrayHandle = UnsafePointer[UnsafePointer[c_char, ImmutUntrackedOrigin], MutUntrackedOrigin]
 comptime OptionalCStringArrayHandle = Optional[CStringArrayHandle]
 
 comptime GPU_BACKEND_NONE = 0
@@ -201,7 +201,7 @@ struct Array4LayoutMetadata(Copyable, DevicePassable, TrivialRegisterPassable):
 @fieldwise_init
 struct Array4View[T: AmrexFloatingDtype, origin: Origin[mut=True]](DevicePassable, TrivialRegisterPassable):
     comptime dtype = Self.T.dtype
-    comptime device_type = Array4View[Self.T, MutAnyOrigin]
+    comptime device_type = Array4View[Self.T, MutUnsafeAnyOrigin]
     comptime value_type = Scalar[Self.dtype]
 
     var data: UnsafePointer[Self.value_type, Self.origin]
@@ -209,7 +209,7 @@ struct Array4View[T: AmrexFloatingDtype, origin: Origin[mut=True]](DevicePassabl
 
     def device_view(self) -> Self.device_type:
         return Self.device_type(
-            data=UnsafePointer[Self.value_type, MutAnyOrigin](self.data),
+            data=self.data.as_unsafe_any_origin(),
             layout=self.layout.copy(),
         )
 
@@ -255,7 +255,7 @@ struct Array4View[T: AmrexFloatingDtype, origin: Origin[mut=True]](DevicePassabl
 @fieldwise_init
 struct TileView[T: AmrexFloatingDtype, origin: Origin[mut=True]](DevicePassable, TrivialRegisterPassable):
     comptime dtype = Self.T.dtype
-    comptime device_type = TileView[Self.T, MutAnyOrigin]
+    comptime device_type = TileView[Self.T, MutUnsafeAnyOrigin]
     comptime value_type = Scalar[Self.dtype]
 
     var tile_box: Box3D
@@ -337,7 +337,7 @@ def box_cell_count(box: Box3D) -> Int:
 
 
 def for_each_box_cell[
-    body_type: (def(Int, Int, Int) -> None) & DevicePassable
+    body_type: (def(Int, Int, Int) -> None) & DevicePassable & ImplicitlyCopyable
 ](box: Box3D, body: body_type):
     for k in range(Int(box.small_end.z), Int(box.big_end.z) + 1):
         for j in range(Int(box.small_end.y), Int(box.big_end.y) + 1):
@@ -348,7 +348,7 @@ def for_each_box_cell[
 def last_error_message(ref lib: OwnedDLHandle) raises -> String:
     var message = lib.call[
         "amrex_mojo_last_error_message",
-        Optional[UnsafePointer[c_char, ImmutExternalOrigin]],
+        Optional[UnsafePointer[c_char, ImmutUntrackedOrigin]],
     ]()
     if not message:
         return String("AMReX call failed.")
@@ -826,8 +826,8 @@ def array4_view_from_mfiter[
 
 def device_array4_view_from_mfiter[
     T: AmrexFloatingDtype
-](ref lib: OwnedDLHandle, multifab: MultiFabHandle, mfiter: MFIterHandle,) raises -> Array4View[T, MutAnyOrigin]:
-    return _device_array4_view_from_mfiter[T, MutAnyOrigin](lib, multifab, mfiter)
+](ref lib: OwnedDLHandle, multifab: MultiFabHandle, mfiter: MFIterHandle,) raises -> Array4View[T, MutUnsafeAnyOrigin]:
+    return _device_array4_view_from_mfiter[T, MutUnsafeAnyOrigin](lib, multifab, mfiter)
 
 
 def device_array4_view_from_mfiter_as_origin[

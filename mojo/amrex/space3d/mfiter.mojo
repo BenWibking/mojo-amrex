@@ -54,7 +54,7 @@ struct MFIterRange(Movable):
 struct MFIterIterator[origin: Origin[mut=True]](Iterator):
     comptime Element = MFIterTile
 
-    var iter: UnsafePointer[MFIter, MutAnyOrigin]
+    var iter: UnsafePointer[MFIter, Self.origin]
 
     def __next__(mut self) raises StopIteration -> Self.Element:
         return self.iter[].__next__()
@@ -207,7 +207,7 @@ struct MFIter(AmrexHandle, Iterator, Movable):
         return tile^
 
     def __iter__(mut self) -> MFIterIterator[origin_of(self)]:
-        return MFIterIterator[origin_of(self)](UnsafePointer[MFIter, MutAnyOrigin](to=self))
+        return MFIterIterator[origin_of(self)](UnsafePointer[MFIter, origin_of(self)](to=self))
 
     def index(ref self) raises -> Int:
         self._require_valid()
@@ -248,7 +248,7 @@ struct MFIter(AmrexHandle, Iterator, Movable):
         return self._growntilebox_impl(self.default_ngrow.copy())
 
     def parallel_for[
-        body_type: (def(Int, Int, Int) -> None) & DevicePassable
+        body_type: (def(Int, Int, Int) -> None) & DevicePassable & ImplicitlyCopyable
     ](mut self, body: body_type, box: Box3D) raises:
         comptime if not AMREX_MOJO_CAN_COMPILE_GPU_PARALLEL_FOR:
             ParallelForCpu(body, box)
@@ -268,7 +268,7 @@ struct MFIter(AmrexHandle, Iterator, Movable):
 
     def stream_handle(
         mut self,
-    ) raises -> UnsafePointer[NoneType, MutExternalOrigin]:
+    ) raises -> UnsafePointer[NoneType, MutUntrackedOrigin]:
         self._require_gpu_backend()
         self._require_valid()
         self._activate_current_stream()

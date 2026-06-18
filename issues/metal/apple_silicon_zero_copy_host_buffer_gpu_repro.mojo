@@ -2,8 +2,8 @@
 
 On affected Apple Silicon systems, a kernel that writes directly into a
 host-backed `List[c_float]` through a zero-copy pointer leaves the host buffer
-unchanged. The same kernel works when launched against a staged `DeviceBuffer`
-and copied back to the host.
+unchanged. The same kernel works when launched against a device-resident
+`DeviceBuffer` and copied back to the host for verification.
 """
 
 from std.builtin.device_passable import DevicePassable, DeviceTypeEncoder
@@ -31,7 +31,7 @@ def init_device_passable_value[
 struct BufferViewF32(DevicePassable, TrivialRegisterPassable):
     comptime device_type = Self
 
-    var data: UnsafePointer[c_float, MutAnyOrigin]
+    var data: UnsafePointer[c_float, MutUnsafeAnyOrigin]
     var size: Int64
 
     def _to_device_type(
@@ -82,7 +82,7 @@ def fill_with_gpu_zero_copy(ref ctx: DeviceContext, dst: BufferViewF32, value: F
     ctx.synchronize()
 
 
-def fill_with_gpu_staged(ref ctx: DeviceContext, dst: BufferViewF32, value: Float32) raises:
+def fill_with_gpu_device_buffer(ref ctx: DeviceContext, dst: BufferViewF32, value: Float32) raises:
     var buffer = ctx.enqueue_create_buffer[DType.float32](Int(dst.size))
     var device_view = BufferViewF32(
         data=buffer.unsafe_ptr(),
@@ -103,23 +103,23 @@ def main() raises:
         raise Error("issues/apple_silicon_zero_copy_host_buffer_gpu_repro.mojo requires a Mojo-supported accelerator.")
 
     var zero_copy_storage = List[c_float](length=ELEMENT_COUNT, fill=0.0)
-    var staged_storage = List[c_float](length=ELEMENT_COUNT, fill=0.0)
+    var device_buffer_result_storage = List[c_float](length=ELEMENT_COUNT, fill=0.0)
     var zero_copy_view = host_view(zero_copy_storage)
-    var staged_view = host_view(staged_storage)
+    var device_buffer_result_view = host_view(device_buffer_result_storage)
 
     var ctx = DeviceContext()
     ctx.synchronize()
 
     fill_with_gpu_zero_copy(ctx, zero_copy_view, FILL_VALUE)
-    fill_with_gpu_staged(ctx, staged_view, FILL_VALUE)
+    fill_with_gpu_device_buffer(ctx, device_buffer_result_view, FILL_VALUE)
 
     var expected_sum = Float64(ELEMENT_COUNT) * Float64(FILL_VALUE)
     var zero_copy_sum = sum_buffer(zero_copy_view)
-    var staged_sum = sum_buffer(staged_view)
+    var device_buffer_sum = sum_buffer(device_buffer_result_view)
 
     print("elements=", ELEMENT_COUNT)
     print("expected_sum=", expected_sum)
     print("zero_copy_sum=", zero_copy_sum)
-    print("staged_sum=", staged_sum)
+    print("device_buffer_sum=", device_buffer_sum)
     print("zero_copy_matches_expected=", zero_copy_sum == expected_sum)
-    print("staged_matches_expected=", staged_sum == expected_sum)
+    print("device_buffer_matches_expected=", device_buffer_sum == expected_sum)

@@ -8,7 +8,7 @@ Mojo bindings for AMReX, built as a narrow C ABI plus Mojo wrapper types.
 
 - `src/capi/`: AMReX-backed C ABI
 - `mojo/amrex/`: Mojo package exposed as top-level `amrex`
-- `examples/`: `Multifab` and `HeatEquation` examples for host, direct GPU interop, and MPI workflows
+- `examples/`: `Multifab` and `HeatEquation` examples for host and MPI workflows
 - `tests/`: C++ and Mojo test coverage
 - `docs/`: usage notes and design details
 
@@ -19,10 +19,9 @@ The current MVP includes:
 - runtime initialization and shutdown
 - `BoxArray`, `DistributionMapping`, `Geometry`, and `MultiFab`
 - tile iteration and zero-copy `Array4` borrows for host-accessible storage
-- portable staged GPU helper types for host-backed `Array4F32View` data
 - reductions, plotfile output, `fill_boundary`, and `parallel_copy_from`
 - optional direct CUDA/HIP GPU interop through AMReX external streams
-- runnable examples for host, heat-equation, direct GPU interop, and MPI flows
+- runnable examples for host, heat-equation, and MPI flows
 
 ## Quickstart
 
@@ -88,9 +87,7 @@ Examples:
 
 ```bash
 mojo examples/Multifab/multifab.mojo
-mojo examples/Multifab/multifab_gpu.mojo
 mojo examples/HeatEquation/heat_equation.mojo
-mojo examples/HeatEquation/heat_equation_gpu.mojo
 mpiexec --oversubscribe --map-by slot -n 2 mojo examples/Multifab/multifab_mpi.mojo
 ```
 

@@ -16,12 +16,8 @@ This repository now implements an opt-in direct CUDA/HIP path.
   and falls back to `NONE` if neither toolchain is available.
 - Direct interop is available when AMReX is configured with
   `AMREX_MOJO_GPU_BACKEND=CUDA` or `AMREX_MOJO_GPU_BACKEND=HIP`.
-- Repository examples for this path live at
-  `examples/Multifab/multifab_gpu.mojo` and
-  `examples/HeatEquation/heat_equation_gpu.mojo`.
-- The portable staged path in `mojo/amrex/space3d/gpu.mojo` remains the
-  fallback for CPU builds and for backends that do not support direct AMReX
-  interop.
+- CPU-only builds use host-accessible `Array4` views. There is no staged
+  host-to-device fallback path in the public API.
 
 ## Design
 
@@ -208,19 +204,8 @@ without hiding the risk.
   convenience overload, so kernels must be compiled first and then enqueued
   explicitly
 
-## Fallback Path
+## CPU Path
 
-When direct AMReX GPU interop is unavailable, the supported fallback remains:
-
-1. borrow a host `Array4`
-2. stage it through a Mojo `DeviceBuffer`
-3. launch the Mojo kernel
-4. copy the result back
-
-That staged path is slower, but it remains useful for:
-
-- CPU-only AMReX builds
-- Metal backends
-- bring-up and debugging
-- any environment where the current toolchain does not expose the needed CUDA
-  or HIP stream exports
+When direct AMReX GPU interop is unavailable, run the same algorithm on the CPU
+against host-accessible `Array4`/`TileView` borrows. The binding layer does not
+provide a staged host-to-device `Array4` fallback.

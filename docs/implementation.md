@@ -53,13 +53,12 @@ rebuilding or setting `AMREX_MOJO_LIBRARY_PATH`.
 
 ## GPU Paths
 
-There are two GPU-related workflows in this repository:
+GPU execution follows one ownership rule in this repository:
 
-- staged Mojo GPU execution helpers in `mojo/amrex/space3d/gpu.mojo`, which
-  copy host-backed tile data through Mojo buffers and remain the portable
-  fallback
-- direct CUDA/HIP interop, which wraps the current AMReX stream in Mojo and
-  borrows device-accessible tile metadata from `MultiFab`
+- CPU builds operate on host-accessible `Array4` views.
+- CUDA/HIP builds run kernels against AMReX-resident, device-accessible
+  `MultiFab` storage by wrapping the current AMReX stream in Mojo and borrowing
+  device tile metadata from `MultiFab`.
 
 The direct path is intentionally narrow and documented in
 `docs/mojo-amrex-direct-gpu-interop.md`.
