@@ -3,7 +3,7 @@ from std.ffi import OwnedDLHandle, c_int
 from std.os.path import exists
 
 
-comptime Token = UnsafePointer[NoneType, MutExternalOrigin]
+comptime Token = UnsafePointer[NoneType, MutUntrackedOrigin]
 
 
 def init_device_passable_value[

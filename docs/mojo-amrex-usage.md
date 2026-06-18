@@ -43,10 +43,9 @@ failure.
   accessible, device accessible, managed, device-only, or pinned.
 - `MultiFab` allocation follows the loaded AMReX runtime: CPU builds use the
   host path, while CUDA/HIP builds use AMReX's GPU-capable default arena.
-- Mojo device kernels in user code are still supported. Use the staged helper
-  types in `amrex.space3d.gpu` (`StagedArray4F32` / `StagedTileF32`) with
-  `std.gpu.host.DeviceContext` when you want the portable host-to-device
-  staging path. That is a Mojo-side execution path, not an AMReX GPU runtime.
+- Mojo device kernels in user code should run against device-resident AMReX
+  storage. CPU-only builds should use the host `Array4`/`TileView` path instead
+  of staging host tiles through Mojo-owned device buffers.
 
 ## Direct GPU Interop Rules
 
@@ -78,14 +77,14 @@ failure.
   `IntVect3D` implement Mojo `DevicePassable` so they can be passed to device
   kernels.
 - The device-side view types intentionally erase pointer provenance to
-  `MutAnyOrigin`. Keeping the original owner origin in `device_type` causes the
+  `MutUnsafeAnyOrigin`. Keeping the original owner origin in `device_type` causes the
   current Mojo compiler to reject `_to_device_type(...)` during alias/provenance
   checking.
 - Direct AMReX GPU interop is now available for CUDA/HIP builds through
   `gpu_stream_handle(ctx)` plus `unsafe_device_array(...)`.
-- The staged `DeviceBuffer` workaround remains the portable fallback for CPU
-  builds, Metal, and any configuration where direct AMReX GPU interop is not
-  available.
+- There is no staged host-to-device `Array4` fallback in the public API. Code
+  should either run on the CPU with host-accessible views or run on the device
+  with AMReX-resident device-accessible views.
 - Detailed design notes and remaining caveats live in
   `docs/mojo-amrex-direct-gpu-interop.md`.
 

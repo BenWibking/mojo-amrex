@@ -14,7 +14,7 @@ Use Pixi from the repo root.
 - `pixi run test-mpi`: run MPI coverage with `mpiexec`.
 - `pixi run format-mojo`: format `mojo/amrex`, `examples`, and `tests/mojo`.
 
-Useful smoke runs: `mojo examples/Multifab/multifab.mojo` and `mojo examples/HeatEquation/heat_equation_gpu.mojo`.
+Useful smoke runs: `mojo examples/Multifab/multifab.mojo` and `mojo examples/HeatEquation/heat_equation.mojo`.
 
 ## Coding Style & Naming Conventions
 Follow the existing style: 4-space indentation, short functions, and `snake_case` for files, variables, and most symbols (`multifab_functional_test.mojo`, `gpu_device_id`). Keep Mojo module paths aligned with `mojo/amrex/`. Match the repo’s CMake style by using multi-line argument blocks instead of dense one-liners. Run `pixi run format-mojo` before submitting Mojo changes.

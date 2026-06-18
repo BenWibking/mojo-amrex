@@ -428,10 +428,11 @@ The first version should not try to reproduce:
 
 Current repo status:
 
-- AMReX GPU backends are intentionally disabled.
-- `MultiFab` storage stays host-resident from the AMReX side.
-- Mojo device kernels are still viable in user code, but only by explicitly
-  staging AMReX tile data through Mojo `DeviceBuffer`s.
+- CPU builds use host-resident `MultiFab` storage and host-accessible `Array4`
+  views.
+- GPU builds should keep `MultiFab` storage device-resident and launch Mojo
+  kernels against AMReX-owned device storage through direct interop.
+- The binding should not expose a staged host-to-device `Array4` fallback.
 
 The original design intent was to preserve AMReX's native ownership model
 instead of replacing it with Mojo-native buffer ownership. In practice, that

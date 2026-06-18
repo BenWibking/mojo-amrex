@@ -162,23 +162,12 @@ Recommended follow-up options:
 
 ### 6. Staged host/device helpers enqueue asynchronous copies without an ordering hook
 
-Status: open.
+Status: closed by removal.
 
-`StagedArray4F32.load_from_host(...)` and
-`StagedArray4F32.store_to_host(...)` enqueue copies through `DeviceContext`.
-Callers may enqueue kernels through a separate `DeviceStream`, but the helper
-does not expose a stream or event dependency. That makes it easy to write code
-where host-to-device copy, kernel execution, and device-to-host copy are not
-explicitly ordered.
-
-Recommended follow-up options:
-
-- Accept a `DeviceStream` for staged copies if the Mojo API supports stream
-  copies.
-- Provide explicit synchronization methods or examples showing the required
-  ordering.
-- Add a focused staged-copy smoke test once the local Mojo GPU target issue is
-  resolved.
+The staged `Array4` helper API was removed. User code should either run on the
+CPU with host-accessible `Array4`/`TileView` borrows, or run on the device
+against AMReX-resident device-accessible `MultiFab` storage through direct
+CUDA/HIP interop. There is no public staged host-to-device `Array4` fallback.
 
 ## Validation Notes
 

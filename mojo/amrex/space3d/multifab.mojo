@@ -225,7 +225,7 @@ struct MultiFab[T: AmrexFloatingDtype](AmrexHandle, Movable):
     ](ref[owner_origin] self, ref mfi: MFIter) raises -> Array4View[Self.T, owner_origin]:
         return self.tile(mfi).array()
 
-    def unsafe_device_array(ref self, ref mfi: MFIter) raises -> Array4View[Self.T, MutAnyOrigin]:
+    def unsafe_device_array(ref self, ref mfi: MFIter) raises -> Array4View[Self.T, MutUnsafeAnyOrigin]:
         var handle = self._handle()
         return device_array4_view_from_mfiter[Self.T](self.runtime[].lib, handle, mfi._handle())
 

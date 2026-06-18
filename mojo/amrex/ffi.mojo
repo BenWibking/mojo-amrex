@@ -201,7 +201,7 @@ struct Array4LayoutMetadata(Copyable, DevicePassable, TrivialRegisterPassable):
 @fieldwise_init
 struct Array4View[T: AmrexFloatingDtype, origin: Origin[mut=True]](DevicePassable, TrivialRegisterPassable):
     comptime dtype = Self.T.dtype
-    comptime device_type = Array4View[Self.T, MutAnyOrigin]
+    comptime device_type = Array4View[Self.T, MutUnsafeAnyOrigin]
     comptime value_type = Scalar[Self.dtype]
 
     var data: UnsafePointer[Self.value_type, Self.origin]
@@ -255,7 +255,7 @@ struct Array4View[T: AmrexFloatingDtype, origin: Origin[mut=True]](DevicePassabl
 @fieldwise_init
 struct TileView[T: AmrexFloatingDtype, origin: Origin[mut=True]](DevicePassable, TrivialRegisterPassable):
     comptime dtype = Self.T.dtype
-    comptime device_type = TileView[Self.T, MutAnyOrigin]
+    comptime device_type = TileView[Self.T, MutUnsafeAnyOrigin]
     comptime value_type = Scalar[Self.dtype]
 
     var tile_box: Box3D
@@ -826,8 +826,8 @@ def array4_view_from_mfiter[
 
 def device_array4_view_from_mfiter[
     T: AmrexFloatingDtype
-](ref lib: OwnedDLHandle, multifab: MultiFabHandle, mfiter: MFIterHandle,) raises -> Array4View[T, MutAnyOrigin]:
-    return _device_array4_view_from_mfiter[T, MutAnyOrigin](lib, multifab, mfiter)
+](ref lib: OwnedDLHandle, multifab: MultiFabHandle, mfiter: MFIterHandle,) raises -> Array4View[T, MutUnsafeAnyOrigin]:
+    return _device_array4_view_from_mfiter[T, MutUnsafeAnyOrigin](lib, multifab, mfiter)
 
 
 def device_array4_view_from_mfiter_as_origin[
