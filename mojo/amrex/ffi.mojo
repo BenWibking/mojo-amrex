@@ -44,7 +44,7 @@ def init_device_passable_value[
 
 
 @fieldwise_init
-struct IntVect3D(DevicePassable, TrivialRegisterPassable):
+struct IntVect3D(DevicePassable, TrivialRegisterPassable, Writable):
     comptime device_type = Self
 
     var x: c_int
@@ -64,7 +64,7 @@ struct IntVect3D(DevicePassable, TrivialRegisterPassable):
 
 
 @fieldwise_init
-struct Box3D(DevicePassable, TrivialRegisterPassable):
+struct Box3D(DevicePassable, TrivialRegisterPassable, Writable):
     comptime device_type = Self
 
     var small_end: IntVect3D
@@ -84,7 +84,7 @@ struct Box3D(DevicePassable, TrivialRegisterPassable):
 
 
 @fieldwise_init
-struct RealBox3D(Copyable, RegisterPassable):
+struct RealBox3D(Copyable, RegisterPassable, Writable):
     var lo_x: Float64
     var lo_y: Float64
     var lo_z: Float64
@@ -94,7 +94,7 @@ struct RealBox3D(Copyable, RegisterPassable):
 
 
 @fieldwise_init
-struct RealVect3D(DevicePassable, TrivialRegisterPassable):
+struct RealVect3D(DevicePassable, TrivialRegisterPassable, Writable):
     comptime device_type = Self
 
     var x: Float64
@@ -144,7 +144,7 @@ struct MultiFabMemoryInfo(Copyable):
 
 
 @fieldwise_init
-struct Array4LayoutMetadata(Copyable, DevicePassable, TrivialRegisterPassable):
+struct Array4LayoutMetadata(Copyable, DevicePassable, TrivialRegisterPassable, Writable):
     comptime device_type = Self
 
     var lo_x: Int
