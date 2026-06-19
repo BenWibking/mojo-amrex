@@ -1,3 +1,6 @@
+# ABOUTME: Locates and loads the AMReX Mojo C API shared library.
+# ABOUTME: Searches installed paths, environment overrides, and the build tree.
+
 from std.ffi import OwnedDLHandle
 from std.os import getenv
 from std.os.path import exists
@@ -12,7 +15,7 @@ def resolve_library_candidate(ref prefix: String) raises -> String:
     if exists(dylib_candidate):
         return dylib_candidate
 
-    return String("")
+    return String()
 
 
 def installed_library_path() raises -> String:
@@ -32,7 +35,7 @@ def installed_library_path() raises -> String:
         if exists(candidate):
             return candidate
 
-    return String("")
+    return String()
 
 
 def default_library_path() raises -> String:
@@ -50,16 +53,14 @@ def default_library_path() raises -> String:
 def load_library(ref path: String) raises -> OwnedDLHandle:
     if not path:
         raise Error(
-            "Unable to determine the AMReX Mojo C API library path. Set "
-            + "AMREX_MOJO_LIBRARY_PATH or run `pixi run build-capi`."
+            t"Unable to determine the AMReX Mojo C API library path. Set "
+            t"AMREX_MOJO_LIBRARY_PATH or run `pixi run build-capi`."
         )
     if not exists(path):
         raise Error(
-            "AMReX Mojo C API library not found at '"
-            + path
-            + "'. Run "
-            + "`pixi run build-capi`, `pixi run install-amrex`, or set "
-            + "AMREX_MOJO_LIBRARY_PATH."
+            t"AMReX Mojo C API library not found at '{path}'. Run "
+            t"`pixi run build-capi`, `pixi run install-amrex`, or set "
+            t"AMREX_MOJO_LIBRARY_PATH."
         )
     return OwnedDLHandle(path)
 

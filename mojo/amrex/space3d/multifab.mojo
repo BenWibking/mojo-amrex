@@ -1,3 +1,6 @@
+# ABOUTME: High-level MultiFab wrapper and Array4 view helpers.
+# ABOUTME: Provides reductions, copies, fill-boundary, and plotfile output.
+
 """`MultiFab` and `Array4` wrappers for the 3D binding layer."""
 
 from amrex.ffi import (
@@ -388,20 +391,6 @@ struct MultiFab[T: AmrexFloatingDtype](AmrexHandle, Movable):
                 time,
                 level_step,
             ),
-        )
-
-    def write_single_level_plotfile(
-        ref self,
-        plotfile: StringLiteral,
-        ref geometry: Geometry,
-        time: Float64 = 0.0,
-        level_step: Int = 0,
-    ) raises:
-        self.write_single_level_plotfile(
-            String(plotfile),
-            geometry,
-            time,
-            level_step,
         )
 
     def _require_tile_index(ref self, tile_index: Int) raises:

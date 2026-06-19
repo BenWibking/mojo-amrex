@@ -1,3 +1,6 @@
+# ABOUTME: Canonical type constraint for 3D tile parallel kernels.
+# ABOUTME: Defines TileLoopBody for device-passable (i, j, k) loop bodies.
+
 """Canonical type constraint for 3D tile `(i, j, k)` parallel kernels.
 
 Use `TileLoopBody` as the documented name for this constraint when writing new

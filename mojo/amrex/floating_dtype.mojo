@@ -1,3 +1,6 @@
+# ABOUTME: Maps Mojo floating-point DTypes to AMReX C ABI symbols.
+# ABOUTME: Defines AmrexFloat32/AmrexFloat64 and their data pointer accessors.
+
 """Compile-time mapping between Mojo floating `DType`s and AMReX C ABI symbols."""
 
 from std.ffi import OwnedDLHandle, c_double, c_float

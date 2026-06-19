@@ -1,3 +1,6 @@
+# ABOUTME: Smoke-test example exercising MultiFab, MFIter, and ParmParse.
+# ABOUTME: Fills tiles, runs a parallel loop, and writes a plotfile.
+
 from amrex.space3d import (
     AmrexFloat64,
     AmrexRuntime,

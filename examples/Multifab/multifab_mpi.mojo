@@ -1,3 +1,6 @@
+# ABOUTME: MPI example verifying fill_boundary and parallel_copy_from.
+# ABOUTME: Exchanges ghost cells across a two-slab domain decomposition.
+
 from amrex.space3d import (
     AmrexFloat64,
     AmrexRuntime,
@@ -13,28 +16,13 @@ from amrex.space3d import (
     intvect3d,
 )
 from std.collections import List
+from std.math import abs
+from std.testing import assert_true
 
 
 comptime DOMAIN_EXTENT = 64
 comptime SLAB_EXTENT = DOMAIN_EXTENT // 2
 comptime CELLS_PER_SLAB = SLAB_EXTENT * DOMAIN_EXTENT * DOMAIN_EXTENT
-
-
-def expect(condition: Bool, message: StringLiteral) raises:
-    if not condition:
-        raise Error(message)
-
-
-def expect_close(
-    actual: Float64,
-    expected: Float64,
-    tolerance: Float64,
-    message: StringLiteral,
-) raises:
-    var delta = actual - expected
-    if delta < 0.0:
-        delta = -delta
-    expect(delta <= tolerance, message)
 
 
 def fill_box_value[
@@ -123,7 +111,7 @@ def main() raises:
     argv[2] = String("multifab_mpi_exchange.right_value=11")
     var runtime = AmrexRuntime(argv, use_parmparse=True)
     try:
-        expect(
+        assert_true(
             runtime.nprocs() >= 2,
             "run this example with at least 2 MPI ranks",
         )
@@ -140,7 +128,7 @@ def main() raises:
         var boxarray = BoxArray(runtime, domain)
         # Force two x-slabs so the shared face is exchanged in the 2-rank example run.
         boxarray.max_size(intvect3d(SLAB_EXTENT, DOMAIN_EXTENT, DOMAIN_EXTENT))
-        expect(
+        assert_true(
             boxarray.size() == 2,
             "expected a two-slab BoxArray decomposition",
         )
@@ -152,7 +140,7 @@ def main() raises:
 
         source.set_val(0.0)
         destination.set_val(0.0)
-        expect(source.tile_count() > 0, "each rank should own at least one tile")
+        assert_true(source.tile_count() > 0, "each rank should own at least one tile")
 
         var mfi = source.mfiter()
         for tile in mfi:
@@ -166,13 +154,11 @@ def main() raises:
         source.fill_boundary(geometry)
         var expected_ghost = interface_expected_value(source, left_value, right_value)
         var source_ghost = interface_ghost_sample(source)
-        expect_close(
-            source_ghost,
-            expected_ghost,
-            1.0e-12,
+        assert_true(
+            abs(source_ghost - expected_ghost) <= 1.0e-12,
             "fill_boundary should exchange the slab interface ghost cells",
         )
-        expect(
+        assert_true(
             has_nonzero_ghost_cells(source),
             "fill_boundary should populate source ghost cells",
         )
@@ -186,17 +172,18 @@ def main() raises:
             intvect3d(1, 1, 1),
             intvect3d(1, 1, 1),
         )
-        expect(
+        assert_true(
             has_nonzero_ghost_cells(destination),
             "parallel_copy_from should populate destination ghost cells",
         )
 
         var expected_sum = Float64(CELLS_PER_SLAB * (left_value + right_value))
-        expect_close(source.sum(0), expected_sum, 1.0e-12, "source.sum mismatch")
-        expect_close(
-            destination.sum(0),
-            expected_sum,
-            1.0e-12,
+        assert_true(
+            abs(source.sum(0) - expected_sum) <= 1.0e-12,
+            "source.sum mismatch",
+        )
+        assert_true(
+            abs(destination.sum(0) - expected_sum) <= 1.0e-12,
             "destination.sum mismatch",
         )
 

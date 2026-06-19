@@ -1,3 +1,6 @@
+# ABOUTME: MFIter wrapper for iterating over MultiFab tiles.
+# ABOUTME: Manages tile state, GPU streams, and parallel-for dispatch.
+
 """`MFIter` wrapper for tile iteration in the 3D binding layer."""
 
 from amrex.ffi import (
@@ -34,7 +37,7 @@ from std.sys import has_accelerator
 
 
 @fieldwise_init
-struct MFIterTile(Copyable, Movable):
+struct MFIterTile(Copyable, Movable, Writable):
     var index: Int
     var local_tile_index: Int
     var tile_box: Box3D

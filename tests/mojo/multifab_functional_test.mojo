@@ -1,3 +1,6 @@
+# ABOUTME: Functional tests for MultiFab operations and MFIter traversal.
+# ABOUTME: Covers reductions, copies, type variants, and plotfile output.
+
 from amrex.space3d import (
     AmrexFloat32,
     AmrexFloat64,
@@ -11,20 +14,13 @@ from amrex.space3d import (
     box3d,
     intvect3d,
 )
+from std.math import abs
 from std.os.path import exists
+from std.testing import assert_equal, assert_true
 
 
 comptime DOMAIN_EXTENT = 64
 comptime DOMAIN_CELLS = DOMAIN_EXTENT * DOMAIN_EXTENT * DOMAIN_EXTENT
-
-
-def expect(condition: Bool, message: StringLiteral) raises:
-    if not condition:
-        raise Error(message)
-
-
-def expect_equal(actual: Float64, expected: Float64, message: StringLiteral) raises:
-    expect(actual == expected, message)
 
 
 def main() raises:
@@ -42,7 +38,7 @@ def main() raises:
         var geometry = Geometry(runtime, domain)
         var default_multifab = MultiFab[AmrexFloat64](runtime, boxarray, distmap, 1)
         var default_memory = default_multifab.memory_info()
-        expect(
+        assert_true(
             default_memory.host_accessible or default_memory.device_accessible,
             "default multifab should expose host or device storage",
         )
@@ -51,20 +47,20 @@ def main() raises:
         var destination = MultiFab[AmrexFloat64](runtime, boxarray, distmap, 1, intvect3d(1, 1, 1))
         var copy_target = MultiFab[AmrexFloat64](runtime, boxarray, distmap, 1, intvect3d(1, 1, 1))
 
-        expect(source.ncomp() == 1, "source should have one component")
+        assert_true(source.ncomp() == 1, "source should have one component")
         var ngrow = source.ngrow()
-        expect(
+        assert_true(
             Int(ngrow.x) == 1 and Int(ngrow.y) == 1 and Int(ngrow.z) == 1,
             "ngrow should be (1, 1, 1)",
         )
 
         var params = ParmParse(runtime, "multifab_functional_test")
         params.add[ParmInt]("tile_add", 3)
-        expect(
+        assert_true(
             params.query[ParmInt]("tile_add") == 3,
             "ParmParse query_int mismatch",
         )
-        expect(
+        assert_true(
             params.query_or[ParmInt]("missing_value", 11) == 11,
             "ParmParse query_int_or mismatch",
         )
@@ -91,28 +87,28 @@ def main() raises:
             mfi.parallel_for(add_cell, tile_box)
             iterated_tiles += 1
 
-        expect(
+        assert_true(
             iterated_tiles == destination.tile_count(),
             "MFIter should visit every tile",
         )
 
         var for_iterated_tiles = 0
         for tile in destination.tiles():
-            expect(
+            assert_true(
                 tile.index >= 0,
                 "MFIter iterator tile index should be non-negative",
             )
-            expect(
+            assert_true(
                 tile.local_tile_index >= 0,
                 "MFIter iterator local tile index should be non-negative",
             )
-            expect(
+            assert_true(
                 tile.tile_box.small_end.x <= tile.tile_box.big_end.x,
                 "MFIter iterator should expose a valid tile box",
             )
             for_iterated_tiles += 1
 
-        expect(
+        assert_true(
             for_iterated_tiles == destination.tile_count(),
             "MFIter iterator should visit every tile",
         )
@@ -122,7 +118,7 @@ def main() raises:
             var gpu_iterated_tiles = 0
             var num_gpu_streams = runtime.gpu_num_streams()
             for tile in gpu_mfi:
-                expect(
+                assert_true(
                     gpu_mfi.stream_index() == gpu_iterated_tiles % num_gpu_streams,
                     "MFIter stream index should round-robin over the active stream set",
                 )
@@ -134,47 +130,47 @@ def main() raises:
                 _ = gpu_mfi.local_tile_index()
                 gpu_iterated_tiles += 1
 
-            expect(
+            assert_true(
                 gpu_iterated_tiles == default_multifab.tile_count(),
                 "MFIter should visit every tile",
             )
 
-        expect_equal(
+        assert_equal(
             source.sum(0),
             2.0 * Float64(DOMAIN_CELLS),
             "source.sum mismatch",
         )
-        expect_equal(
+        assert_equal(
             destination.sum(0),
             5.0 * Float64(DOMAIN_CELLS),
             "destination.sum after MFIter update mismatch",
         )
-        expect_equal(destination.min(0), 5.0, "destination.min mismatch")
-        expect_equal(destination.max(0), 5.0, "destination.max mismatch")
-        expect_equal(destination.norm0(0), 5.0, "destination.norm0 mismatch")
+        assert_equal(destination.min(0), 5.0, "destination.min mismatch")
+        assert_equal(destination.max(0), 5.0, "destination.max mismatch")
+        assert_equal(destination.norm0(0), 5.0, "destination.norm0 mismatch")
 
         destination.plus(1.0, 0, 1)
-        expect_equal(
+        assert_equal(
             destination.sum(0),
             6.0 * Float64(DOMAIN_CELLS),
             "destination.sum after plus mismatch",
         )
 
         destination.mult(0.5, 0, 1)
-        expect_equal(
+        assert_equal(
             destination.sum(0),
             3.0 * Float64(DOMAIN_CELLS),
             "destination.sum after mult mismatch",
         )
-        expect_equal(destination.min(0), 3.0, "destination.min after mult mismatch")
-        expect_equal(destination.max(0), 3.0, "destination.max after mult mismatch")
-        expect_equal(
+        assert_equal(destination.min(0), 3.0, "destination.min after mult mismatch")
+        assert_equal(destination.max(0), 3.0, "destination.max after mult mismatch")
+        assert_equal(
             destination.norm1(0),
             3.0 * Float64(DOMAIN_CELLS),
             "destination.norm1 mismatch",
         )
         copy_target.copy_from(destination, 0, 0, 1)
-        expect_equal(
+        assert_equal(
             copy_target.sum(0),
             destination.sum(0),
             "copy_target.sum mismatch",
@@ -185,7 +181,7 @@ def main() raises:
         source_f32.set_val(Float32(1.25))
         destination_f32.set_val(Float32(0.0))
         destination_f32.copy_from(source_f32, 0, 0, 1)
-        expect_equal(
+        assert_equal(
             destination_f32.sum(0),
             1.25 * Float64(DOMAIN_CELLS),
             "destination_f32.sum after copy_from mismatch",
@@ -202,20 +198,20 @@ def main() raises:
 
             mfi_f32.parallel_for(add_cell_f32, tile_box_f32)
 
-        expect_equal(
+        assert_equal(
             destination_f32.sum(0),
             1.75 * Float64(DOMAIN_CELLS),
             "destination_f32.sum after MFIter update mismatch",
         )
         destination_f32.plus(Float32(0.25), 0, 1)
-        expect_equal(
+        assert_equal(
             destination_f32.max(0),
             2.0,
             "destination_f32.max after plus mismatch",
         )
         var plotfile_path_f32 = String("build/multifab_functional_test_plotfile_f32")
         destination_f32.write_single_level_plotfile(plotfile_path_f32, geometry)
-        expect(
+        assert_true(
             exists(plotfile_path_f32 + "/Header"),
             "Float32 plotfile Header was not written",
         )
@@ -247,7 +243,7 @@ def main() raises:
             intvect3d(0, 0, 0),
             intvect3d(1, 1, 1),
         )
-        expect_equal(
+        assert_equal(
             comm_destination.sum(0),
             comm_source.sum(0),
             "parallel_copy_from should preserve the valid-region sum",
@@ -255,7 +251,7 @@ def main() raises:
 
         var plotfile_path = String("build/multifab_functional_test_plotfile")
         destination.write_single_level_plotfile(plotfile_path, geometry)
-        expect(
+        assert_true(
             exists(plotfile_path + "/Header"),
             "plotfile Header was not written",
         )

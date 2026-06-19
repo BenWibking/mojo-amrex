@@ -1,3 +1,6 @@
+# ABOUTME: Shared ownership helpers and moved-from diagnostics for wrappers.
+# ABOUTME: Defines the AmrexHandle trait and optional handle destruction.
+
 """Shared ownership and moved-from diagnostics for AMReX wrappers."""
 
 from std.ffi import OwnedDLHandle

@@ -1,3 +1,8 @@
+# ABOUTME: Manages the AMReX runtime lifecycle and GPU context matching.
+# ABOUTME: Provides AmrexRuntime for initialization, queries, and shutdown.
+
+"""Shared AMReX runtime lifecycle and GPU context matching."""
+
 from amrex.ffi import (
     GPU_BACKEND_CUDA,
     GPU_BACKEND_HIP,
@@ -39,6 +44,12 @@ struct _AmrexRuntimeState(Movable):
 comptime RuntimeLease = ArcPointer[_AmrexRuntimeState]
 
 
+@fieldwise_init
+struct _AmrexRuntimeParts(Movable):
+    var state: RuntimeLease
+    var handle: OptionalRuntimeHandle
+
+
 def _require_runtime_handle(ref lib: OwnedDLHandle, handle: OptionalRuntimeHandle) raises -> RuntimeHandle:
     if not handle:
         raise Error(last_error_message(lib))
@@ -47,6 +58,34 @@ def _require_runtime_handle(ref lib: OwnedDLHandle, handle: OptionalRuntimeHandl
 
 def _make_runtime_state(var path: String, var lib: OwnedDLHandle, runtime_handle: RuntimeHandle) -> RuntimeLease:
     return RuntimeLease(_AmrexRuntimeState(lib^, runtime_handle, path^))
+
+
+def _make_runtime_parts(
+    path: String,
+    device_id: Int,
+    argv: List[String],
+    use_parmparse: Bool,
+) raises -> _AmrexRuntimeParts:
+    var path_owned = path.copy()
+    if not path_owned:
+        path_owned = default_library_path()
+    var lib = load_library(path_owned)
+    var runtime_handle_opt: OptionalRuntimeHandle
+    if len(argv) == 0 and not use_parmparse:
+        if device_id < 0:
+            runtime_handle_opt = runtime_create(lib)
+        else:
+            runtime_handle_opt = runtime_create(lib, device_id)
+    else:
+        if device_id < 0:
+            runtime_handle_opt = runtime_create(lib, argv, use_parmparse)
+        else:
+            runtime_handle_opt = runtime_create(lib, argv, use_parmparse, device_id)
+    var runtime_handle = _require_runtime_handle(lib, runtime_handle_opt)
+    return _AmrexRuntimeParts(
+        state=_make_runtime_state(path_owned^, lib^, runtime_handle),
+        handle=OptionalRuntimeHandle(runtime_handle),
+    )
 
 
 def require_matching_gpu_context(
@@ -58,18 +97,18 @@ def require_matching_gpu_context(
     if amrex_backend == GPU_BACKEND_NONE:
         raise Error("The loaded AMReX library was built without GPU support.")
     if amrex_backend == GPU_BACKEND_CUDA and mojo_backend != "cuda":
-        raise Error("AMReX was built for CUDA but the active Mojo device context reports '" + mojo_backend + "'.")
+        raise Error(t"AMReX was built for CUDA but the active Mojo device context reports '{mojo_backend}'.")
     if amrex_backend == GPU_BACKEND_HIP and mojo_backend != "hip":
-        raise Error("AMReX was built for HIP but the active Mojo device context reports '" + mojo_backend + "'.")
+        raise Error(t"AMReX was built for HIP but the active Mojo device context reports '{mojo_backend}'.")
 
     var amrex_device_id = ffi_gpu_device_id(runtime[].lib)
     if amrex_device_id < 0:
         raise Error("The loaded AMReX runtime does not report an active GPU device.")
     if Int(ctx.id()) != amrex_device_id:
         raise Error(
-            "AMReX and the active Mojo device context are using different GPU devices."
-            + " Construct `AmrexRuntime` on the same device as `ctx` before"
-            + " sharing streams."
+            t"AMReX and the active Mojo device context are using different GPU devices."
+            t" Construct `AmrexRuntime` on the same device as `ctx` before"
+            t" sharing streams."
         )
     return amrex_backend
 
@@ -80,44 +119,29 @@ struct AmrexRuntime(Movable):
     var handle: OptionalRuntimeHandle
 
     def __init__(out self) raises:
-        var path = default_library_path()
-        var lib = load_library(path)
-        var handle = runtime_create(lib)
-        var runtime_handle = _require_runtime_handle(lib, handle)
-        self.state = _make_runtime_state(path^, lib^, runtime_handle)
-        self.handle = OptionalRuntimeHandle(runtime_handle)
+        var parts = _make_runtime_parts(path=String(), device_id=-1, argv=List[String](), use_parmparse=False)
+        self.state = parts.state
+        self.handle = parts.handle
 
     def __init__(out self, argv: List[String], use_parmparse: Bool = False) raises:
-        var path = default_library_path()
-        var lib = load_library(path)
-        var handle = runtime_create(lib, argv, use_parmparse)
-        var runtime_handle = _require_runtime_handle(lib, handle)
-        self.state = _make_runtime_state(path^, lib^, runtime_handle)
-        self.handle = OptionalRuntimeHandle(runtime_handle)
+        var parts = _make_runtime_parts(path=String(), device_id=-1, argv=argv, use_parmparse=use_parmparse)
+        self.state = parts.state
+        self.handle = parts.handle
 
     def __init__(out self, path: String) raises:
-        var path_owned = path.copy()
-        var lib = load_library(path_owned)
-        var handle = runtime_create(lib)
-        var runtime_handle = _require_runtime_handle(lib, handle)
-        self.state = _make_runtime_state(path_owned^, lib^, runtime_handle)
-        self.handle = OptionalRuntimeHandle(runtime_handle)
+        var parts = _make_runtime_parts(path=path, device_id=-1, argv=List[String](), use_parmparse=False)
+        self.state = parts.state
+        self.handle = parts.handle
 
     def __init__(out self, path: String, argv: List[String], use_parmparse: Bool = False) raises:
-        var path_owned = path.copy()
-        var lib = load_library(path_owned)
-        var handle = runtime_create(lib, argv, use_parmparse)
-        var runtime_handle = _require_runtime_handle(lib, handle)
-        self.state = _make_runtime_state(path_owned^, lib^, runtime_handle)
-        self.handle = OptionalRuntimeHandle(runtime_handle)
+        var parts = _make_runtime_parts(path=path, device_id=-1, argv=argv, use_parmparse=use_parmparse)
+        self.state = parts.state
+        self.handle = parts.handle
 
     def __init__(out self, device_id: Int) raises:
-        var path = default_library_path()
-        var lib = load_library(path)
-        var handle = runtime_create(lib, device_id)
-        var runtime_handle = _require_runtime_handle(lib, handle)
-        self.state = _make_runtime_state(path^, lib^, runtime_handle)
-        self.handle = OptionalRuntimeHandle(runtime_handle)
+        var parts = _make_runtime_parts(path=String(), device_id=device_id, argv=List[String](), use_parmparse=False)
+        self.state = parts.state
+        self.handle = parts.handle
 
     def __init__(
         out self,
@@ -125,20 +149,14 @@ struct AmrexRuntime(Movable):
         argv: List[String],
         use_parmparse: Bool = False,
     ) raises:
-        var path = default_library_path()
-        var lib = load_library(path)
-        var handle = runtime_create(lib, argv, use_parmparse, device_id)
-        var runtime_handle = _require_runtime_handle(lib, handle)
-        self.state = _make_runtime_state(path^, lib^, runtime_handle)
-        self.handle = OptionalRuntimeHandle(runtime_handle)
+        var parts = _make_runtime_parts(path=String(), device_id=device_id, argv=argv, use_parmparse=use_parmparse)
+        self.state = parts.state
+        self.handle = parts.handle
 
     def __init__(out self, path: String, device_id: Int) raises:
-        var path_owned = path.copy()
-        var lib = load_library(path_owned)
-        var handle = runtime_create(lib, device_id)
-        var runtime_handle = _require_runtime_handle(lib, handle)
-        self.state = _make_runtime_state(path_owned^, lib^, runtime_handle)
-        self.handle = OptionalRuntimeHandle(runtime_handle)
+        var parts = _make_runtime_parts(path=path, device_id=device_id, argv=List[String](), use_parmparse=False)
+        self.state = parts.state
+        self.handle = parts.handle
 
     def __init__(
         out self,
@@ -147,12 +165,9 @@ struct AmrexRuntime(Movable):
         argv: List[String],
         use_parmparse: Bool = False,
     ) raises:
-        var path_owned = path.copy()
-        var lib = load_library(path_owned)
-        var handle = runtime_create(lib, argv, use_parmparse, device_id)
-        var runtime_handle = _require_runtime_handle(lib, handle)
-        self.state = _make_runtime_state(path_owned^, lib^, runtime_handle)
-        self.handle = OptionalRuntimeHandle(runtime_handle)
+        var parts = _make_runtime_parts(path=path, device_id=device_id, argv=argv, use_parmparse=use_parmparse)
+        self.state = parts.state
+        self.handle = parts.handle
 
     def abi_version(ref self) raises -> Int:
         var state = self._lease()

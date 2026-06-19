@@ -1,3 +1,6 @@
+# ABOUTME: Shared 3D index-space helpers and re-exports.
+# ABOUTME: Bundles common types and utilities used across the binding layer.
+
 """Shared 3D index-space helpers and re-exports for the binding layer."""
 
 from amrex.ffi import (

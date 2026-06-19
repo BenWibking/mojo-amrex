@@ -1,3 +1,6 @@
+# ABOUTME: Notebook-friendly heat equation runner with Python control.
+# ABOUTME: Exposes a Python extension type for interactive stepping.
+
 """Notebook-friendly heat equation runner with step-wise Python control."""
 
 from amrex.space3d import (

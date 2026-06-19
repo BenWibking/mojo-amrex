@@ -1,3 +1,6 @@
+# ABOUTME: Top-level package entry point for the AMReX Mojo bindings.
+# ABOUTME: Re-exports the public C API loader and 3D binding modules.
+
 """Top-level package for the AMReX Mojo MVP bindings."""
 
 from amrex.loader import (

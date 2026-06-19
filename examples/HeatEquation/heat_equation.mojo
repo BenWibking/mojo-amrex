@@ -1,3 +1,6 @@
+# ABOUTME: Heat equation example translated from AMReX HeatEquation_Simple.
+# ABOUTME: Reads parameters, initializes data, and advances in time.
+
 """A close Mojo translation of AMReX HeatEquation_Simple/main.cpp.
 
 Run from the repo root so the bundled inputs file is found:
