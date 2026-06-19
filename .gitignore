@@ -11,3 +11,4 @@ dist/
 *.a
 *.swp
 *.DS_Store
+plt*
