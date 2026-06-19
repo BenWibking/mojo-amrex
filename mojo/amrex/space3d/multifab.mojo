@@ -393,20 +393,6 @@ struct MultiFab[T: AmrexFloatingDtype](AmrexHandle, Movable):
             ),
         )
 
-    def write_single_level_plotfile(
-        ref self,
-        plotfile: StringLiteral,
-        ref geometry: Geometry,
-        time: Float64 = 0.0,
-        level_step: Int = 0,
-    ) raises:
-        self.write_single_level_plotfile(
-            String(plotfile),
-            geometry,
-            time,
-            level_step,
-        )
-
     def _require_tile_index(ref self, tile_index: Int) raises:
         if tile_index < 0 or tile_index >= self.tile_count():
             raise Error("tile index is out of range.")

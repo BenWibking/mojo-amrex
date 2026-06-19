@@ -111,13 +111,7 @@ struct ParmParse(AmrexHandle, Movable):
     var runtime: RuntimeLease
     var handle: OptionalParmParseHandle
 
-    def __init__(out self, ref runtime: AmrexRuntime, prefix: StringLiteral = "") raises:
-        self.runtime = runtime._lease()
-        self.handle = parmparse_create(self.runtime[].lib, self.runtime[].handle, prefix)
-        if not self.handle:
-            raise Error(last_error_message(self.runtime[].lib))
-
-    def __init__(out self, ref runtime: AmrexRuntime, prefix: String) raises:
+    def __init__(out self, ref runtime: AmrexRuntime, prefix: String = "") raises:
         self.runtime = runtime._lease()
         self.handle = parmparse_create(self.runtime[].lib, self.runtime[].handle, prefix)
         if not self.handle:
@@ -133,27 +127,13 @@ struct ParmParse(AmrexHandle, Movable):
         var handle = self._handle()
         T.add(self.runtime[].lib, handle, name, value)
 
-    def add[T: WritableParmValue](mut self, name: StringLiteral, value: T.value_type) raises:
-        self.add[T](String(name), value)
-
     def query[T: ReadableParmValue](ref self, name: String) raises -> T.value_type:
         var handle = self._handle()
         return T.query_required(self.runtime[].lib, handle, name)
 
-    def query[T: ReadableParmValue](ref self, name: StringLiteral) raises -> T.value_type:
-        return self.query[T](String(name))
-
     def get[T: ReadableParmValue](ref self, name: String) raises -> T.value_type:
         return self.query[T](name)
-
-    def get[T: ReadableParmValue](ref self, name: StringLiteral) raises -> T.value_type:
-        return self.get[T](String(name))
 
     def query_or[T: ReadableParmValue](ref self, name: String, default_value: T.value_type) raises -> T.value_type:
         var handle = self._handle()
         return T.query_or(self.runtime[].lib, handle, name, default_value)
-
-    def query_or[
-        T: ReadableParmValue
-    ](ref self, name: StringLiteral, default_value: T.value_type) raises -> T.value_type:
-        return self.query_or[T](String(name), default_value)

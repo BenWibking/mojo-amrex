@@ -1036,37 +1036,10 @@ def multifab_write_single_level_plotfile(
     )
 
 
-def multifab_write_single_level_plotfile(
-    ref lib: OwnedDLHandle,
-    multifab: MultiFabHandle,
-    geometry: GeometryHandle,
-    plotfile: StringLiteral,
-    time: Float64,
-    level_step: Int,
-) raises -> Int:
-    return Int(
-        lib.call["amrex_mojo_write_single_level_plotfile", c_int](
-            multifab,
-            geometry,
-            plotfile.as_c_string_slice().unsafe_ptr(),
-            c_double(time),
-            c_int(level_step),
-        )
-    )
-
-
 def parmparse_create(ref lib: OwnedDLHandle, runtime: RuntimeHandle, prefix: String) raises -> OptionalParmParseHandle:
     var prefix_owned = prefix
     return lib.call["amrex_mojo_parmparse_create", OptionalParmParseHandle](
         runtime, prefix_owned.as_c_string_slice().unsafe_ptr()
-    )
-
-
-def parmparse_create(
-    ref lib: OwnedDLHandle, runtime: RuntimeHandle, prefix: StringLiteral
-) raises -> OptionalParmParseHandle:
-    return lib.call["amrex_mojo_parmparse_create", OptionalParmParseHandle](
-        runtime, prefix.as_c_string_slice().unsafe_ptr()
     )
 
 
@@ -1090,21 +1063,6 @@ def parmparse_add_int(
     )
 
 
-def parmparse_add_int(
-    ref lib: OwnedDLHandle,
-    parmparse: ParmParseHandle,
-    name: StringLiteral,
-    value: Int,
-) raises -> Int:
-    return Int(
-        lib.call["amrex_mojo_parmparse_add_int", c_int](
-            parmparse,
-            name.as_c_string_slice().unsafe_ptr(),
-            c_int(value),
-        )
-    )
-
-
 def parmparse_query_int(
     ref lib: OwnedDLHandle, parmparse: ParmParseHandle, name: String
 ) raises -> ParmParseIntQueryResult:
@@ -1126,26 +1084,6 @@ def parmparse_query_int(
     )
 
 
-def parmparse_query_int(
-    ref lib: OwnedDLHandle, parmparse: ParmParseHandle, name: StringLiteral
-) raises -> ParmParseIntQueryResult:
-    var out_value = InlineArray[c_int, 1](fill=0)
-    var out_found = InlineArray[c_int, 1](fill=0)
-    var status = Int(
-        lib.call["amrex_mojo_parmparse_query_int", c_int](
-            parmparse,
-            name.as_c_string_slice().unsafe_ptr(),
-            out_value.unsafe_ptr(),
-            out_found.unsafe_ptr(),
-        )
-    )
-    return ParmParseIntQueryResult(
-        status=status,
-        found=out_found[0] != 0,
-        value=Int(out_value[0]),
-    )
-
-
 def parmparse_query_real(
     ref lib: OwnedDLHandle, parmparse: ParmParseHandle, name: String
 ) raises -> ParmParseRealQueryResult:
@@ -1156,26 +1094,6 @@ def parmparse_query_real(
         lib.call["amrex_mojo_parmparse_query_real", c_int](
             parmparse,
             name_owned.as_c_string_slice().unsafe_ptr(),
-            out_value.unsafe_ptr(),
-            out_found.unsafe_ptr(),
-        )
-    )
-    return ParmParseRealQueryResult(
-        status=status,
-        found=out_found[0] != 0,
-        value=Float64(out_value[0]),
-    )
-
-
-def parmparse_query_real(
-    ref lib: OwnedDLHandle, parmparse: ParmParseHandle, name: StringLiteral
-) raises -> ParmParseRealQueryResult:
-    var out_value = InlineArray[c_double, 1](fill=0.0)
-    var out_found = InlineArray[c_int, 1](fill=0)
-    var status = Int(
-        lib.call["amrex_mojo_parmparse_query_real", c_int](
-            parmparse,
-            name.as_c_string_slice().unsafe_ptr(),
             out_value.unsafe_ptr(),
             out_found.unsafe_ptr(),
         )
