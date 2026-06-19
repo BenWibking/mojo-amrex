@@ -1,3 +1,8 @@
+# ABOUTME: Manages the AMReX runtime lifecycle and GPU context matching.
+# ABOUTME: Provides AmrexRuntime for initialization, queries, and shutdown.
+
+"""Shared AMReX runtime lifecycle and GPU context matching."""
+
 from amrex.ffi import (
     GPU_BACKEND_CUDA,
     GPU_BACKEND_HIP,
@@ -58,18 +63,18 @@ def require_matching_gpu_context(
     if amrex_backend == GPU_BACKEND_NONE:
         raise Error("The loaded AMReX library was built without GPU support.")
     if amrex_backend == GPU_BACKEND_CUDA and mojo_backend != "cuda":
-        raise Error("AMReX was built for CUDA but the active Mojo device context reports '" + mojo_backend + "'.")
+        raise Error(t"AMReX was built for CUDA but the active Mojo device context reports '{mojo_backend}'.")
     if amrex_backend == GPU_BACKEND_HIP and mojo_backend != "hip":
-        raise Error("AMReX was built for HIP but the active Mojo device context reports '" + mojo_backend + "'.")
+        raise Error(t"AMReX was built for HIP but the active Mojo device context reports '{mojo_backend}'.")
 
     var amrex_device_id = ffi_gpu_device_id(runtime[].lib)
     if amrex_device_id < 0:
         raise Error("The loaded AMReX runtime does not report an active GPU device.")
     if Int(ctx.id()) != amrex_device_id:
         raise Error(
-            "AMReX and the active Mojo device context are using different GPU devices."
-            + " Construct `AmrexRuntime` on the same device as `ctx` before"
-            + " sharing streams."
+            t"AMReX and the active Mojo device context are using different GPU devices."
+            t" Construct `AmrexRuntime` on the same device as `ctx` before"
+            t" sharing streams."
         )
     return amrex_backend
 

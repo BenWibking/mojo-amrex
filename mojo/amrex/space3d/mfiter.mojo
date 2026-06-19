@@ -1,3 +1,6 @@
+# ABOUTME: MFIter wrapper for iterating over MultiFab tiles.
+# ABOUTME: Manages tile state, GPU streams, and parallel-for dispatch.
+
 """`MFIter` wrapper for tile iteration in the 3D binding layer."""
 
 from amrex.ffi import (

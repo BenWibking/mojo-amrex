@@ -1,3 +1,6 @@
+# ABOUTME: High-level MultiFab wrapper and Array4 view helpers.
+# ABOUTME: Provides reductions, copies, fill-boundary, and plotfile output.
+
 """`MultiFab` and `Array4` wrappers for the 3D binding layer."""
 
 from amrex.ffi import (

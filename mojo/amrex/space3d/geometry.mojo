@@ -1,3 +1,6 @@
+# ABOUTME: Geometry wrapper exposing AMReX domain and coordinate metadata.
+# ABOUTME: Provides domain, prob_domain, cell_size, and periodicity queries.
+
 """`Geometry` wrapper for the 3D binding layer."""
 
 from amrex.ffi import (

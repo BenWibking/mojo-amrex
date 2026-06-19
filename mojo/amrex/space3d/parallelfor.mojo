@@ -1,3 +1,6 @@
+# ABOUTME: CPU and GPU ParallelFor dispatch over 3D tile boxes.
+# ABOUTME: Selects backends and enqueues device kernels for tile loops.
+
 """`ParallelFor` helpers for 3D tile boxes.
 
 Tile kernels use the `TileLoopBody` constraint from `amrex.space3d.tile_loop`.

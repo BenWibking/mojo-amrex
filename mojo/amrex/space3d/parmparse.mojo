@@ -1,3 +1,6 @@
+# ABOUTME: ParmParse wrapper for AMReX runtime parameter tables.
+# ABOUTME: Supports querying and adding integer and real parameters.
+
 """`ParmParse` wrapper for the 3D binding layer."""
 
 from amrex.ffi import (

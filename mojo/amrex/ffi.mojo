@@ -1,3 +1,6 @@
+# ABOUTME: Low-level C FFI wrappers and value types for the AMReX C API.
+# ABOUTME: Defines handles, device-passable structs, and ABI helper functions.
+
 from std.collections import List
 from std.builtin.device_passable import DevicePassable, DeviceTypeEncoder
 from std.ffi import OwnedDLHandle, c_char, c_double, c_int

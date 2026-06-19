@@ -1,3 +1,6 @@
+# ABOUTME: BoxArray and DistributionMapping wrappers for 3D domains.
+# ABOUTME: Handles domain decomposition and mapping boxes to MPI ranks.
+
 """`BoxArray` wrapper for the 3D binding layer."""
 
 from amrex.ffi import (

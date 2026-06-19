@@ -1,3 +1,6 @@
+# ABOUTME: Public entry point for the AMReX 3D Mojo bindings.
+# ABOUTME: Re-exports geometry, multifab, iteration, and parameter types.
+
 """User-facing 3D bindings for the AMReX Mojo MVP."""
 
 from amrex.ffi import (
