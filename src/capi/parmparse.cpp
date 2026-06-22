@@ -13,10 +13,13 @@ amrex_mojo_parmparse_create(amrex_mojo_runtime_t* runtime, const char* prefix)
 
     auto* state = amrex_mojo::detail::retain_runtime(runtime->state);
     try {
-        auto* parmparse = new amrex_mojo_parmparse{
-            state,
-            std::make_unique<amrex::ParmParse>(std::string(prefix != nullptr ? prefix : ""))
-        };
+        std::unique_ptr<amrex::ParmParse> value;
+        if (prefix == nullptr || prefix[0] == '\0') {
+            value = std::make_unique<amrex::ParmParse>();
+        } else {
+            value = std::make_unique<amrex::ParmParse>(std::string(prefix));
+        }
+        auto* parmparse = new amrex_mojo_parmparse{state, std::move(value)};
         amrex_mojo::detail::clear_last_error();
         return parmparse;
     } catch (const std::exception& ex) {

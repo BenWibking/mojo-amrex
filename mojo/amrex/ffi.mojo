@@ -28,7 +28,9 @@ comptime OptionalMultiFabHandle = Optional[MultiFabHandle]
 comptime OptionalMFIterHandle = Optional[MFIterHandle]
 comptime OptionalParmParseHandle = Optional[ParmParseHandle]
 comptime OptionalGpuStreamHandle = Optional[GpuStreamHandle]
-comptime CStringArrayHandle = UnsafePointer[UnsafePointer[c_char, ImmutUntrackedOrigin], MutUntrackedOrigin]
+comptime CStringHandle = UnsafePointer[c_char, ImmutUntrackedOrigin]
+comptime OptionalCStringHandle = Optional[CStringHandle]
+comptime CStringArrayHandle = UnsafePointer[CStringHandle, MutUntrackedOrigin]
 comptime OptionalCStringArrayHandle = Optional[CStringArrayHandle]
 
 comptime GPU_BACKEND_NONE = 0
@@ -1038,6 +1040,9 @@ def multifab_write_single_level_plotfile(
 
 def parmparse_create(ref lib: OwnedDLHandle, runtime: RuntimeHandle, prefix: String) raises -> OptionalParmParseHandle:
     var prefix_owned = prefix
+    if prefix_owned.byte_length() == 0:
+        var prefix_null: OptionalCStringHandle = None
+        return lib.call["amrex_mojo_parmparse_create", OptionalParmParseHandle](runtime, prefix_null)
     return lib.call["amrex_mojo_parmparse_create", OptionalParmParseHandle](
         runtime, prefix_owned.as_c_string_slice().unsafe_ptr()
     )

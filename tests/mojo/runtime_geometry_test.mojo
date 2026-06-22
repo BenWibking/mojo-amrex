@@ -26,6 +26,7 @@ def main() raises:
     argv[0] = String("runtime_geometry_test")
     argv[1] = String("runtime_geometry_test.answer=17")
     argv[2] = String("runtime_geometry_test.dt=0.125")
+    argv.append(String("top_level_answer=23"))
     var runtime = AmrexRuntime(argv, use_parmparse=True)
     try:
         assert_true(runtime.abi_version() == 6, "unexpected ABI version")
@@ -61,6 +62,12 @@ def main() raises:
             except e:
                 same_device_runtime^.close()
                 raise e^
+
+        var top_level_params = ParmParse(runtime)
+        assert_true(
+            top_level_params.get[ParmInt]("top_level_answer") == 23,
+            "top-level ParmParse get_int mismatch",
+        )
 
         var params = ParmParse(runtime, "runtime_geometry_test")
         assert_true(params.get[ParmInt]("answer") == 17, "ParmParse get_int mismatch")
