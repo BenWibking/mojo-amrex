@@ -7,13 +7,6 @@ This directory tracks small reproducers for upstream Mojo issues filed against
 nightly, not necessarily the GitHub issue state. At the time of retesting, all
 linked upstream issues were still open.
 
-## Fixed in the tested nightly
-
-| Local repro | Upstream issue | Local result |
-| --- | --- | --- |
-| [`mojo-c-ffi-struct-by-value/`](mojo-c-ffi-struct-by-value/) | [modular/modular#6567](https://github.com/modular/modular/issues/6567) | Fixed in the current nightly: `struct_early`, `scalars_after_five`, and `struct_after_five` all return status 0 with the expected values, then `all checks passed`. |
-| [`closures/associated_type_register_passable_capture_repro.mojo`](closures/associated_type_register_passable_capture_repro.mojo) | [modular/modular#6592](https://github.com/modular/modular/issues/6592) | Fixed in the current nightly: the repro completes without a witness error. |
-
 ## Still open locally
 
 | Local repro | Upstream issue | Local result |
