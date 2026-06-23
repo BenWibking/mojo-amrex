@@ -12,6 +12,7 @@ from amrex.space3d import (
     ParmInt,
     ParmParse,
     box3d,
+    convert,
     intvect3d,
 )
 from std.math import abs
@@ -33,10 +34,54 @@ def main() raises:
 
         var boxarray = BoxArray(runtime, domain)
         boxarray.max_size(32)
+        var original_box = boxarray.box(0)
+
+        var xface_boxarray = convert(boxarray, intvect3d(1, 0, 0))
+        var xface_box = xface_boxarray.box(0)
+        assert_true(
+            Int(original_box.nodal.x) == 0 and Int(original_box.nodal.y) == 0 and Int(original_box.nodal.z) == 0,
+            "convert helper should not mutate the source BoxArray",
+        )
+        assert_true(
+            Int(xface_box.nodal.x) == 1 and Int(xface_box.nodal.y) == 0 and Int(xface_box.nodal.z) == 0,
+            "convert helper should make an x-face-centered BoxArray",
+        )
+        assert_true(
+            Int(xface_box.small_end.x) == Int(original_box.small_end.x)
+            and Int(xface_box.big_end.x) == Int(original_box.big_end.x) + 1,
+            "x-face-centered BoxArray should extend one node past the cell-centered high x face",
+        )
+
+        var yface_boxarray = BoxArray(runtime, domain)
+        yface_boxarray.max_size(32)
+        yface_boxarray.surrounding_nodes(1)
+        var yface_box = yface_boxarray.box(0)
+        assert_true(
+            Int(yface_box.nodal.x) == 0 and Int(yface_box.nodal.y) == 1 and Int(yface_box.nodal.z) == 0,
+            "surrounding_nodes(dir) should make a face-centered BoxArray",
+        )
+
+        var nodal_boxarray = BoxArray(runtime, domain)
+        nodal_boxarray.max_size(32)
+        nodal_boxarray.surrounding_nodes()
+        var nodal_box = nodal_boxarray.box(0)
+        assert_true(
+            Int(nodal_box.nodal.x) == 1 and Int(nodal_box.nodal.y) == 1 and Int(nodal_box.nodal.z) == 1,
+            "surrounding_nodes() should make a node-centered BoxArray",
+        )
 
         var distmap = DistributionMapping(runtime, boxarray)
+        var xface_distmap = DistributionMapping(runtime, xface_boxarray)
         var geometry = Geometry(runtime, domain)
         var default_multifab = MultiFab[AmrexFloat64](runtime, boxarray, distmap, 1)
+        var xface_multifab = MultiFab[AmrexFloat64](runtime, xface_boxarray, xface_distmap, 1)
+        var xface_valid_box = xface_multifab.valid_box(0)
+        assert_true(
+            Int(xface_valid_box.nodal.x) == 1
+            and Int(xface_valid_box.nodal.y) == 0
+            and Int(xface_valid_box.nodal.z) == 0,
+            "face-centered MultiFab should preserve BoxArray centering",
+        )
         var default_memory = default_multifab.memory_info()
         assert_true(
             default_memory.host_accessible or default_memory.device_accessible,

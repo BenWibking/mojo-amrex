@@ -338,6 +338,40 @@ auto main() -> int
         "boxarray cells should cover the full domain."
     );
 
+    amrex_mojo_boxarray_t* xface_boxarray =
+        amrex_mojo_boxarray_convert_copy(boxarray, amrex_mojo_intvect_3d{1, 0, 0});
+    expect(xface_boxarray != nullptr, "boxarray_convert_copy returned null.");
+    const amrex_mojo_box_3d original_box = amrex_mojo_boxarray_box(boxarray, 0);
+    expect(
+        original_box.nodal.x == 0 && original_box.nodal.y == 0 && original_box.nodal.z == 0,
+        "boxarray_convert_copy should not mutate the source boxarray."
+    );
+    const amrex_mojo_box_3d xface_box = amrex_mojo_boxarray_box(xface_boxarray, 0);
+    expect(
+        xface_box.nodal.x == 1 && xface_box.nodal.y == 0 && xface_box.nodal.z == 0,
+        "boxarray_convert_copy should make an x-face-centered BoxArray."
+    );
+    expect(
+        xface_box.small_end.x == original_box.small_end.x &&
+            xface_box.big_end.x == original_box.big_end.x + 1,
+        "x-face-centered BoxArray should extend one node past the cell-centered high x face."
+    );
+    expect(
+        amrex_mojo_boxarray_surrounding_nodes(xface_boxarray, 1) == AMREX_MOJO_STATUS_OK,
+        "boxarray_surrounding_nodes failed."
+    );
+    const amrex_mojo_box_3d xyface_box = amrex_mojo_boxarray_box(xface_boxarray, 0);
+    expect(
+        xyface_box.nodal.x == 1 && xyface_box.nodal.y == 1 && xyface_box.nodal.z == 0,
+        "boxarray_surrounding_nodes should add nodal centering in the requested direction."
+    );
+    expect(
+        amrex_mojo_boxarray_surrounding_nodes(xface_boxarray, 3) ==
+            AMREX_MOJO_STATUS_INVALID_ARGUMENT,
+        "boxarray_surrounding_nodes should reject invalid directions."
+    );
+    amrex_mojo_boxarray_destroy(xface_boxarray);
+
     amrex_mojo_distmap_t* distmap = amrex_mojo_distmap_create_from_boxarray(runtime, boxarray);
     expect(distmap != nullptr, "distmap_create_from_boxarray returned null.");
 

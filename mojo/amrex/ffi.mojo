@@ -518,6 +518,30 @@ def boxarray_max_size(ref lib: OwnedDLHandle, boxarray: BoxArrayHandle, max_size
     return Int(f(boxarray, max_size))
 
 
+def boxarray_surrounding_nodes(ref lib: OwnedDLHandle, boxarray: BoxArrayHandle, dir: Int) raises -> Int:
+    return Int(lib.call["amrex_mojo_boxarray_surrounding_nodes", c_int](boxarray, c_int(dir)))
+
+
+def boxarray_surrounding_nodes_all(ref lib: OwnedDLHandle, boxarray: BoxArrayHandle) raises -> Int:
+    return Int(lib.call["amrex_mojo_boxarray_surrounding_nodes_all", c_int](boxarray))
+
+
+def boxarray_convert(ref lib: OwnedDLHandle, boxarray: BoxArrayHandle, typ: IntVect3D) raises -> Int:
+    var f = lib.get_function[def(BoxArrayHandle, IntVect3D) thin abi("C") -> c_int]("amrex_mojo_boxarray_convert")
+    return Int(f(boxarray, typ))
+
+
+def boxarray_convert_copy(
+    ref lib: OwnedDLHandle,
+    boxarray: BoxArrayHandle,
+    typ: IntVect3D,
+) raises -> OptionalBoxArrayHandle:
+    var f = lib.get_function[def(BoxArrayHandle, IntVect3D) thin abi("C") -> OptionalBoxArrayHandle](
+        "amrex_mojo_boxarray_convert_copy"
+    )
+    return f(boxarray, typ)
+
+
 def boxarray_size(ref lib: OwnedDLHandle, boxarray: BoxArrayHandle) raises -> Int:
     return Int(lib.call["amrex_mojo_boxarray_size", c_int](boxarray))
 

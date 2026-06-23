@@ -6,7 +6,7 @@
 extern "C" {
 #endif
 
-#define AMREX_MOJO_ABI_VERSION 7
+#define AMREX_MOJO_ABI_VERSION 8
 
 typedef struct amrex_mojo_runtime amrex_mojo_runtime_t;
 typedef struct amrex_mojo_boxarray amrex_mojo_boxarray_t;
@@ -172,6 +172,21 @@ amrex_mojo_status_code_t amrex_mojo_boxarray_max_size_xyz(
     int32_t x,
     int32_t y,
     int32_t z
+);
+amrex_mojo_status_code_t amrex_mojo_boxarray_surrounding_nodes(
+    amrex_mojo_boxarray_t* boxarray,
+    int32_t dir
+);
+amrex_mojo_status_code_t amrex_mojo_boxarray_surrounding_nodes_all(
+    amrex_mojo_boxarray_t* boxarray
+);
+amrex_mojo_status_code_t amrex_mojo_boxarray_convert(
+    amrex_mojo_boxarray_t* boxarray,
+    amrex_mojo_intvect_3d typ
+);
+amrex_mojo_boxarray_t* amrex_mojo_boxarray_convert_copy(
+    const amrex_mojo_boxarray_t* boxarray,
+    amrex_mojo_intvect_3d typ
 );
 int32_t amrex_mojo_boxarray_size(const amrex_mojo_boxarray_t* boxarray);
 amrex_mojo_box_3d amrex_mojo_boxarray_box(const amrex_mojo_boxarray_t* boxarray, int32_t index);

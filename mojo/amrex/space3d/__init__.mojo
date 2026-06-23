@@ -20,7 +20,7 @@ from amrex.ffi import (
 )
 from amrex.floating_dtype import AmrexFloat32, AmrexFloat64, AmrexFloatingDtype
 from amrex.runtime import AmrexRuntime
-from amrex.space3d.boxarray import BoxArray, DistributionMapping
+from amrex.space3d.boxarray import BoxArray, DistributionMapping, convert
 from amrex.space3d.geometry import Geometry
 from amrex.space3d.mfiter import MFIter, MFIterRange, MFIterTile
 from amrex.space3d.multifab import MultiFab

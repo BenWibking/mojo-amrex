@@ -29,7 +29,7 @@ def main() raises:
     argv.append(String("top_level_answer=23"))
     var runtime = AmrexRuntime(argv, use_parmparse=True)
     try:
-        assert_true(runtime.abi_version() == 7, "unexpected ABI version")
+        assert_true(runtime.abi_version() == 8, "unexpected ABI version")
         assert_true(runtime.initialized(), "runtime should be initialized")
         assert_true(runtime.nprocs() >= 1, "nprocs should be >= 1")
         assert_true(runtime.myproc() >= 0, "myproc should be >= 0")

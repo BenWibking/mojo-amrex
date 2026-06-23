@@ -11,9 +11,13 @@ from amrex.ffi import (
     OptionalBoxArrayHandle,
     OptionalDistributionMappingHandle,
     boxarray_box,
+    boxarray_convert,
+    boxarray_convert_copy,
     boxarray_create_from_box,
     boxarray_max_size,
     boxarray_size,
+    boxarray_surrounding_nodes,
+    boxarray_surrounding_nodes_all,
     distmap_create_from_boxarray,
     intvect3d,
     last_error_message,
@@ -35,6 +39,10 @@ struct BoxArray(AmrexHandle, Movable):
         if not self.handle:
             raise Error(last_error_message(self.runtime[].lib))
 
+    def __init__(out self, var runtime: RuntimeLease, handle: BoxArrayHandle):
+        self.runtime = runtime^
+        self.handle = OptionalBoxArrayHandle(handle)
+
     def __del__(deinit self):
         destroy_amrex_optional_handle[Self.destroy_symbol](self.runtime[].lib, self.handle)
 
@@ -48,6 +56,27 @@ struct BoxArray(AmrexHandle, Movable):
     def max_size(mut self, max_size: Int) raises:
         self.max_size(intvect3d(max_size, max_size, max_size))
 
+    def surrounding_nodes(mut self, dir: Int) raises:
+        var handle = self._handle()
+        raise_on_error(
+            self.runtime[].lib,
+            boxarray_surrounding_nodes(self.runtime[].lib, handle, dir),
+        )
+
+    def surrounding_nodes(mut self) raises:
+        var handle = self._handle()
+        raise_on_error(
+            self.runtime[].lib,
+            boxarray_surrounding_nodes_all(self.runtime[].lib, handle),
+        )
+
+    def convert(mut self, typ: IntVect3D) raises:
+        var handle = self._handle()
+        raise_on_error(
+            self.runtime[].lib,
+            boxarray_convert(self.runtime[].lib, handle, typ),
+        )
+
     def size(ref self) raises -> Int:
         var handle = self._handle()
         return boxarray_size(self.runtime[].lib, handle)
@@ -57,6 +86,17 @@ struct BoxArray(AmrexHandle, Movable):
         if index < 0 or index >= self.size():
             raise Error("BoxArray box index is out of range.")
         return boxarray_box(self.runtime[].lib, handle, index)
+
+
+def convert(ref boxarray: BoxArray, typ: IntVect3D) raises -> BoxArray:
+    var handle = boxarray_convert_copy(
+        boxarray.runtime[].lib,
+        boxarray._handle(),
+        typ,
+    )
+    if not handle:
+        raise Error(last_error_message(boxarray.runtime[].lib))
+    return BoxArray(boxarray.runtime.copy(), handle.value())
 
 
 struct DistributionMapping(AmrexHandle, Movable):

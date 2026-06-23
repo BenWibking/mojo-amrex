@@ -1,5 +1,15 @@
 #include "capi_internal.H"
 
+namespace
+{
+    auto is_valid_index_type(amrex_mojo_intvect_3d typ) -> bool
+    {
+        return (typ.x == 0 || typ.x == 1) &&
+            (typ.y == 0 || typ.y == 1) &&
+            (typ.z == 0 || typ.z == 1);
+    }
+}
+
 extern "C" amrex_mojo_boxarray_t*
 amrex_mojo_boxarray_create_from_box(amrex_mojo_runtime_t* runtime, amrex_mojo_box_3d domain)
 {
@@ -98,6 +108,136 @@ extern "C" amrex_mojo_status_code_t
 amrex_mojo_boxarray_max_size_xyz(amrex_mojo_boxarray_t* boxarray, int32_t x, int32_t y, int32_t z)
 {
     return amrex_mojo_boxarray_max_size(boxarray, amrex_mojo_intvect_3d{x, y, z});
+}
+
+extern "C" amrex_mojo_status_code_t
+amrex_mojo_boxarray_surrounding_nodes(amrex_mojo_boxarray_t* boxarray, int32_t dir)
+{
+    if (boxarray == nullptr) {
+        return amrex_mojo::detail::set_last_error(
+            AMREX_MOJO_STATUS_INVALID_ARGUMENT,
+            "boxarray_surrounding_nodes requires a non-null boxarray."
+        );
+    }
+
+    if (dir < 0 || dir >= AMREX_SPACEDIM) {
+        return amrex_mojo::detail::set_last_error(
+            AMREX_MOJO_STATUS_INVALID_ARGUMENT,
+            "boxarray_surrounding_nodes requires a valid direction."
+        );
+    }
+
+    try {
+        boxarray->value.surroundingNodes(dir);
+        amrex_mojo::detail::clear_last_error();
+        return AMREX_MOJO_STATUS_OK;
+    } catch (const std::exception& ex) {
+        return amrex_mojo::detail::set_last_error(AMREX_MOJO_STATUS_INTERNAL_ERROR, ex.what());
+    } catch (...) {
+        return amrex_mojo::detail::set_last_error(
+            AMREX_MOJO_STATUS_INTERNAL_ERROR,
+            "boxarray_surrounding_nodes failed with an unknown exception."
+        );
+    }
+}
+
+extern "C" amrex_mojo_status_code_t
+amrex_mojo_boxarray_surrounding_nodes_all(amrex_mojo_boxarray_t* boxarray)
+{
+    if (boxarray == nullptr) {
+        return amrex_mojo::detail::set_last_error(
+            AMREX_MOJO_STATUS_INVALID_ARGUMENT,
+            "boxarray_surrounding_nodes_all requires a non-null boxarray."
+        );
+    }
+
+    try {
+        boxarray->value.surroundingNodes();
+        amrex_mojo::detail::clear_last_error();
+        return AMREX_MOJO_STATUS_OK;
+    } catch (const std::exception& ex) {
+        return amrex_mojo::detail::set_last_error(AMREX_MOJO_STATUS_INTERNAL_ERROR, ex.what());
+    } catch (...) {
+        return amrex_mojo::detail::set_last_error(
+            AMREX_MOJO_STATUS_INTERNAL_ERROR,
+            "boxarray_surrounding_nodes_all failed with an unknown exception."
+        );
+    }
+}
+
+extern "C" amrex_mojo_status_code_t
+amrex_mojo_boxarray_convert(amrex_mojo_boxarray_t* boxarray, amrex_mojo_intvect_3d typ)
+{
+    if (boxarray == nullptr) {
+        return amrex_mojo::detail::set_last_error(
+            AMREX_MOJO_STATUS_INVALID_ARGUMENT,
+            "boxarray_convert requires a non-null boxarray."
+        );
+    }
+
+    if (!is_valid_index_type(typ)) {
+        return amrex_mojo::detail::set_last_error(
+            AMREX_MOJO_STATUS_INVALID_ARGUMENT,
+            "boxarray_convert requires each index type entry to be 0 or 1."
+        );
+    }
+
+    try {
+        boxarray->value.convert(amrex_mojo::detail::to_intvect(typ));
+        amrex_mojo::detail::clear_last_error();
+        return AMREX_MOJO_STATUS_OK;
+    } catch (const std::exception& ex) {
+        return amrex_mojo::detail::set_last_error(AMREX_MOJO_STATUS_INTERNAL_ERROR, ex.what());
+    } catch (...) {
+        return amrex_mojo::detail::set_last_error(
+            AMREX_MOJO_STATUS_INTERNAL_ERROR,
+            "boxarray_convert failed with an unknown exception."
+        );
+    }
+}
+
+extern "C" amrex_mojo_boxarray_t*
+amrex_mojo_boxarray_convert_copy(
+    const amrex_mojo_boxarray_t* boxarray,
+    amrex_mojo_intvect_3d typ
+)
+{
+    if (boxarray == nullptr) {
+        amrex_mojo::detail::set_last_error(
+            AMREX_MOJO_STATUS_INVALID_ARGUMENT,
+            "boxarray_convert_copy requires a non-null boxarray."
+        );
+        return nullptr;
+    }
+
+    if (!is_valid_index_type(typ)) {
+        amrex_mojo::detail::set_last_error(
+            AMREX_MOJO_STATUS_INVALID_ARGUMENT,
+            "boxarray_convert_copy requires each index type entry to be 0 or 1."
+        );
+        return nullptr;
+    }
+
+    auto* state = amrex_mojo::detail::retain_runtime(boxarray->state);
+    try {
+        auto* converted = new amrex_mojo_boxarray{
+            state,
+            amrex::convert(boxarray->value, amrex_mojo::detail::to_intvect(typ))
+        };
+        amrex_mojo::detail::clear_last_error();
+        return converted;
+    } catch (const std::exception& ex) {
+        amrex_mojo::detail::release_runtime(state);
+        amrex_mojo::detail::set_last_error(AMREX_MOJO_STATUS_INTERNAL_ERROR, ex.what());
+        return nullptr;
+    } catch (...) {
+        amrex_mojo::detail::release_runtime(state);
+        amrex_mojo::detail::set_last_error(
+            AMREX_MOJO_STATUS_INTERNAL_ERROR,
+            "boxarray_convert_copy failed with an unknown exception."
+        );
+        return nullptr;
+    }
 }
 
 extern "C" int32_t amrex_mojo_boxarray_size(const amrex_mojo_boxarray_t* boxarray)
