@@ -56,7 +56,7 @@ def main() raises:
         var max_grid_size: Int = params.get[ParmInt]("max_grid_size")
         var nsteps: Int = params.query_or[ParmInt]("nsteps", 10)
         var plot_int: Int = params.query_or[ParmInt]("plot_int", -1)
-        var dt: Float64 = params.get[ParmReal]("dt")
+        var dt = params.get[ParmReal]("dt")
 
         # **********************************
         # DEFINE SIMULATION SETUP AND GEOMETRY

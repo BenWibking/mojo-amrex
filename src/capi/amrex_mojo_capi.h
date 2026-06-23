@@ -6,7 +6,7 @@
 extern "C" {
 #endif
 
-#define AMREX_MOJO_ABI_VERSION 6
+#define AMREX_MOJO_ABI_VERSION 7
 
 typedef struct amrex_mojo_runtime amrex_mojo_runtime_t;
 typedef struct amrex_mojo_boxarray amrex_mojo_boxarray_t;
@@ -175,13 +175,6 @@ amrex_mojo_status_code_t amrex_mojo_boxarray_max_size_xyz(
 );
 int32_t amrex_mojo_boxarray_size(const amrex_mojo_boxarray_t* boxarray);
 amrex_mojo_box_3d amrex_mojo_boxarray_box(const amrex_mojo_boxarray_t* boxarray, int32_t index);
-amrex_mojo_status_code_t amrex_mojo_boxarray_box_metadata(
-    const amrex_mojo_boxarray_t* boxarray,
-    int32_t index,
-    int32_t* out_small_end,
-    int32_t* out_big_end,
-    int32_t* out_nodal
-);
 
 amrex_mojo_distmap_t* amrex_mojo_distmap_create_from_boxarray(
     amrex_mojo_runtime_t* runtime,
@@ -238,25 +231,6 @@ amrex_mojo_box_3d amrex_mojo_geometry_domain(const amrex_mojo_geometry_t* geomet
 amrex_mojo_realbox_3d amrex_mojo_geometry_prob_domain(const amrex_mojo_geometry_t* geometry);
 amrex_mojo_realvect_3d amrex_mojo_geometry_cell_size(const amrex_mojo_geometry_t* geometry);
 amrex_mojo_intvect_3d amrex_mojo_geometry_periodicity(const amrex_mojo_geometry_t* geometry);
-amrex_mojo_status_code_t amrex_mojo_geometry_domain_metadata(
-    const amrex_mojo_geometry_t* geometry,
-    int32_t* out_small_end,
-    int32_t* out_big_end,
-    int32_t* out_nodal
-);
-amrex_mojo_status_code_t amrex_mojo_geometry_prob_domain_metadata(
-    const amrex_mojo_geometry_t* geometry,
-    double* out_lo,
-    double* out_hi
-);
-amrex_mojo_status_code_t amrex_mojo_geometry_cell_size_data(
-    const amrex_mojo_geometry_t* geometry,
-    double* out_cell_size
-);
-amrex_mojo_status_code_t amrex_mojo_geometry_periodicity_data(
-    const amrex_mojo_geometry_t* geometry,
-    int32_t* out_periodicity
-);
 
 amrex_mojo_multifab_t* amrex_mojo_multifab_create(
     amrex_mojo_runtime_t* runtime,
@@ -443,30 +417,12 @@ int32_t amrex_mojo_mfiter_is_valid(const amrex_mojo_mfiter_t* mfiter);
 amrex_mojo_status_code_t amrex_mojo_mfiter_next(amrex_mojo_mfiter_t* mfiter);
 int32_t amrex_mojo_mfiter_index(const amrex_mojo_mfiter_t* mfiter);
 int32_t amrex_mojo_mfiter_local_tile_index(const amrex_mojo_mfiter_t* mfiter);
-amrex_mojo_status_code_t amrex_mojo_mfiter_tile_box_metadata(
+amrex_mojo_box_3d amrex_mojo_mfiter_tile_box(const amrex_mojo_mfiter_t* mfiter);
+amrex_mojo_box_3d amrex_mojo_mfiter_valid_box(const amrex_mojo_mfiter_t* mfiter);
+amrex_mojo_box_3d amrex_mojo_mfiter_fab_box(const amrex_mojo_mfiter_t* mfiter);
+amrex_mojo_box_3d amrex_mojo_mfiter_growntile_box(
     const amrex_mojo_mfiter_t* mfiter,
-    int32_t* out_small_end,
-    int32_t* out_big_end,
-    int32_t* out_nodal
-);
-amrex_mojo_status_code_t amrex_mojo_mfiter_valid_box_metadata(
-    const amrex_mojo_mfiter_t* mfiter,
-    int32_t* out_small_end,
-    int32_t* out_big_end,
-    int32_t* out_nodal
-);
-amrex_mojo_status_code_t amrex_mojo_mfiter_fab_box_metadata(
-    const amrex_mojo_mfiter_t* mfiter,
-    int32_t* out_small_end,
-    int32_t* out_big_end,
-    int32_t* out_nodal
-);
-amrex_mojo_status_code_t amrex_mojo_mfiter_growntile_box_metadata(
-    const amrex_mojo_mfiter_t* mfiter,
-    amrex_mojo_intvect_3d ngrow,
-    int32_t* out_small_end,
-    int32_t* out_big_end,
-    int32_t* out_nodal
+    amrex_mojo_intvect_3d ngrow
 );
 
 amrex_mojo_parmparse_t* amrex_mojo_parmparse_create(

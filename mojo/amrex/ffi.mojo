@@ -130,12 +130,6 @@ struct ParmParseRealQueryResult(Copyable):
 
 
 @fieldwise_init
-struct Box3DResult(Copyable):
-    var status: Int
-    var value: Box3D
-
-
-@fieldwise_init
 struct MultiFabMemoryInfo(Copyable):
     var requested_kind: Int
     var host_accessible: Bool
@@ -678,76 +672,24 @@ def mfiter_local_tile_index(ref lib: OwnedDLHandle, mfiter: MFIterHandle) raises
     return Int(lib.call["amrex_mojo_mfiter_local_tile_index", c_int](mfiter))
 
 
-def box_from_bounds(lo_raw: InlineArray[c_int, 3], hi_raw: InlineArray[c_int, 3]) raises -> Box3D:
-    return box3d(
-        small_end=intvect3d(Int(lo_raw[0]), Int(lo_raw[1]), Int(lo_raw[2])),
-        big_end=intvect3d(Int(hi_raw[0]), Int(hi_raw[1]), Int(hi_raw[2])),
-    )
+def mfiter_tile_box(ref lib: OwnedDLHandle, mfiter: MFIterHandle) raises -> Box3D:
+    var f = lib.get_function[def(MFIterHandle) thin abi("C") -> Box3D]("amrex_mojo_mfiter_tile_box")
+    return f(mfiter)
 
 
-def box_from_parts(
-    lo_raw: InlineArray[c_int, 3], hi_raw: InlineArray[c_int, 3], nodal_raw: InlineArray[c_int, 3]
-) raises -> Box3D:
-    return box3d(
-        small_end=intvect3d(Int(lo_raw[0]), Int(lo_raw[1]), Int(lo_raw[2])),
-        big_end=intvect3d(Int(hi_raw[0]), Int(hi_raw[1]), Int(hi_raw[2])),
-        nodal=intvect3d(Int(nodal_raw[0]), Int(nodal_raw[1]), Int(nodal_raw[2])),
-    )
+def mfiter_valid_box(ref lib: OwnedDLHandle, mfiter: MFIterHandle) raises -> Box3D:
+    var f = lib.get_function[def(MFIterHandle) thin abi("C") -> Box3D]("amrex_mojo_mfiter_valid_box")
+    return f(mfiter)
 
 
-def _mfiter_box_query[func_name: StringLiteral](ref lib: OwnedDLHandle, mfiter: MFIterHandle) raises -> Box3DResult:
-    var small_end = InlineArray[c_int, 3](fill=0)
-    var big_end = InlineArray[c_int, 3](fill=0)
-    var nodal = InlineArray[c_int, 3](fill=0)
-    var status = Int(
-        lib.call[func_name, c_int](
-            mfiter,
-            small_end.unsafe_ptr(),
-            big_end.unsafe_ptr(),
-            nodal.unsafe_ptr(),
-        )
-    )
-    return Box3DResult(
-        status=status,
-        value=box_from_parts(small_end, big_end, nodal),
-    )
+def mfiter_fab_box(ref lib: OwnedDLHandle, mfiter: MFIterHandle) raises -> Box3D:
+    var f = lib.get_function[def(MFIterHandle) thin abi("C") -> Box3D]("amrex_mojo_mfiter_fab_box")
+    return f(mfiter)
 
 
-def _mfiter_box_query_with_ngrow[
-    func_name: StringLiteral
-](ref lib: OwnedDLHandle, mfiter: MFIterHandle, ngrow: IntVect3D) raises -> Box3DResult:
-    var small_end = InlineArray[c_int, 3](fill=0)
-    var big_end = InlineArray[c_int, 3](fill=0)
-    var nodal = InlineArray[c_int, 3](fill=0)
-    var status = Int(
-        lib.call[func_name, c_int](
-            mfiter,
-            ngrow,
-            small_end.unsafe_ptr(),
-            big_end.unsafe_ptr(),
-            nodal.unsafe_ptr(),
-        )
-    )
-    return Box3DResult(
-        status=status,
-        value=box_from_parts(small_end, big_end, nodal),
-    )
-
-
-def mfiter_tile_box(ref lib: OwnedDLHandle, mfiter: MFIterHandle) raises -> Box3DResult:
-    return _mfiter_box_query["amrex_mojo_mfiter_tile_box_metadata"](lib, mfiter)
-
-
-def mfiter_valid_box(ref lib: OwnedDLHandle, mfiter: MFIterHandle) raises -> Box3DResult:
-    return _mfiter_box_query["amrex_mojo_mfiter_valid_box_metadata"](lib, mfiter)
-
-
-def mfiter_fab_box(ref lib: OwnedDLHandle, mfiter: MFIterHandle) raises -> Box3DResult:
-    return _mfiter_box_query["amrex_mojo_mfiter_fab_box_metadata"](lib, mfiter)
-
-
-def mfiter_growntile_box(ref lib: OwnedDLHandle, mfiter: MFIterHandle, ngrow: IntVect3D) raises -> Box3DResult:
-    return _mfiter_box_query_with_ngrow["amrex_mojo_mfiter_growntile_box_metadata"](lib, mfiter, ngrow)
+def mfiter_growntile_box(ref lib: OwnedDLHandle, mfiter: MFIterHandle, ngrow: IntVect3D) raises -> Box3D:
+    var f = lib.get_function[def(MFIterHandle, IntVect3D) thin abi("C") -> Box3D]("amrex_mojo_mfiter_growntile_box")
+    return f(mfiter, ngrow)
 
 
 def _mfiter_scalar_data_ptr[

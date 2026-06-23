@@ -65,7 +65,7 @@ struct HeatEquationRunner(Movable, Writable):
             var n_cell: Int = params.get[ParmInt]("n_cell")
             var max_grid_size: Int = params.get[ParmInt]("max_grid_size")
             var nsteps: Int = params.query_or[ParmInt]("nsteps", 10)
-            var dt: Float64 = params.get[ParmReal]("dt")
+            var dt = params.get[ParmReal]("dt")
 
             var dom_lo = intvect3d(0, 0, 0)
             var dom_hi = intvect3d(n_cell - 1, n_cell - 1, n_cell - 1)

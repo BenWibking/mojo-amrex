@@ -79,16 +79,6 @@ namespace
         }
     }
 
-    auto box_from_metadata(const int32_t* lo, const int32_t* hi, const int32_t* nodal)
-        -> amrex_mojo_box_3d
-    {
-        return amrex_mojo_box_3d{
-            amrex_mojo_intvect_3d{lo[0], lo[1], lo[2]},
-            amrex_mojo_intvect_3d{hi[0], hi[1], hi[2]},
-            amrex_mojo_intvect_3d{nodal[0], nodal[1], nodal[2]}
-        };
-    }
-
     auto array4_from_mfiter(
         const amrex_mojo_multifab_t* multifab,
         const amrex_mojo_mfiter_t* mfiter
@@ -170,15 +160,7 @@ namespace
             "has_nonzero_ghost_cells mfiter_create failed."
         );
         while (amrex_mojo_mfiter_is_valid(mfiter) != 0) {
-            int32_t valid_lo[3] = {0, 0, 0};
-            int32_t valid_hi[3] = {0, 0, 0};
-            int32_t nodal[3] = {0, 0, 0};
-            expect(
-                amrex_mojo_mfiter_valid_box_metadata(mfiter, valid_lo, valid_hi, nodal) ==
-                    AMREX_MOJO_STATUS_OK,
-                "mfiter_valid_box_metadata failed."
-            );
-            const auto valid_box = box_from_metadata(valid_lo, valid_hi, nodal);
+            const auto valid_box = amrex_mojo_mfiter_valid_box(mfiter);
             const auto array4 = array4_from_mfiter(multifab, mfiter);
             for (int k = array4.lo_z; k <= array4.hi_z; ++k) {
                 for (int j = array4.lo_y; j <= array4.hi_y; ++j) {
@@ -503,16 +485,19 @@ auto main() -> int
 
     int iterated_tiles = 0;
     while (amrex_mojo_mfiter_is_valid(mfiter) != 0) {
-        int32_t tile_lo[3] = {0, 0, 0};
-        int32_t tile_hi[3] = {0, 0, 0};
-        int32_t nodal[3] = {0, 0, 0};
+        const auto tile_box = amrex_mojo_mfiter_tile_box(mfiter);
         expect(
-            amrex_mojo_mfiter_tile_box_metadata(mfiter, tile_lo, tile_hi, nodal) == AMREX_MOJO_STATUS_OK,
-            "mfiter_tile_box_metadata failed."
+            tile_box.small_end.x <= tile_box.big_end.x,
+            "mfiter tile box x-bounds should be ordered."
         );
-        expect(tile_lo[0] <= tile_hi[0], "mfiter tile box x-bounds should be ordered.");
-        expect(tile_lo[1] <= tile_hi[1], "mfiter tile box y-bounds should be ordered.");
-        expect(tile_lo[2] <= tile_hi[2], "mfiter tile box z-bounds should be ordered.");
+        expect(
+            tile_box.small_end.y <= tile_box.big_end.y,
+            "mfiter tile box y-bounds should be ordered."
+        );
+        expect(
+            tile_box.small_end.z <= tile_box.big_end.z,
+            "mfiter tile box z-bounds should be ordered."
+        );
         if (default_memory.host_accessible == 1) {
             expect(
                 amrex_mojo_multifab_data_ptr_for_mfiter(multifab, mfiter) != nullptr,
@@ -556,15 +541,7 @@ auto main() -> int
             "comm_source mfiter_create failed."
         );
         while (amrex_mojo_mfiter_is_valid(comm_mfiter) != 0) {
-            int32_t tile_lo[3] = {0, 0, 0};
-            int32_t tile_hi[3] = {0, 0, 0};
-            int32_t nodal[3] = {0, 0, 0};
-            expect(
-                amrex_mojo_mfiter_tile_box_metadata(comm_mfiter, tile_lo, tile_hi, nodal) ==
-                    AMREX_MOJO_STATUS_OK,
-                "comm_source mfiter_tile_box_metadata failed."
-            );
-            const auto tile_box = box_from_metadata(tile_lo, tile_hi, nodal);
+            const auto tile_box = amrex_mojo_mfiter_tile_box(comm_mfiter);
             const auto tile_array = array4_from_mfiter(comm_source, comm_mfiter);
             fill_valid_box(
                 tile_array,

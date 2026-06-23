@@ -63,18 +63,6 @@ struct MFIterIterator[origin: Origin[mut=True]](Iterator):
         return self.iter[].__next__()
 
 
-def _box_from_raw_parts(
-    small_end: InlineArray[c_int, 3],
-    big_end: InlineArray[c_int, 3],
-    nodal: InlineArray[c_int, 3],
-) -> Box3D:
-    return Box3D(
-        small_end=IntVect3D(x=small_end[0], y=small_end[1], z=small_end[2]),
-        big_end=IntVect3D(x=big_end[0], y=big_end[1], z=big_end[2]),
-        nodal=IntVect3D(x=nodal[0], y=nodal[1], z=nodal[2]),
-    )
-
-
 struct MFIter(AmrexHandle, Iterator, Movable):
     comptime Element = MFIterTile
     comptime moved_from_message = "MFIter no longer owns a live AMReX handle. The value may have been moved from."
@@ -168,44 +156,12 @@ struct MFIter(AmrexHandle, Iterator, Movable):
             self._finalize_no_error()
             raise StopIteration()
 
-        var tile_small_end = InlineArray[c_int, 3](fill=0)
-        var tile_big_end = InlineArray[c_int, 3](fill=0)
-        var tile_nodal = InlineArray[c_int, 3](fill=0)
-        var valid_small_end = InlineArray[c_int, 3](fill=0)
-        var valid_big_end = InlineArray[c_int, 3](fill=0)
-        var valid_nodal = InlineArray[c_int, 3](fill=0)
-        var fab_small_end = InlineArray[c_int, 3](fill=0)
-        var fab_big_end = InlineArray[c_int, 3](fill=0)
-        var fab_nodal = InlineArray[c_int, 3](fill=0)
-
-        var tile_status = self.runtime[].lib.call["amrex_mojo_mfiter_tile_box_metadata", c_int](
-            raw_handle,
-            tile_small_end.unsafe_ptr(),
-            tile_big_end.unsafe_ptr(),
-            tile_nodal.unsafe_ptr(),
-        )
-        var valid_status = self.runtime[].lib.call["amrex_mojo_mfiter_valid_box_metadata", c_int](
-            raw_handle,
-            valid_small_end.unsafe_ptr(),
-            valid_big_end.unsafe_ptr(),
-            valid_nodal.unsafe_ptr(),
-        )
-        var fab_status = self.runtime[].lib.call["amrex_mojo_mfiter_fab_box_metadata", c_int](
-            raw_handle,
-            fab_small_end.unsafe_ptr(),
-            fab_big_end.unsafe_ptr(),
-            fab_nodal.unsafe_ptr(),
-        )
-        if tile_status != 0 or valid_status != 0 or fab_status != 0:
-            self._finalize_no_error()
-            raise StopIteration()
-
         var tile = MFIterTile(
             index=Int(self.runtime[].lib.call["amrex_mojo_mfiter_index", c_int](raw_handle)),
             local_tile_index=Int(self.runtime[].lib.call["amrex_mojo_mfiter_local_tile_index", c_int](raw_handle)),
-            tile_box=_box_from_raw_parts(tile_small_end, tile_big_end, tile_nodal),
-            valid_box=_box_from_raw_parts(valid_small_end, valid_big_end, valid_nodal),
-            fab_box=_box_from_raw_parts(fab_small_end, fab_big_end, fab_nodal),
+            tile_box=self.runtime[].lib.call["amrex_mojo_mfiter_tile_box", Box3D](raw_handle),
+            valid_box=self.runtime[].lib.call["amrex_mojo_mfiter_valid_box", Box3D](raw_handle),
+            fab_box=self.runtime[].lib.call["amrex_mojo_mfiter_fab_box", Box3D](raw_handle),
         )
         return tile^
 
@@ -223,23 +179,17 @@ struct MFIter(AmrexHandle, Iterator, Movable):
     def tilebox(ref self) raises -> Box3D:
         self._require_valid()
         var handle = self._handle()
-        var result = mfiter_tile_box(self.runtime[].lib, handle)
-        raise_on_error(self.runtime[].lib, result.status)
-        return result.value.copy()
+        return mfiter_tile_box(self.runtime[].lib, handle)
 
     def validbox(ref self) raises -> Box3D:
         self._require_valid()
         var handle = self._handle()
-        var result = mfiter_valid_box(self.runtime[].lib, handle)
-        raise_on_error(self.runtime[].lib, result.status)
-        return result.value.copy()
+        return mfiter_valid_box(self.runtime[].lib, handle)
 
     def fabbox(ref self) raises -> Box3D:
         self._require_valid()
         var handle = self._handle()
-        var result = mfiter_fab_box(self.runtime[].lib, handle)
-        raise_on_error(self.runtime[].lib, result.status)
-        return result.value.copy()
+        return mfiter_fab_box(self.runtime[].lib, handle)
 
     def growntilebox(ref self, ngrow: IntVect3D) raises -> Box3D:
         return self._growntilebox_impl(ngrow)
