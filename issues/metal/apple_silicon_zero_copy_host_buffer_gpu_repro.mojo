@@ -28,18 +28,26 @@ def init_device_passable_value[
 
 
 @fieldwise_init
-struct BufferViewF32(DevicePassable, TrivialRegisterPassable):
-    comptime device_type = Self
+struct BufferViewF32[origin: Origin[mut=True]](
+    DevicePassable, TrivialRegisterPassable
+):
+    comptime device_type = BufferViewF32[MutUnsafeAnyOrigin]
 
-    var data: UnsafePointer[c_float, MutUnsafeAnyOrigin]
+    var data: UnsafePointer[c_float, Self.origin]
     var size: Int64
+
+    def device_view(self) -> Self.device_type:
+        return Self.device_type(
+            data=self.data.as_unsafe_any_origin(),
+            size=self.size,
+        )
 
     def _to_device_type(
         self,
         mut encoder: Some[DeviceTypeEncoder],
         target: UnsafePointer[mut=True, NoneType, _],
     ):
-        init_device_passable_value(self, target)
+        init_device_passable_value(self.device_view(), target)
 
     @staticmethod
     def get_type_name() -> String:
@@ -52,28 +60,35 @@ struct BufferViewF32(DevicePassable, TrivialRegisterPassable):
         self.data[index] = value
 
 
-def host_view(mut storage: List[c_float]) -> BufferViewF32:
-    return BufferViewF32(
+def host_view(mut storage: List[c_float]) -> BufferViewF32[origin_of(storage)]:
+    return BufferViewF32[origin_of(storage)](
         data=storage.unsafe_ptr(),
         size=Int64(len(storage)),
     )
 
 
-def sum_buffer(view: BufferViewF32) -> Float64:
+def sum_buffer[
+    origin: Origin[mut=True],
+](view: BufferViewF32[origin]) -> Float64:
     var total = Float64(0.0)
     for i in range(Int(view.size)):
         total += Float64(view[i])
     return total
 
 
-def fill_buffer_gpu(dst: BufferViewF32, value: Float32):
+def fill_buffer_gpu[
+    origin: Origin[mut=True],
+](dst: BufferViewF32[origin], value: Float32):
     var tid = global_idx.x
     if tid < Int(dst.size):
         dst[Int(tid)] = value
 
 
-def fill_with_gpu_zero_copy(ref ctx: DeviceContext, dst: BufferViewF32, value: Float32) raises:
-    ctx.enqueue_function[fill_buffer_gpu](
+def fill_with_gpu_zero_copy[
+    origin: Origin[mut=True],
+](ref ctx: DeviceContext, dst: BufferViewF32[origin], value: Float32) raises:
+    comptime kernel = fill_buffer_gpu[origin]
+    ctx.enqueue_function[kernel](
         dst,
         value,
         grid_dim=ceildiv(Int(dst.size), BLOCK_SIZE),
@@ -82,13 +97,16 @@ def fill_with_gpu_zero_copy(ref ctx: DeviceContext, dst: BufferViewF32, value: F
     ctx.synchronize()
 
 
-def fill_with_gpu_device_buffer(ref ctx: DeviceContext, dst: BufferViewF32, value: Float32) raises:
+def fill_with_gpu_device_buffer[
+    origin: Origin[mut=True],
+](ref ctx: DeviceContext, dst: BufferViewF32[origin], value: Float32) raises:
     var buffer = ctx.enqueue_create_buffer[DType.float32](Int(dst.size))
-    var device_view = BufferViewF32(
+    var device_view = BufferViewF32[MutUntrackedOrigin](
         data=buffer.unsafe_ptr(),
         size=dst.size,
     )
-    ctx.enqueue_function[fill_buffer_gpu](
+    comptime kernel = fill_buffer_gpu[MutUntrackedOrigin]
+    ctx.enqueue_function[kernel](
         device_view,
         value,
         grid_dim=ceildiv(Int(device_view.size), BLOCK_SIZE),
@@ -100,10 +118,15 @@ def fill_with_gpu_device_buffer(ref ctx: DeviceContext, dst: BufferViewF32, valu
 
 def main() raises:
     if not has_accelerator():
-        raise Error("issues/apple_silicon_zero_copy_host_buffer_gpu_repro.mojo requires a Mojo-supported accelerator.")
+        raise Error(
+            "issues/apple_silicon_zero_copy_host_buffer_gpu_repro.mojo requires"
+            " a Mojo-supported accelerator."
+        )
 
     var zero_copy_storage = List[c_float](length=ELEMENT_COUNT, fill=0.0)
-    var device_buffer_result_storage = List[c_float](length=ELEMENT_COUNT, fill=0.0)
+    var device_buffer_result_storage = List[c_float](
+        length=ELEMENT_COUNT, fill=0.0
+    )
     var zero_copy_view = host_view(zero_copy_storage)
     var device_buffer_result_view = host_view(device_buffer_result_storage)
 
