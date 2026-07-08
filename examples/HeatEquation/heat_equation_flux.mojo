@@ -160,68 +160,74 @@ def main() raises:
             var dyinv = 1.0 / dx.y
             var dzinv = 1.0 / dx.z
 
-            var x_phi_mfi = phi_old.mfiter()
+            # One tile loop dispatches all four device kernels per tile. The flux
+            # boxes for a tile exactly cover that tile's own cell faces, so the
+            # advance kernel only consumes flux values computed on the same tile.
+            # All four iterators share a stream at each tile_ordinal, so the
+            # in-tile kernels stay ordered on that stream.
+            var phi_mfi = phi_old.mfiter()
             var xflux_mfi = flux_x.mfiter()
-            for x_tile in xflux_mfi:
-                _ = x_phi_mfi.__next__()
-                var bx = x_tile.tile_box
-                var phi_old_arr = phi_old.array(x_phi_mfi)
+            var yflux_mfi = flux_y.mfiter()
+            var zflux_mfi = flux_z.mfiter()
+            for tile in phi_mfi:
+                _ = xflux_mfi.__next__()
+                _ = yflux_mfi.__next__()
+                _ = zflux_mfi.__next__()
+
+                var xbx = xflux_mfi.tilebox()
+                var phi_old_x = phi_old.array(phi_mfi)
                 var flux_x_arr = flux_x.array(xflux_mfi)
 
-                def compute_flux_x(i: Int, j: Int, k: Int) {var flux_x_arr^, var phi_old_arr^, var dxinv}:
-                    flux_x_arr[i, j, k] = (phi_old_arr[i, j, k] - phi_old_arr[i - 1, j, k]) * dxinv
+                def compute_flux_x(
+                    i: Int, j: Int, k: Int
+                ) {var flux_x_arr^, var phi_old_x^, var dxinv}:
+                    flux_x_arr[i, j, k] = (
+                        phi_old_x[i, j, k] - phi_old_x[i - 1, j, k]
+                    ) * dxinv
 
-                xflux_mfi.parallel_for(compute_flux_x, bx)
+                xflux_mfi.parallel_for(compute_flux_x, xbx)
 
-            var y_phi_mfi = phi_old.mfiter()
-            var yflux_mfi = flux_y.mfiter()
-            for y_tile in yflux_mfi:
-                _ = y_phi_mfi.__next__()
-                var bx = y_tile.tile_box
-                var phi_old_arr = phi_old.array(y_phi_mfi)
+                var ybx = yflux_mfi.tilebox()
+                var phi_old_y = phi_old.array(phi_mfi)
                 var flux_y_arr = flux_y.array(yflux_mfi)
 
-                def compute_flux_y(i: Int, j: Int, k: Int) {var flux_y_arr^, var phi_old_arr^, var dyinv}:
-                    flux_y_arr[i, j, k] = (phi_old_arr[i, j, k] - phi_old_arr[i, j - 1, k]) * dyinv
+                def compute_flux_y(
+                    i: Int, j: Int, k: Int
+                ) {var flux_y_arr^, var phi_old_y^, var dyinv}:
+                    flux_y_arr[i, j, k] = (
+                        phi_old_y[i, j, k] - phi_old_y[i, j - 1, k]
+                    ) * dyinv
 
-                yflux_mfi.parallel_for(compute_flux_y, bx)
+                yflux_mfi.parallel_for(compute_flux_y, ybx)
 
-            var z_phi_mfi = phi_old.mfiter()
-            var zflux_mfi = flux_z.mfiter()
-            for z_tile in zflux_mfi:
-                _ = z_phi_mfi.__next__()
-                var bx = z_tile.tile_box
-                var phi_old_arr = phi_old.array(z_phi_mfi)
+                var zbx = zflux_mfi.tilebox()
+                var phi_old_z = phi_old.array(phi_mfi)
                 var flux_z_arr = flux_z.array(zflux_mfi)
 
-                def compute_flux_z(i: Int, j: Int, k: Int) {var flux_z_arr^, var phi_old_arr^, var dzinv}:
-                    flux_z_arr[i, j, k] = (phi_old_arr[i, j, k] - phi_old_arr[i, j, k - 1]) * dzinv
+                def compute_flux_z(
+                    i: Int, j: Int, k: Int
+                ) {var flux_z_arr^, var phi_old_z^, var dzinv}:
+                    flux_z_arr[i, j, k] = (
+                        phi_old_z[i, j, k] - phi_old_z[i, j, k - 1]
+                    ) * dzinv
 
-                zflux_mfi.parallel_for(compute_flux_z, bx)
+                zflux_mfi.parallel_for(compute_flux_z, zbx)
 
-            var update_mfi = phi_old.mfiter()
-            var x_update_mfi = flux_x.mfiter()
-            var y_update_mfi = flux_y.mfiter()
-            var z_update_mfi = flux_z.mfiter()
-            for tile in update_mfi:
-                _ = x_update_mfi.__next__()
-                _ = y_update_mfi.__next__()
-                _ = z_update_mfi.__next__()
                 var bx = tile.valid_box
-                var phi_old_arr = phi_old.array(update_mfi)
-                var phi_new_arr = phi_new.array(update_mfi)
-                var flux_x_arr = flux_x.array(x_update_mfi)
-                var flux_y_arr = flux_y.array(y_update_mfi)
-                var flux_z_arr = flux_z.array(z_update_mfi)
+                var phi_old_arr = phi_old.array(phi_mfi)
+                var phi_new_arr = phi_new.array(phi_mfi)
+                var flux_x_up = flux_x.array(xflux_mfi)
+                var flux_y_up = flux_y.array(yflux_mfi)
+                var flux_z_up = flux_z.array(zflux_mfi)
 
                 def advance_cell(
                     i: Int, j: Int, k: Int
                 ) {
                     var phi_new_arr^,
                     var phi_old_arr^,
-                    var flux_x_arr^,
-                    var flux_y_arr^,
-                    var flux_z_arr^,
+                    var flux_x_up^,
+                    var flux_y_up^,
+                    var flux_z_up^,
                     var dxinv,
                     var dyinv,
                     var dzinv,
@@ -229,12 +235,18 @@ def main() raises:
                 }:
                     phi_new_arr[i, j, k] = (
                         phi_old_arr[i, j, k]
-                        + dt * dxinv * (flux_x_arr[i + 1, j, k] - flux_x_arr[i, j, k])
-                        + dt * dyinv * (flux_y_arr[i, j + 1, k] - flux_y_arr[i, j, k])
-                        + dt * dzinv * (flux_z_arr[i, j, k + 1] - flux_z_arr[i, j, k])
+                        + dt
+                        * dxinv
+                        * (flux_x_up[i + 1, j, k] - flux_x_up[i, j, k])
+                        + dt
+                        * dyinv
+                        * (flux_y_up[i, j + 1, k] - flux_y_up[i, j, k])
+                        + dt
+                        * dzinv
+                        * (flux_z_up[i, j, k + 1] - flux_z_up[i, j, k])
                     )
 
-                update_mfi.parallel_for(advance_cell, bx)
+                phi_mfi.parallel_for(advance_cell, bx)
 
             time = time + dt
             var phi_swap = phi_old^
