@@ -131,8 +131,8 @@ namespace
 
         const auto& multifab_tile =
             multifab->tiles[static_cast<std::size_t>(mfiter->current_tile)];
-        if (multifab_tile.tile_box != iter_tile->tile_box ||
-            multifab_tile.valid_box != iter_tile->valid_box) {
+        if (multifab_tile.box_index != iter_tile->box_index ||
+            multifab_tile.local_tile_index != iter_tile->local_tile_index) {
             amrex_mojo::detail::set_last_error(
                 AMREX_MOJO_STATUS_INVALID_ARGUMENT,
                 "multifab tile layout is not compatible with the iterator."
