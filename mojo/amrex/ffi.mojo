@@ -42,7 +42,7 @@ def init_device_passable_value[
     T: TrivialRegisterPassable,
     mut_origin: MutOrigin,
 ](value: T, target: UnsafePointer[NoneType, mut_origin]):
-    target.bitcast[T]().init_pointee_copy(value)
+    target.bitcast[T]().unsafe_write(value)
 
 
 @fieldwise_init
