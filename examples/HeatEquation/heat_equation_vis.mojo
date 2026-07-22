@@ -33,7 +33,7 @@ def initialize_phi(mut phi_old: MultiFab[AmrexFloat64], dx: RealVect3D) raises:
         var phi_old_array = phi_old.array(mfi)
         var tile_dx = dx.copy()
 
-        def initialize_cell(i: Int, j: Int, k: Int) {var phi_old_array^, var tile_dx}:
+        def initialize_cell(i: Int, j: Int, k: Int) {var phi_old_array, var tile_dx}:
             var x = (Float64(i) + 0.5) * tile_dx.x
             var y = (Float64(j) + 0.5) * tile_dx.y
             var z = (Float64(k) + 0.5) * tile_dx.z
@@ -146,7 +146,7 @@ struct HeatEquationRunner(Movable, Writable):
 
             def advance_cell(
                 i: Int, j: Int, k: Int
-            ) {var phi_new_array^, var phi_old_array^, var tile_dx, var dt,}:
+            ) {var phi_new_array, var phi_old_array, var tile_dx, var dt,}:
                 phi_new_array[i, j, k] = phi_old_array[i, j, k] + dt * (
                     (phi_old_array[i + 1, j, k] - 2.0 * phi_old_array[i, j, k] + phi_old_array[i - 1, j, k])
                     / (tile_dx.x * tile_dx.x)

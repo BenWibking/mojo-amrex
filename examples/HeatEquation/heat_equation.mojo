@@ -101,7 +101,7 @@ def main() raises:
             var phi_old_arr = phi_old.array(mfi)
             var dx = geometry.cell_size()
 
-            def initialize_cell(i: Int, j: Int, k: Int) {var phi_old_arr^, var dx}:
+            def initialize_cell(i: Int, j: Int, k: Int) {var phi_old_arr, var dx}:
                 var x = (Float64(i) + 0.5) * dx.x
                 var y = (Float64(j) + 0.5) * dx.y
                 var z = (Float64(k) + 0.5) * dx.z
@@ -138,7 +138,7 @@ def main() raises:
 
                 def advance_cell(
                     i: Int, j: Int, k: Int
-                ) {var phi_new_arr^, var phi_old_arr^, var dx, var dt,}:
+                ) {var phi_new_arr, var phi_old_arr, var dx, var dt,}:
                     phi_new_arr[i, j, k] = phi_old_arr[i, j, k] + dt * (
                         (phi_old_arr[i + 1, j, k] - 2.0 * phi_old_arr[i, j, k] + phi_old_arr[i - 1, j, k])
                         / (dx.x * dx.x)

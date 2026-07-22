@@ -191,3 +191,63 @@ extern "C" amrex_mojo_intvect_3d amrex_mojo_geometry_periodicity(const amrex_moj
         geometry->value.isPeriodic(2)
     };
 }
+
+extern "C" amrex_mojo_status_code_t amrex_mojo_geometry_domain_into(
+    const amrex_mojo_geometry_t* geometry,
+    amrex_mojo_box_3d* out_domain
+)
+{
+    if (geometry == nullptr || out_domain == nullptr) {
+        return amrex_mojo::detail::set_last_error(
+            AMREX_MOJO_STATUS_INVALID_ARGUMENT,
+            "geometry_domain_into requires non-null geometry and output pointers."
+        );
+    }
+    *out_domain = amrex_mojo_geometry_domain(geometry);
+    return AMREX_MOJO_STATUS_OK;
+}
+
+extern "C" amrex_mojo_status_code_t amrex_mojo_geometry_prob_domain_into(
+    const amrex_mojo_geometry_t* geometry,
+    amrex_mojo_realbox_3d* out_prob_domain
+)
+{
+    if (geometry == nullptr || out_prob_domain == nullptr) {
+        return amrex_mojo::detail::set_last_error(
+            AMREX_MOJO_STATUS_INVALID_ARGUMENT,
+            "geometry_prob_domain_into requires non-null geometry and output pointers."
+        );
+    }
+    *out_prob_domain = amrex_mojo_geometry_prob_domain(geometry);
+    return AMREX_MOJO_STATUS_OK;
+}
+
+extern "C" amrex_mojo_status_code_t amrex_mojo_geometry_cell_size_into(
+    const amrex_mojo_geometry_t* geometry,
+    amrex_mojo_realvect_3d* out_cell_size
+)
+{
+    if (geometry == nullptr || out_cell_size == nullptr) {
+        return amrex_mojo::detail::set_last_error(
+            AMREX_MOJO_STATUS_INVALID_ARGUMENT,
+            "geometry_cell_size_into requires non-null geometry and output pointers."
+        );
+    }
+    *out_cell_size = amrex_mojo_geometry_cell_size(geometry);
+    return AMREX_MOJO_STATUS_OK;
+}
+
+extern "C" amrex_mojo_status_code_t amrex_mojo_geometry_periodicity_into(
+    const amrex_mojo_geometry_t* geometry,
+    amrex_mojo_intvect_3d* out_periodicity
+)
+{
+    if (geometry == nullptr || out_periodicity == nullptr) {
+        return amrex_mojo::detail::set_last_error(
+            AMREX_MOJO_STATUS_INVALID_ARGUMENT,
+            "geometry_periodicity_into requires non-null geometry and output pointers."
+        );
+    }
+    *out_periodicity = amrex_mojo_geometry_periodicity(geometry);
+    return AMREX_MOJO_STATUS_OK;
+}

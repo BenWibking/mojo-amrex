@@ -111,6 +111,12 @@ amrex_mojo_boxarray_max_size_xyz(amrex_mojo_boxarray_t* boxarray, int32_t x, int
 }
 
 extern "C" amrex_mojo_status_code_t
+amrex_mojo_boxarray_convert_xyz(amrex_mojo_boxarray_t* boxarray, int32_t x, int32_t y, int32_t z)
+{
+    return amrex_mojo_boxarray_convert(boxarray, amrex_mojo_intvect_3d{x, y, z});
+}
+
+extern "C" amrex_mojo_status_code_t
 amrex_mojo_boxarray_surrounding_nodes(amrex_mojo_boxarray_t* boxarray, int32_t dir)
 {
     if (boxarray == nullptr) {
@@ -240,6 +246,17 @@ amrex_mojo_boxarray_convert_copy(
     }
 }
 
+extern "C" amrex_mojo_boxarray_t*
+amrex_mojo_boxarray_convert_copy_xyz(
+    const amrex_mojo_boxarray_t* boxarray,
+    int32_t x,
+    int32_t y,
+    int32_t z
+)
+{
+    return amrex_mojo_boxarray_convert_copy(boxarray, amrex_mojo_intvect_3d{x, y, z});
+}
+
 extern "C" int32_t amrex_mojo_boxarray_size(const amrex_mojo_boxarray_t* boxarray)
 {
     if (boxarray == nullptr) {
@@ -274,4 +291,25 @@ extern "C" amrex_mojo_box_3d amrex_mojo_boxarray_box(const amrex_mojo_boxarray_t
 
     amrex_mojo::detail::clear_last_error();
     return amrex_mojo::detail::from_box(boxarray->value[index]);
+}
+
+extern "C" amrex_mojo_status_code_t amrex_mojo_boxarray_box_into(
+    const amrex_mojo_boxarray_t* boxarray,
+    int32_t index,
+    amrex_mojo_box_3d* out_box
+)
+{
+    if (out_box == nullptr) {
+        return amrex_mojo::detail::set_last_error(
+            AMREX_MOJO_STATUS_INVALID_ARGUMENT,
+            "boxarray_box_into requires a non-null output pointer."
+        );
+    }
+    if (boxarray == nullptr || index < 0 || index >= boxarray->value.size()) {
+        (void)amrex_mojo_boxarray_box(boxarray, index);
+        return AMREX_MOJO_STATUS_INVALID_ARGUMENT;
+    }
+
+    *out_box = amrex_mojo_boxarray_box(boxarray, index);
+    return AMREX_MOJO_STATUS_OK;
 }

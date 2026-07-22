@@ -929,6 +929,48 @@ extern "C" amrex_mojo_box_3d amrex_mojo_multifab_valid_box(const amrex_mojo_mult
     return amrex_mojo::detail::from_box(tile->valid_box);
 }
 
+extern "C" amrex_mojo_status_code_t amrex_mojo_multifab_tile_box_into(
+    const amrex_mojo_multifab_t* multifab,
+    int32_t tile_index,
+    amrex_mojo_box_3d* out_box
+)
+{
+    if (out_box == nullptr) {
+        return amrex_mojo::detail::set_last_error(
+            AMREX_MOJO_STATUS_INVALID_ARGUMENT,
+            "multifab_tile_box_into requires a non-null output pointer."
+        );
+    }
+    const auto* tile = require_tile(multifab, tile_index);
+    if (tile == nullptr) {
+        return AMREX_MOJO_STATUS_INVALID_ARGUMENT;
+    }
+    *out_box = amrex_mojo::detail::from_box(tile->tile_box);
+    amrex_mojo::detail::clear_last_error();
+    return AMREX_MOJO_STATUS_OK;
+}
+
+extern "C" amrex_mojo_status_code_t amrex_mojo_multifab_valid_box_into(
+    const amrex_mojo_multifab_t* multifab,
+    int32_t tile_index,
+    amrex_mojo_box_3d* out_box
+)
+{
+    if (out_box == nullptr) {
+        return amrex_mojo::detail::set_last_error(
+            AMREX_MOJO_STATUS_INVALID_ARGUMENT,
+            "multifab_valid_box_into requires a non-null output pointer."
+        );
+    }
+    const auto* tile = require_tile(multifab, tile_index);
+    if (tile == nullptr) {
+        return AMREX_MOJO_STATUS_INVALID_ARGUMENT;
+    }
+    *out_box = amrex_mojo::detail::from_box(tile->valid_box);
+    amrex_mojo::detail::clear_last_error();
+    return AMREX_MOJO_STATUS_OK;
+}
+
 extern "C" amrex_mojo_status_code_t
 amrex_mojo_multifab_array4_metadata_for_mfiter(
     const amrex_mojo_multifab_t* multifab,
@@ -1255,6 +1297,44 @@ amrex_mojo_multifab_mult(
             "multifab_mult failed with an unknown exception."
         );
     }
+}
+
+extern "C" amrex_mojo_status_code_t amrex_mojo_multifab_plus_xyz(
+    amrex_mojo_multifab_t* multifab,
+    double value,
+    int32_t start_comp,
+    int32_t ncomp,
+    int32_t ngrow_x,
+    int32_t ngrow_y,
+    int32_t ngrow_z
+)
+{
+    return amrex_mojo_multifab_plus(
+        multifab,
+        value,
+        start_comp,
+        ncomp,
+        amrex_mojo_intvect_3d{ngrow_x, ngrow_y, ngrow_z}
+    );
+}
+
+extern "C" amrex_mojo_status_code_t amrex_mojo_multifab_mult_xyz(
+    amrex_mojo_multifab_t* multifab,
+    double value,
+    int32_t start_comp,
+    int32_t ncomp,
+    int32_t ngrow_x,
+    int32_t ngrow_y,
+    int32_t ngrow_z
+)
+{
+    return amrex_mojo_multifab_mult(
+        multifab,
+        value,
+        start_comp,
+        ncomp,
+        amrex_mojo_intvect_3d{ngrow_x, ngrow_y, ngrow_z}
+    );
 }
 
 extern "C" amrex_mojo_status_code_t

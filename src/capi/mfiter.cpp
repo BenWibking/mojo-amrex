@@ -218,3 +218,88 @@ amrex_mojo_mfiter_growntile_box(const amrex_mojo_mfiter_t* mfiter, amrex_mojo_in
     amrex_mojo::detail::clear_last_error();
     return amrex_mojo::detail::from_box(grown_tile_box(*tile, ngrow));
 }
+
+extern "C" amrex_mojo_status_code_t amrex_mojo_mfiter_tile_box_into(
+    const amrex_mojo_mfiter_t* mfiter,
+    amrex_mojo_box_3d* out_box
+)
+{
+    if (out_box == nullptr) {
+        return amrex_mojo::detail::set_last_error(
+            AMREX_MOJO_STATUS_INVALID_ARGUMENT,
+            "mfiter_tile_box_into requires a non-null output pointer."
+        );
+    }
+    const auto* tile = require_current_tile(mfiter);
+    if (tile == nullptr) {
+        return AMREX_MOJO_STATUS_INVALID_ARGUMENT;
+    }
+    *out_box = amrex_mojo::detail::from_box(tile->tile_box);
+    amrex_mojo::detail::clear_last_error();
+    return AMREX_MOJO_STATUS_OK;
+}
+
+extern "C" amrex_mojo_status_code_t amrex_mojo_mfiter_valid_box_into(
+    const amrex_mojo_mfiter_t* mfiter,
+    amrex_mojo_box_3d* out_box
+)
+{
+    if (out_box == nullptr) {
+        return amrex_mojo::detail::set_last_error(
+            AMREX_MOJO_STATUS_INVALID_ARGUMENT,
+            "mfiter_valid_box_into requires a non-null output pointer."
+        );
+    }
+    const auto* tile = require_current_tile(mfiter);
+    if (tile == nullptr) {
+        return AMREX_MOJO_STATUS_INVALID_ARGUMENT;
+    }
+    *out_box = amrex_mojo::detail::from_box(tile->valid_box);
+    amrex_mojo::detail::clear_last_error();
+    return AMREX_MOJO_STATUS_OK;
+}
+
+extern "C" amrex_mojo_status_code_t amrex_mojo_mfiter_fab_box_into(
+    const amrex_mojo_mfiter_t* mfiter,
+    amrex_mojo_box_3d* out_box
+)
+{
+    if (out_box == nullptr) {
+        return amrex_mojo::detail::set_last_error(
+            AMREX_MOJO_STATUS_INVALID_ARGUMENT,
+            "mfiter_fab_box_into requires a non-null output pointer."
+        );
+    }
+    const auto* tile = require_current_tile(mfiter);
+    if (tile == nullptr) {
+        return AMREX_MOJO_STATUS_INVALID_ARGUMENT;
+    }
+    *out_box = amrex_mojo::detail::from_box(tile->fab_box);
+    amrex_mojo::detail::clear_last_error();
+    return AMREX_MOJO_STATUS_OK;
+}
+
+extern "C" amrex_mojo_status_code_t amrex_mojo_mfiter_growntile_box_xyz_into(
+    const amrex_mojo_mfiter_t* mfiter,
+    int32_t ngrow_x,
+    int32_t ngrow_y,
+    int32_t ngrow_z,
+    amrex_mojo_box_3d* out_box
+)
+{
+    if (out_box == nullptr) {
+        return amrex_mojo::detail::set_last_error(
+            AMREX_MOJO_STATUS_INVALID_ARGUMENT,
+            "mfiter_growntile_box_xyz_into requires a non-null output pointer."
+        );
+    }
+    const auto* tile = require_current_tile(mfiter);
+    if (tile == nullptr) {
+        return AMREX_MOJO_STATUS_INVALID_ARGUMENT;
+    }
+    *out_box = amrex_mojo::detail::from_box(
+        grown_tile_box(*tile, amrex_mojo_intvect_3d{ngrow_x, ngrow_y, ngrow_z})
+    );
+    amrex_mojo::detail::clear_last_error();
+    return AMREX_MOJO_STATUS_OK;
+}

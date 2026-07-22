@@ -129,7 +129,7 @@ def main() raises:
 
             def initialize_cell(
                 i: Int, j: Int, k: Int
-            ) {var phi_old_arr^, var dx}:
+            ) {var phi_old_arr, var dx}:
                 var x = (Float64(i) + 0.5) * dx.x
                 var y = (Float64(j) + 0.5) * dx.y
                 var z = (Float64(k) + 0.5) * dx.z
@@ -182,7 +182,7 @@ def main() raises:
 
                 def compute_flux_x(
                     i: Int, j: Int, k: Int
-                ) {var flux_x_arr^, var phi_old_arr^, var dxinv}:
+                ) {var flux_x_arr, var phi_old_arr, var dxinv}:
                     flux_x_arr[i, j, k] = (
                         phi_old_arr[i, j, k] - phi_old_arr[i - 1, j, k]
                     ) * dxinv
@@ -191,7 +191,7 @@ def main() raises:
 
                 def compute_flux_y(
                     i: Int, j: Int, k: Int
-                ) {var flux_y_arr^, var phi_old_arr^, var dyinv}:
+                ) {var flux_y_arr, var phi_old_arr, var dyinv}:
                     flux_y_arr[i, j, k] = (
                         phi_old_arr[i, j, k] - phi_old_arr[i, j - 1, k]
                     ) * dyinv
@@ -200,7 +200,7 @@ def main() raises:
 
                 def compute_flux_z(
                     i: Int, j: Int, k: Int
-                ) {var flux_z_arr^, var phi_old_arr^, var dzinv}:
+                ) {var flux_z_arr, var phi_old_arr, var dzinv}:
                     flux_z_arr[i, j, k] = (
                         phi_old_arr[i, j, k] - phi_old_arr[i, j, k - 1]
                     ) * dzinv
@@ -212,11 +212,11 @@ def main() raises:
                 def advance_cell(
                     i: Int, j: Int, k: Int
                 ) {
-                    var phi_new_arr^,
-                    var phi_old_arr^,
-                    var flux_x_arr^,
-                    var flux_y_arr^,
-                    var flux_z_arr^,
+                    var phi_new_arr,
+                    var phi_old_arr,
+                    var flux_x_arr,
+                    var flux_y_arr,
+                    var flux_z_arr,
                     var dxinv,
                     var dyinv,
                     var dzinv,
