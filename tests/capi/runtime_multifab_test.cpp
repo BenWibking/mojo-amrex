@@ -317,8 +317,9 @@ auto main() -> int
     amrex_mojo_boxarray_t* boxarray = amrex_mojo_boxarray_create_from_box(runtime, domain);
     expect(boxarray != nullptr, "boxarray_create_from_box returned null.");
     expect(
-        amrex_mojo_boxarray_max_size_xyz(boxarray, 32, 32, 32) == AMREX_MOJO_STATUS_OK,
-        "boxarray_max_size_xyz failed."
+        amrex_mojo_boxarray_max_size(boxarray, amrex_mojo_intvect_3d{32, 32, 32}) ==
+            AMREX_MOJO_STATUS_OK,
+        "boxarray_max_size failed."
     );
     expect(amrex_mojo_boxarray_size(boxarray) == 8, "boxarray should split into 8 boxes.");
 
@@ -415,8 +416,14 @@ auto main() -> int
         "geometry periodicity should be all zeros."
     );
 
-    amrex_mojo_multifab_t* multifab = amrex_mojo_multifab_create_xyz(runtime, boxarray, distmap, 1, 0, 0, 0);
-    expect(multifab != nullptr, "multifab_create_xyz returned null.");
+    amrex_mojo_multifab_t* multifab = amrex_mojo_multifab_create(
+        runtime,
+        boxarray,
+        distmap,
+        1,
+        amrex_mojo_intvect_3d{0, 0, 0}
+    );
+    expect(multifab != nullptr, "multifab_create returned null.");
     expect(amrex_mojo_multifab_ncomp(multifab) == 1, "multifab should have one component.");
     expect(amrex_mojo_multifab_tile_count(multifab) > 0, "multifab should expose at least one tile.");
 
@@ -459,14 +466,12 @@ auto main() -> int
     amrex_mojo_mfiter_destroy(default_array_mfiter);
 
     amrex_mojo_multifab_t* float_multifab =
-        amrex_mojo_multifab_create_with_memory_and_datatype_xyz(
+        amrex_mojo_multifab_create_with_memory_and_datatype(
             runtime,
             boxarray,
             distmap,
             1,
-            0,
-            0,
-            0,
+            amrex_mojo_intvect_3d{0, 0, 0},
             AMREX_MOJO_MULTIFAB_MEMORY_DEFAULT,
             AMREX_MOJO_DATATYPE_FLOAT32
         );
@@ -553,10 +558,22 @@ auto main() -> int
     amrex_mojo_mfiter_destroy(mfiter);
 
     amrex_mojo_multifab_t* comm_source =
-        amrex_mojo_multifab_create_xyz(runtime, boxarray, distmap, 1, 1, 1, 1);
+        amrex_mojo_multifab_create(
+            runtime,
+            boxarray,
+            distmap,
+            1,
+            amrex_mojo_intvect_3d{1, 1, 1}
+        );
     expect(comm_source != nullptr, "comm_source create failed.");
     amrex_mojo_multifab_t* comm_destination =
-        amrex_mojo_multifab_create_xyz(runtime, boxarray, distmap, 1, 1, 1, 1);
+        amrex_mojo_multifab_create(
+            runtime,
+            boxarray,
+            distmap,
+            1,
+            amrex_mojo_intvect_3d{1, 1, 1}
+        );
     expect(comm_destination != nullptr, "comm_destination create failed.");
     expect(
         amrex_mojo_multifab_set_val(comm_source, 0.0, 0, 1) == AMREX_MOJO_STATUS_OK,

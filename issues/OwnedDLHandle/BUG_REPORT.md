@@ -13,6 +13,20 @@ The current [`OwnedDLHandle` documentation][docs] uses this invocation pattern.
 
 [docs]: https://mojolang.org/docs/std/ffi/OwnedDLHandle
 
+## Resolution
+
+Mojo `1.0.0b3.dev2026073014` fixes C ABI argument forwarding for
+`OwnedDLHandle.get_function` and changes its type parameter from the complete
+function type to the return type. The standalone source now uses:
+
+```mojo
+var abs = lib.get_function[Int32]("abs")
+print(abs(Int32(-7)))
+```
+
+and prints `7`. The report below preserves the original failing source and
+diagnostic for the affected nightly.
+
 ## Environment
 
 - Mojo: `1.0.0b3.dev2026072006 (7d0f0c04)`

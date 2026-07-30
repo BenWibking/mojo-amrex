@@ -43,30 +43,6 @@ amrex_mojo_boxarray_create_from_box(amrex_mojo_runtime_t* runtime, amrex_mojo_bo
     }
 }
 
-extern "C" amrex_mojo_boxarray_t*
-amrex_mojo_boxarray_create_from_bounds(
-    amrex_mojo_runtime_t* runtime,
-    int32_t lo_x,
-    int32_t lo_y,
-    int32_t lo_z,
-    int32_t hi_x,
-    int32_t hi_y,
-    int32_t hi_z,
-    int32_t nodal_x,
-    int32_t nodal_y,
-    int32_t nodal_z
-)
-{
-    return amrex_mojo_boxarray_create_from_box(
-        runtime,
-        amrex_mojo_box_3d{
-            amrex_mojo_intvect_3d{lo_x, lo_y, lo_z},
-            amrex_mojo_intvect_3d{hi_x, hi_y, hi_z},
-            amrex_mojo_intvect_3d{nodal_x, nodal_y, nodal_z}
-        }
-    );
-}
-
 extern "C" void amrex_mojo_boxarray_destroy(amrex_mojo_boxarray_t* boxarray)
 {
     if (boxarray == nullptr) {
@@ -102,18 +78,6 @@ amrex_mojo_boxarray_max_size(amrex_mojo_boxarray_t* boxarray, amrex_mojo_intvect
             "boxarray_max_size failed with an unknown exception."
         );
     }
-}
-
-extern "C" amrex_mojo_status_code_t
-amrex_mojo_boxarray_max_size_xyz(amrex_mojo_boxarray_t* boxarray, int32_t x, int32_t y, int32_t z)
-{
-    return amrex_mojo_boxarray_max_size(boxarray, amrex_mojo_intvect_3d{x, y, z});
-}
-
-extern "C" amrex_mojo_status_code_t
-amrex_mojo_boxarray_convert_xyz(amrex_mojo_boxarray_t* boxarray, int32_t x, int32_t y, int32_t z)
-{
-    return amrex_mojo_boxarray_convert(boxarray, amrex_mojo_intvect_3d{x, y, z});
 }
 
 extern "C" amrex_mojo_status_code_t
@@ -246,17 +210,6 @@ amrex_mojo_boxarray_convert_copy(
     }
 }
 
-extern "C" amrex_mojo_boxarray_t*
-amrex_mojo_boxarray_convert_copy_xyz(
-    const amrex_mojo_boxarray_t* boxarray,
-    int32_t x,
-    int32_t y,
-    int32_t z
-)
-{
-    return amrex_mojo_boxarray_convert_copy(boxarray, amrex_mojo_intvect_3d{x, y, z});
-}
-
 extern "C" int32_t amrex_mojo_boxarray_size(const amrex_mojo_boxarray_t* boxarray)
 {
     if (boxarray == nullptr) {
@@ -291,25 +244,4 @@ extern "C" amrex_mojo_box_3d amrex_mojo_boxarray_box(const amrex_mojo_boxarray_t
 
     amrex_mojo::detail::clear_last_error();
     return amrex_mojo::detail::from_box(boxarray->value[index]);
-}
-
-extern "C" amrex_mojo_status_code_t amrex_mojo_boxarray_box_into(
-    const amrex_mojo_boxarray_t* boxarray,
-    int32_t index,
-    amrex_mojo_box_3d* out_box
-)
-{
-    if (out_box == nullptr) {
-        return amrex_mojo::detail::set_last_error(
-            AMREX_MOJO_STATUS_INVALID_ARGUMENT,
-            "boxarray_box_into requires a non-null output pointer."
-        );
-    }
-    if (boxarray == nullptr || index < 0 || index >= boxarray->value.size()) {
-        (void)amrex_mojo_boxarray_box(boxarray, index);
-        return AMREX_MOJO_STATUS_INVALID_ARGUMENT;
-    }
-
-    *out_box = amrex_mojo_boxarray_box(boxarray, index);
-    return AMREX_MOJO_STATUS_OK;
 }

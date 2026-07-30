@@ -114,7 +114,7 @@ def require_matching_gpu_context(
 
 
 @explicit_destroy("Must call close() on AmrexRuntime")
-struct AmrexRuntime(Movable, ImplicitlyDeletable where False):
+struct AmrexRuntime(ImplicitlyDeletable where False, Movable):
     var state: RuntimeLease
     var handle: OptionalRuntimeHandle
 

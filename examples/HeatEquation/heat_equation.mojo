@@ -28,14 +28,14 @@ from std.math import exp
 
 def plotfile_name(step: Int) -> String:
     if step < 10:
-        return String.write(t"plt0000{step}")
+        return String(t"plt0000{step}")
     if step < 100:
-        return String.write(t"plt000{step}")
+        return String(t"plt000{step}")
     if step < 1000:
-        return String.write(t"plt00{step}")
+        return String(t"plt00{step}")
     if step < 10000:
-        return String.write(t"plt0{step}")
-    return String.write(t"plt{step}")
+        return String(t"plt0{step}")
+    return String(t"plt{step}")
 
 
 def main() raises:

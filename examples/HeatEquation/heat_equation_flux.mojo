@@ -29,14 +29,14 @@ from std.math import exp
 
 def plotfile_name(step: Int) -> String:
     if step < 10:
-        return String.write(t"plt0000{step}")
+        return String(t"plt0000{step}")
     if step < 100:
-        return String.write(t"plt000{step}")
+        return String(t"plt000{step}")
     if step < 1000:
-        return String.write(t"plt00{step}")
+        return String(t"plt00{step}")
     if step < 10000:
-        return String.write(t"plt0{step}")
-    return String.write(t"plt{step}")
+        return String(t"plt0{step}")
+    return String(t"plt{step}")
 
 
 def main() raises:
@@ -127,17 +127,11 @@ def main() raises:
             var phi_old_arr = phi_old.array(mfi)
             var dx = geometry.cell_size()
 
-            def initialize_cell(
-                i: Int, j: Int, k: Int
-            ) {var phi_old_arr, var dx}:
+            def initialize_cell(i: Int, j: Int, k: Int) {var phi_old_arr, var dx}:
                 var x = (Float64(i) + 0.5) * dx.x
                 var y = (Float64(j) + 0.5) * dx.y
                 var z = (Float64(k) + 0.5) * dx.z
-                var rsquared = (
-                    (x - 0.5) * (x - 0.5)
-                    + (y - 0.5) * (y - 0.5)
-                    + (z - 0.5) * (z - 0.5)
-                ) / 0.01
+                var rsquared = ((x - 0.5) * (x - 0.5) + (y - 0.5) * (y - 0.5) + (z - 0.5) * (z - 0.5)) / 0.01
                 phi_old_arr[i, j, k] = 1.0 + exp(-rsquared)
 
             mfi.parallel_for(initialize_cell, bx)
@@ -180,30 +174,18 @@ def main() raises:
 
                 ## compute fluxes on this tile
 
-                def compute_flux_x(
-                    i: Int, j: Int, k: Int
-                ) {var flux_x_arr, var phi_old_arr, var dxinv}:
-                    flux_x_arr[i, j, k] = (
-                        phi_old_arr[i, j, k] - phi_old_arr[i - 1, j, k]
-                    ) * dxinv
+                def compute_flux_x(i: Int, j: Int, k: Int) {var flux_x_arr, var phi_old_arr, var dxinv}:
+                    flux_x_arr[i, j, k] = (phi_old_arr[i, j, k] - phi_old_arr[i - 1, j, k]) * dxinv
 
                 mfi.parallel_for(compute_flux_x, tile.valid_box)
 
-                def compute_flux_y(
-                    i: Int, j: Int, k: Int
-                ) {var flux_y_arr, var phi_old_arr, var dyinv}:
-                    flux_y_arr[i, j, k] = (
-                        phi_old_arr[i, j, k] - phi_old_arr[i, j - 1, k]
-                    ) * dyinv
+                def compute_flux_y(i: Int, j: Int, k: Int) {var flux_y_arr, var phi_old_arr, var dyinv}:
+                    flux_y_arr[i, j, k] = (phi_old_arr[i, j, k] - phi_old_arr[i, j - 1, k]) * dyinv
 
                 mfi.parallel_for(compute_flux_y, tile.valid_box)
 
-                def compute_flux_z(
-                    i: Int, j: Int, k: Int
-                ) {var flux_z_arr, var phi_old_arr, var dzinv}:
-                    flux_z_arr[i, j, k] = (
-                        phi_old_arr[i, j, k] - phi_old_arr[i, j, k - 1]
-                    ) * dzinv
+                def compute_flux_z(i: Int, j: Int, k: Int) {var flux_z_arr, var phi_old_arr, var dzinv}:
+                    flux_z_arr[i, j, k] = (phi_old_arr[i, j, k] - phi_old_arr[i, j, k - 1]) * dzinv
 
                 mfi.parallel_for(compute_flux_z, tile.valid_box)
 
@@ -224,15 +206,9 @@ def main() raises:
                 }:
                     phi_new_arr[i, j, k] = (
                         phi_old_arr[i, j, k]
-                        + dt
-                        * dxinv
-                        * (flux_x_arr[i + 1, j, k] - flux_x_arr[i, j, k])
-                        + dt
-                        * dyinv
-                        * (flux_y_arr[i, j + 1, k] - flux_y_arr[i, j, k])
-                        + dt
-                        * dzinv
-                        * (flux_z_arr[i, j, k + 1] - flux_z_arr[i, j, k])
+                        + dt * dxinv * (flux_x_arr[i + 1, j, k] - flux_x_arr[i, j, k])
+                        + dt * dyinv * (flux_y_arr[i, j + 1, k] - flux_y_arr[i, j, k])
+                        + dt * dzinv * (flux_z_arr[i, j, k + 1] - flux_z_arr[i, j, k])
                     )
 
                 mfi.parallel_for(advance_cell, tile.valid_box)

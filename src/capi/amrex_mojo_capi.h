@@ -6,7 +6,7 @@
 extern "C" {
 #endif
 
-#define AMREX_MOJO_ABI_VERSION 8
+#define AMREX_MOJO_ABI_VERSION 9
 
 typedef struct amrex_mojo_runtime amrex_mojo_runtime_t;
 typedef struct amrex_mojo_boxarray amrex_mojo_boxarray_t;
@@ -150,34 +150,10 @@ amrex_mojo_boxarray_t* amrex_mojo_boxarray_create_from_box(
     amrex_mojo_runtime_t* runtime,
     amrex_mojo_box_3d domain
 );
-amrex_mojo_boxarray_t* amrex_mojo_boxarray_create_from_bounds(
-    amrex_mojo_runtime_t* runtime,
-    int32_t lo_x,
-    int32_t lo_y,
-    int32_t lo_z,
-    int32_t hi_x,
-    int32_t hi_y,
-    int32_t hi_z,
-    int32_t nodal_x,
-    int32_t nodal_y,
-    int32_t nodal_z
-);
 void amrex_mojo_boxarray_destroy(amrex_mojo_boxarray_t* boxarray);
 amrex_mojo_status_code_t amrex_mojo_boxarray_max_size(
     amrex_mojo_boxarray_t* boxarray,
     amrex_mojo_intvect_3d max_size
-);
-amrex_mojo_status_code_t amrex_mojo_boxarray_max_size_xyz(
-    amrex_mojo_boxarray_t* boxarray,
-    int32_t x,
-    int32_t y,
-    int32_t z
-);
-amrex_mojo_status_code_t amrex_mojo_boxarray_convert_xyz(
-    amrex_mojo_boxarray_t* boxarray,
-    int32_t x,
-    int32_t y,
-    int32_t z
 );
 amrex_mojo_status_code_t amrex_mojo_boxarray_surrounding_nodes(
     amrex_mojo_boxarray_t* boxarray,
@@ -194,19 +170,8 @@ amrex_mojo_boxarray_t* amrex_mojo_boxarray_convert_copy(
     const amrex_mojo_boxarray_t* boxarray,
     amrex_mojo_intvect_3d typ
 );
-amrex_mojo_boxarray_t* amrex_mojo_boxarray_convert_copy_xyz(
-    const amrex_mojo_boxarray_t* boxarray,
-    int32_t x,
-    int32_t y,
-    int32_t z
-);
 int32_t amrex_mojo_boxarray_size(const amrex_mojo_boxarray_t* boxarray);
 amrex_mojo_box_3d amrex_mojo_boxarray_box(const amrex_mojo_boxarray_t* boxarray, int32_t index);
-amrex_mojo_status_code_t amrex_mojo_boxarray_box_into(
-    const amrex_mojo_boxarray_t* boxarray,
-    int32_t index,
-    amrex_mojo_box_3d* out_box
-);
 
 amrex_mojo_distmap_t* amrex_mojo_distmap_create_from_boxarray(
     amrex_mojo_runtime_t* runtime,
@@ -224,61 +189,11 @@ amrex_mojo_geometry_t* amrex_mojo_geometry_create_with_real_box_and_periodicity(
     amrex_mojo_realbox_3d real_box,
     amrex_mojo_intvect_3d is_periodic
 );
-amrex_mojo_geometry_t*
-amrex_mojo_geometry_create_from_bounds_with_real_box_and_periodicity(
-    amrex_mojo_runtime_t* runtime,
-    int32_t lo_x,
-    int32_t lo_y,
-    int32_t lo_z,
-    int32_t hi_x,
-    int32_t hi_y,
-    int32_t hi_z,
-    int32_t nodal_x,
-    int32_t nodal_y,
-    int32_t nodal_z,
-    double real_lo_x,
-    double real_lo_y,
-    double real_lo_z,
-    double real_hi_x,
-    double real_hi_y,
-    double real_hi_z,
-    int32_t periodic_x,
-    int32_t periodic_y,
-    int32_t periodic_z
-);
-amrex_mojo_geometry_t* amrex_mojo_geometry_create_from_bounds(
-    amrex_mojo_runtime_t* runtime,
-    int32_t lo_x,
-    int32_t lo_y,
-    int32_t lo_z,
-    int32_t hi_x,
-    int32_t hi_y,
-    int32_t hi_z,
-    int32_t nodal_x,
-    int32_t nodal_y,
-    int32_t nodal_z
-);
 void amrex_mojo_geometry_destroy(amrex_mojo_geometry_t* geometry);
 amrex_mojo_box_3d amrex_mojo_geometry_domain(const amrex_mojo_geometry_t* geometry);
 amrex_mojo_realbox_3d amrex_mojo_geometry_prob_domain(const amrex_mojo_geometry_t* geometry);
 amrex_mojo_realvect_3d amrex_mojo_geometry_cell_size(const amrex_mojo_geometry_t* geometry);
 amrex_mojo_intvect_3d amrex_mojo_geometry_periodicity(const amrex_mojo_geometry_t* geometry);
-amrex_mojo_status_code_t amrex_mojo_geometry_domain_into(
-    const amrex_mojo_geometry_t* geometry,
-    amrex_mojo_box_3d* out_domain
-);
-amrex_mojo_status_code_t amrex_mojo_geometry_prob_domain_into(
-    const amrex_mojo_geometry_t* geometry,
-    amrex_mojo_realbox_3d* out_prob_domain
-);
-amrex_mojo_status_code_t amrex_mojo_geometry_cell_size_into(
-    const amrex_mojo_geometry_t* geometry,
-    amrex_mojo_realvect_3d* out_cell_size
-);
-amrex_mojo_status_code_t amrex_mojo_geometry_periodicity_into(
-    const amrex_mojo_geometry_t* geometry,
-    amrex_mojo_intvect_3d* out_periodicity
-);
 
 amrex_mojo_multifab_t* amrex_mojo_multifab_create(
     amrex_mojo_runtime_t* runtime,
@@ -304,36 +219,6 @@ amrex_mojo_multifab_t* amrex_mojo_multifab_create_with_memory_and_datatype(
     amrex_mojo_multifab_memory_kind_t memory_kind,
     amrex_mojo_datatype_t datatype
 );
-amrex_mojo_multifab_t* amrex_mojo_multifab_create_xyz(
-    amrex_mojo_runtime_t* runtime,
-    const amrex_mojo_boxarray_t* boxarray,
-    const amrex_mojo_distmap_t* distmap,
-    int32_t ncomp,
-    int32_t ngrow_x,
-    int32_t ngrow_y,
-    int32_t ngrow_z
-);
-amrex_mojo_multifab_t* amrex_mojo_multifab_create_with_memory_xyz(
-    amrex_mojo_runtime_t* runtime,
-    const amrex_mojo_boxarray_t* boxarray,
-    const amrex_mojo_distmap_t* distmap,
-    int32_t ncomp,
-    int32_t ngrow_x,
-    int32_t ngrow_y,
-    int32_t ngrow_z,
-    amrex_mojo_multifab_memory_kind_t memory_kind
-);
-amrex_mojo_multifab_t* amrex_mojo_multifab_create_with_memory_and_datatype_xyz(
-    amrex_mojo_runtime_t* runtime,
-    const amrex_mojo_boxarray_t* boxarray,
-    const amrex_mojo_distmap_t* distmap,
-    int32_t ncomp,
-    int32_t ngrow_x,
-    int32_t ngrow_y,
-    int32_t ngrow_z,
-    amrex_mojo_multifab_memory_kind_t memory_kind,
-    amrex_mojo_datatype_t datatype
-);
 void amrex_mojo_multifab_destroy(amrex_mojo_multifab_t* multifab);
 int32_t amrex_mojo_multifab_ncomp(const amrex_mojo_multifab_t* multifab);
 amrex_mojo_intvect_3d amrex_mojo_multifab_ngrow(const amrex_mojo_multifab_t* multifab);
@@ -356,16 +241,6 @@ amrex_mojo_box_3d amrex_mojo_multifab_tile_box(
 amrex_mojo_box_3d amrex_mojo_multifab_valid_box(
     const amrex_mojo_multifab_t* multifab,
     int32_t tile_index
-);
-amrex_mojo_status_code_t amrex_mojo_multifab_tile_box_into(
-    const amrex_mojo_multifab_t* multifab,
-    int32_t tile_index,
-    amrex_mojo_box_3d* out_box
-);
-amrex_mojo_status_code_t amrex_mojo_multifab_valid_box_into(
-    const amrex_mojo_multifab_t* multifab,
-    int32_t tile_index,
-    amrex_mojo_box_3d* out_box
 );
 amrex_mojo_status_code_t amrex_mojo_multifab_array4_metadata_for_mfiter(
     const amrex_mojo_multifab_t* multifab,
@@ -411,24 +286,6 @@ amrex_mojo_status_code_t amrex_mojo_multifab_mult(
     int32_t ncomp,
     amrex_mojo_intvect_3d ngrow
 );
-amrex_mojo_status_code_t amrex_mojo_multifab_plus_xyz(
-    amrex_mojo_multifab_t* multifab,
-    double value,
-    int32_t start_comp,
-    int32_t ncomp,
-    int32_t ngrow_x,
-    int32_t ngrow_y,
-    int32_t ngrow_z
-);
-amrex_mojo_status_code_t amrex_mojo_multifab_mult_xyz(
-    amrex_mojo_multifab_t* multifab,
-    double value,
-    int32_t start_comp,
-    int32_t ncomp,
-    int32_t ngrow_x,
-    int32_t ngrow_y,
-    int32_t ngrow_z
-);
 amrex_mojo_status_code_t amrex_mojo_multifab_copy(
     amrex_mojo_multifab_t* dst_multifab,
     const amrex_mojo_multifab_t* src_multifab,
@@ -436,16 +293,6 @@ amrex_mojo_status_code_t amrex_mojo_multifab_copy(
     int32_t dst_comp,
     int32_t ncomp,
     amrex_mojo_intvect_3d ngrow
-);
-amrex_mojo_status_code_t amrex_mojo_multifab_copy_xyz(
-    amrex_mojo_multifab_t* dst_multifab,
-    const amrex_mojo_multifab_t* src_multifab,
-    int32_t src_comp,
-    int32_t dst_comp,
-    int32_t ncomp,
-    int32_t ngrow_x,
-    int32_t ngrow_y,
-    int32_t ngrow_z
 );
 amrex_mojo_status_code_t amrex_mojo_multifab_parallel_copy(
     amrex_mojo_multifab_t* dst_multifab,
@@ -456,20 +303,6 @@ amrex_mojo_status_code_t amrex_mojo_multifab_parallel_copy(
     int32_t ncomp,
     amrex_mojo_intvect_3d src_ngrow,
     amrex_mojo_intvect_3d dst_ngrow
-);
-amrex_mojo_status_code_t amrex_mojo_multifab_parallel_copy_xyz(
-    amrex_mojo_multifab_t* dst_multifab,
-    const amrex_mojo_multifab_t* src_multifab,
-    const amrex_mojo_geometry_t* geometry,
-    int32_t src_comp,
-    int32_t dst_comp,
-    int32_t ncomp,
-    int32_t src_ngrow_x,
-    int32_t src_ngrow_y,
-    int32_t src_ngrow_z,
-    int32_t dst_ngrow_x,
-    int32_t dst_ngrow_y,
-    int32_t dst_ngrow_z
 );
 amrex_mojo_status_code_t amrex_mojo_multifab_fill_boundary(
     amrex_mojo_multifab_t* multifab,
@@ -499,25 +332,6 @@ amrex_mojo_box_3d amrex_mojo_mfiter_fab_box(const amrex_mojo_mfiter_t* mfiter);
 amrex_mojo_box_3d amrex_mojo_mfiter_growntile_box(
     const amrex_mojo_mfiter_t* mfiter,
     amrex_mojo_intvect_3d ngrow
-);
-amrex_mojo_status_code_t amrex_mojo_mfiter_tile_box_into(
-    const amrex_mojo_mfiter_t* mfiter,
-    amrex_mojo_box_3d* out_box
-);
-amrex_mojo_status_code_t amrex_mojo_mfiter_valid_box_into(
-    const amrex_mojo_mfiter_t* mfiter,
-    amrex_mojo_box_3d* out_box
-);
-amrex_mojo_status_code_t amrex_mojo_mfiter_fab_box_into(
-    const amrex_mojo_mfiter_t* mfiter,
-    amrex_mojo_box_3d* out_box
-);
-amrex_mojo_status_code_t amrex_mojo_mfiter_growntile_box_xyz_into(
-    const amrex_mojo_mfiter_t* mfiter,
-    int32_t ngrow_x,
-    int32_t ngrow_y,
-    int32_t ngrow_z,
-    amrex_mojo_box_3d* out_box
 );
 
 amrex_mojo_parmparse_t* amrex_mojo_parmparse_create(

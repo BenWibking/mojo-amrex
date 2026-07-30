@@ -41,8 +41,9 @@ comptime GPU_BACKEND_HIP = 2
 def init_device_passable_value[
     T: TrivialRegisterPassable,
     mut_origin: MutOrigin,
-](value: T, target: UnsafePointer[NoneType, mut_origin]):
-    target.bitcast[T]().unsafe_write(value)
+](value: T, target: Pointer[NoneType, mut_origin]):
+    var raw_target: UnsafePointer[NoneType, mut_origin] = target
+    raw_target.bitcast[T]().unsafe_write(value)
 
 
 @fieldwise_init
@@ -56,7 +57,7 @@ struct IntVect3D(DevicePassable, TrivialRegisterPassable, Writable):
     def _to_device_type(
         self,
         mut encoder: Some[DeviceTypeEncoder],
-        target: UnsafePointer[mut=True, NoneType, _],
+        target: Pointer[mut=True, NoneType, _],
     ):
         init_device_passable_value(self, target)
 
@@ -76,7 +77,7 @@ struct Box3D(DevicePassable, TrivialRegisterPassable, Writable):
     def _to_device_type(
         self,
         mut encoder: Some[DeviceTypeEncoder],
-        target: UnsafePointer[mut=True, NoneType, _],
+        target: Pointer[mut=True, NoneType, _],
     ):
         init_device_passable_value(self, target)
 
@@ -106,7 +107,7 @@ struct RealVect3D(DevicePassable, TrivialRegisterPassable, Writable):
     def _to_device_type(
         self,
         mut encoder: Some[DeviceTypeEncoder],
-        target: UnsafePointer[mut=True, NoneType, _],
+        target: Pointer[mut=True, NoneType, _],
     ):
         init_device_passable_value(self, target)
 
@@ -158,7 +159,7 @@ struct Array4LayoutMetadata(Copyable, DevicePassable, TrivialRegisterPassable, W
     def _to_device_type(
         self,
         mut encoder: Some[DeviceTypeEncoder],
-        target: UnsafePointer[mut=True, NoneType, _],
+        target: Pointer[mut=True, NoneType, _],
     ):
         init_device_passable_value(self, target)
 
@@ -215,7 +216,7 @@ struct Array4View[T: AmrexFloatingDtype, origin: Origin[mut=True]](DevicePassabl
     def _to_device_type(
         self,
         mut encoder: Some[DeviceTypeEncoder],
-        target: UnsafePointer[mut=True, NoneType, _],
+        target: Pointer[mut=True, NoneType, _],
     ):
         init_device_passable_value(self.device_view(), target)
 
@@ -271,7 +272,7 @@ struct TileView[T: AmrexFloatingDtype, origin: Origin[mut=True]](DevicePassable,
     def _to_device_type(
         self,
         mut encoder: Some[DeviceTypeEncoder],
-        target: UnsafePointer[mut=True, NoneType, _],
+        target: Pointer[mut=True, NoneType, _],
     ):
         init_device_passable_value(self.device_view(), target)
 
@@ -504,20 +505,9 @@ def boxarray_create_from_box(
     ref lib: OwnedDLHandle, runtime: RuntimeHandle, domain: Box3D
 ) raises -> OptionalBoxArrayHandle:
     return lib.call[
-        "amrex_mojo_boxarray_create_from_bounds",
+        "amrex_mojo_boxarray_create_from_box",
         OptionalBoxArrayHandle,
-    ](
-        runtime,
-        domain.small_end.x,
-        domain.small_end.y,
-        domain.small_end.z,
-        domain.big_end.x,
-        domain.big_end.y,
-        domain.big_end.z,
-        domain.nodal.x,
-        domain.nodal.y,
-        domain.nodal.z,
-    )
+    ](runtime, domain)
 
 
 def boxarray_destroy(ref lib: OwnedDLHandle, boxarray: BoxArrayHandle) raises:
@@ -525,7 +515,7 @@ def boxarray_destroy(ref lib: OwnedDLHandle, boxarray: BoxArrayHandle) raises:
 
 
 def boxarray_max_size(ref lib: OwnedDLHandle, boxarray: BoxArrayHandle, max_size: IntVect3D) raises -> Int:
-    return Int(lib.call["amrex_mojo_boxarray_max_size_xyz", c_int](boxarray, max_size.x, max_size.y, max_size.z))
+    return Int(lib.call["amrex_mojo_boxarray_max_size", c_int](boxarray, max_size))
 
 
 def boxarray_surrounding_nodes(ref lib: OwnedDLHandle, boxarray: BoxArrayHandle, dir: Int) raises -> Int:
@@ -537,7 +527,7 @@ def boxarray_surrounding_nodes_all(ref lib: OwnedDLHandle, boxarray: BoxArrayHan
 
 
 def boxarray_convert(ref lib: OwnedDLHandle, boxarray: BoxArrayHandle, typ: IntVect3D) raises -> Int:
-    return Int(lib.call["amrex_mojo_boxarray_convert_xyz", c_int](boxarray, typ.x, typ.y, typ.z))
+    return Int(lib.call["amrex_mojo_boxarray_convert", c_int](boxarray, typ))
 
 
 def boxarray_convert_copy(
@@ -546,9 +536,9 @@ def boxarray_convert_copy(
     typ: IntVect3D,
 ) raises -> OptionalBoxArrayHandle:
     return lib.call[
-        "amrex_mojo_boxarray_convert_copy_xyz",
+        "amrex_mojo_boxarray_convert_copy",
         OptionalBoxArrayHandle,
-    ](boxarray, typ.x, typ.y, typ.z)
+    ](boxarray, typ)
 
 
 def boxarray_size(ref lib: OwnedDLHandle, boxarray: BoxArrayHandle) raises -> Int:
@@ -572,20 +562,9 @@ def distmap_destroy(ref lib: OwnedDLHandle, distmap: DistributionMappingHandle) 
 
 def geometry_create(ref lib: OwnedDLHandle, runtime: RuntimeHandle, domain: Box3D) raises -> OptionalGeometryHandle:
     return lib.call[
-        "amrex_mojo_geometry_create_from_bounds",
+        "amrex_mojo_geometry_create",
         OptionalGeometryHandle,
-    ](
-        runtime,
-        domain.small_end.x,
-        domain.small_end.y,
-        domain.small_end.z,
-        domain.big_end.x,
-        domain.big_end.y,
-        domain.big_end.z,
-        domain.nodal.x,
-        domain.nodal.y,
-        domain.nodal.z,
-    )
+    ](runtime, domain)
 
 
 def geometry_create(
@@ -596,29 +575,9 @@ def geometry_create(
     is_periodic: IntVect3D,
 ) raises -> OptionalGeometryHandle:
     return lib.call[
-        "amrex_mojo_geometry_create_from_bounds_with_real_box_and_periodicity",
+        "amrex_mojo_geometry_create_with_real_box_and_periodicity",
         OptionalGeometryHandle,
-    ](
-        runtime,
-        domain.small_end.x,
-        domain.small_end.y,
-        domain.small_end.z,
-        domain.big_end.x,
-        domain.big_end.y,
-        domain.big_end.z,
-        domain.nodal.x,
-        domain.nodal.y,
-        domain.nodal.z,
-        c_double(real_box.lo_x),
-        c_double(real_box.lo_y),
-        c_double(real_box.lo_z),
-        c_double(real_box.hi_x),
-        c_double(real_box.hi_y),
-        c_double(real_box.hi_z),
-        is_periodic.x,
-        is_periodic.y,
-        is_periodic.z,
-    )
+    ](runtime, domain, real_box, is_periodic)
 
 
 def geometry_destroy(ref lib: OwnedDLHandle, geometry: GeometryHandle) raises:
@@ -635,16 +594,14 @@ def multifab_create(
     datatype: Int = MULTIFAB_DATATYPE_FLOAT64,
 ) raises -> OptionalMultiFabHandle:
     return lib.call[
-        "amrex_mojo_multifab_create_with_memory_and_datatype_xyz",
+        "amrex_mojo_multifab_create_with_memory_and_datatype",
         OptionalMultiFabHandle,
     ](
         runtime,
         boxarray,
         distmap,
         c_int(ncomp),
-        ngrow.x,
-        ngrow.y,
-        ngrow.z,
+        ngrow,
         c_int(0),
         c_int(datatype),
     )
@@ -692,15 +649,11 @@ def multifab_tile_count(ref lib: OwnedDLHandle, multifab: MultiFabHandle) raises
 
 
 def multifab_tile_box(ref lib: OwnedDLHandle, multifab: MultiFabHandle, tile_index: Int) raises -> Box3D:
-    var out = [box3d(zero_intvect3d(), zero_intvect3d())]
-    _ = lib.call["amrex_mojo_multifab_tile_box_into", c_int](multifab, c_int(tile_index), out.unsafe_ptr())
-    return out[0]
+    return lib.call["amrex_mojo_multifab_tile_box", Box3D](multifab, c_int(tile_index))
 
 
 def multifab_valid_box(ref lib: OwnedDLHandle, multifab: MultiFabHandle, tile_index: Int) raises -> Box3D:
-    var out = [box3d(zero_intvect3d(), zero_intvect3d())]
-    _ = lib.call["amrex_mojo_multifab_valid_box_into", c_int](multifab, c_int(tile_index), out.unsafe_ptr())
-    return out[0]
+    return lib.call["amrex_mojo_multifab_valid_box", Box3D](multifab, c_int(tile_index))
 
 
 def mfiter_create(ref lib: OwnedDLHandle, multifab: MultiFabHandle) raises -> OptionalMFIterHandle:
@@ -733,27 +686,19 @@ def mfiter_local_tile_index(ref lib: OwnedDLHandle, mfiter: MFIterHandle) raises
 
 
 def mfiter_tile_box(ref lib: OwnedDLHandle, mfiter: MFIterHandle) raises -> Box3D:
-    var out = [box3d(zero_intvect3d(), zero_intvect3d())]
-    _ = lib.call["amrex_mojo_mfiter_tile_box_into", c_int](mfiter, out.unsafe_ptr())
-    return out[0]
+    return lib.call["amrex_mojo_mfiter_tile_box", Box3D](mfiter)
 
 
 def mfiter_valid_box(ref lib: OwnedDLHandle, mfiter: MFIterHandle) raises -> Box3D:
-    var out = [box3d(zero_intvect3d(), zero_intvect3d())]
-    _ = lib.call["amrex_mojo_mfiter_valid_box_into", c_int](mfiter, out.unsafe_ptr())
-    return out[0]
+    return lib.call["amrex_mojo_mfiter_valid_box", Box3D](mfiter)
 
 
 def mfiter_fab_box(ref lib: OwnedDLHandle, mfiter: MFIterHandle) raises -> Box3D:
-    var out = [box3d(zero_intvect3d(), zero_intvect3d())]
-    _ = lib.call["amrex_mojo_mfiter_fab_box_into", c_int](mfiter, out.unsafe_ptr())
-    return out[0]
+    return lib.call["amrex_mojo_mfiter_fab_box", Box3D](mfiter)
 
 
 def mfiter_growntile_box(ref lib: OwnedDLHandle, mfiter: MFIterHandle, ngrow: IntVect3D) raises -> Box3D:
-    var out = [box3d(zero_intvect3d(), zero_intvect3d())]
-    _ = lib.call["amrex_mojo_mfiter_growntile_box_xyz_into", c_int](mfiter, ngrow.x, ngrow.y, ngrow.z, out.unsafe_ptr())
-    return out[0]
+    return lib.call["amrex_mojo_mfiter_growntile_box", Box3D](mfiter, ngrow)
 
 
 def _mfiter_scalar_data_ptr[
@@ -782,10 +727,10 @@ def _array4_view_from_mfiter_impl[
     use_device_ptr: Bool,
     owner_origin: Origin[mut=True],
 ](ref lib: OwnedDLHandle, multifab: MultiFabHandle, mfiter: MFIterHandle,) raises -> Array4View[T, owner_origin]:
-    var data_lo = InlineArray[c_int, 3](fill=0)
-    var data_hi = InlineArray[c_int, 3](fill=0)
-    var stride = InlineArray[Int64, 4](fill=0)
-    var ncomp_raw = InlineArray[c_int, 1](fill=0)
+    var data_lo = Array[c_int, 3](fill=0)
+    var data_hi = Array[c_int, 3](fill=0)
+    var stride = Array[Int64, 4](fill=0)
+    var ncomp_raw = Array[c_int, 1](fill=0)
 
     _ = lib.call["amrex_mojo_multifab_array4_metadata_for_mfiter", c_int](
         multifab,
@@ -853,33 +798,23 @@ def multifab_sum(ref lib: OwnedDLHandle, multifab: MultiFabHandle, comp: Int) ra
 
 
 def boxarray_box(ref lib: OwnedDLHandle, boxarray: BoxArrayHandle, index: Int) raises -> Box3D:
-    var out = [box3d(zero_intvect3d(), zero_intvect3d())]
-    _ = lib.call["amrex_mojo_boxarray_box_into", c_int](boxarray, c_int(index), out.unsafe_ptr())
-    return out[0]
+    return lib.call["amrex_mojo_boxarray_box", Box3D](boxarray, c_int(index))
 
 
 def geometry_domain(ref lib: OwnedDLHandle, geometry: GeometryHandle) raises -> Box3D:
-    var out = [box3d(zero_intvect3d(), zero_intvect3d())]
-    _ = lib.call["amrex_mojo_geometry_domain_into", c_int](geometry, out.unsafe_ptr())
-    return out[0]
+    return lib.call["amrex_mojo_geometry_domain", Box3D](geometry)
 
 
 def geometry_prob_domain(ref lib: OwnedDLHandle, geometry: GeometryHandle) raises -> RealBox3D:
-    var out = [realbox3d(0.0, 0.0, 0.0, 0.0, 0.0, 0.0)]
-    _ = lib.call["amrex_mojo_geometry_prob_domain_into", c_int](geometry, out.unsafe_ptr())
-    return out[0].copy()
+    return lib.call["amrex_mojo_geometry_prob_domain", RealBox3D](geometry)
 
 
 def geometry_cell_size(ref lib: OwnedDLHandle, geometry: GeometryHandle) raises -> RealVect3D:
-    var out = [RealVect3D(x=0.0, y=0.0, z=0.0)]
-    _ = lib.call["amrex_mojo_geometry_cell_size_into", c_int](geometry, out.unsafe_ptr())
-    return out[0]
+    return lib.call["amrex_mojo_geometry_cell_size", RealVect3D](geometry)
 
 
 def geometry_periodicity(ref lib: OwnedDLHandle, geometry: GeometryHandle) raises -> IntVect3D:
-    var out = [zero_intvect3d()]
-    _ = lib.call["amrex_mojo_geometry_periodicity_into", c_int](geometry, out.unsafe_ptr())
-    return out[0]
+    return lib.call["amrex_mojo_geometry_periodicity", IntVect3D](geometry)
 
 
 def multifab_min(ref lib: OwnedDLHandle, multifab: MultiFabHandle, comp: Int) raises -> Float64:
@@ -911,14 +846,12 @@ def multifab_plus(
     ngrow: IntVect3D,
 ) raises -> Int:
     return Int(
-        lib.call["amrex_mojo_multifab_plus_xyz", c_int](
+        lib.call["amrex_mojo_multifab_plus", c_int](
             multifab,
             c_double(value),
             c_int(start_comp),
             c_int(ncomp),
-            ngrow.x,
-            ngrow.y,
-            ngrow.z,
+            ngrow,
         )
     )
 
@@ -932,14 +865,12 @@ def multifab_mult(
     ngrow: IntVect3D,
 ) raises -> Int:
     return Int(
-        lib.call["amrex_mojo_multifab_mult_xyz", c_int](
+        lib.call["amrex_mojo_multifab_mult", c_int](
             multifab,
             c_double(value),
             c_int(start_comp),
             c_int(ncomp),
-            ngrow.x,
-            ngrow.y,
-            ngrow.z,
+            ngrow,
         )
     )
 
@@ -954,15 +885,13 @@ def multifab_copy(
     ngrow: IntVect3D,
 ) raises -> Int:
     return Int(
-        lib.call["amrex_mojo_multifab_copy_xyz", c_int](
+        lib.call["amrex_mojo_multifab_copy", c_int](
             dst_multifab,
             src_multifab,
             c_int(src_comp),
             c_int(dst_comp),
             c_int(ncomp),
-            ngrow.x,
-            ngrow.y,
-            ngrow.z,
+            ngrow,
         )
     )
 
@@ -979,19 +908,15 @@ def multifab_parallel_copy(
     dst_ngrow: IntVect3D,
 ) raises -> Int:
     return Int(
-        lib.call["amrex_mojo_multifab_parallel_copy_xyz", c_int](
+        lib.call["amrex_mojo_multifab_parallel_copy", c_int](
             dst_multifab,
             src_multifab,
             geometry,
             c_int(src_comp),
             c_int(dst_comp),
             c_int(ncomp),
-            src_ngrow.x,
-            src_ngrow.y,
-            src_ngrow.z,
-            dst_ngrow.x,
-            dst_ngrow.y,
-            dst_ngrow.z,
+            src_ngrow,
+            dst_ngrow,
         )
     )
 
@@ -1069,8 +994,8 @@ def parmparse_query_int(
     ref lib: OwnedDLHandle, parmparse: ParmParseHandle, name: String
 ) raises -> ParmParseIntQueryResult:
     var name_owned = name
-    var out_value = InlineArray[c_int, 1](fill=0)
-    var out_found = InlineArray[c_int, 1](fill=0)
+    var out_value = Array[c_int, 1](fill=0)
+    var out_found = Array[c_int, 1](fill=0)
     var status = Int(
         lib.call["amrex_mojo_parmparse_query_int", c_int](
             parmparse,
@@ -1090,8 +1015,8 @@ def parmparse_query_real(
     ref lib: OwnedDLHandle, parmparse: ParmParseHandle, name: String
 ) raises -> ParmParseRealQueryResult:
     var name_owned = name
-    var out_value = InlineArray[c_double, 1](fill=0.0)
-    var out_found = InlineArray[c_int, 1](fill=0)
+    var out_value = Array[c_double, 1](fill=0.0)
+    var out_found = Array[c_int, 1](fill=0)
     var status = Int(
         lib.call["amrex_mojo_parmparse_query_real", c_int](
             parmparse,
