@@ -51,7 +51,7 @@ struct Geometry(AmrexHandle, Movable):
         if not self.handle:
             raise Error(last_error_message(self.runtime[].lib))
 
-    def __del__(deinit self):
+    def __deinit__(deinit self):
         destroy_amrex_optional_handle[Self.destroy_symbol](self.runtime[].lib, self.handle)
 
     def _optional_handle(ref self) -> Optional[AmrexRawHandle]:

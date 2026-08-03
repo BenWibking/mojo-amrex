@@ -107,7 +107,7 @@ struct MFIter(AmrexHandle, Iterator, Movable):
                 self._activate_current_stream()
                 self._refresh_stream_wrapper()
 
-    def __del__(deinit self):
+    def __deinit__(deinit self):
         if self._has_gpu_backend() and not self.finalized:
             for stream_index in range(self.num_streams):
                 _ = self.runtime[].lib.call[

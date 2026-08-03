@@ -43,7 +43,7 @@ def init_device_passable_value[
     mut_origin: MutOrigin,
 ](value: T, target: Pointer[NoneType, mut_origin]):
     var raw_target: UnsafePointer[NoneType, mut_origin] = target
-    raw_target.bitcast[T]().unsafe_write(value)
+    raw_target.unsafe_bitcast[T]().unsafe_write(value)
 
 
 @fieldwise_init
@@ -190,12 +190,12 @@ struct Array4LayoutMetadata(Copyable, DevicePassable, TrivialRegisterPassable, W
     def get[
         dtype: DType, origin: Origin[mut=True]
     ](self, data: UnsafePointer[Scalar[dtype], origin], i: Int, j: Int, k: Int, comp: Int,) -> Scalar[dtype]:
-        return data[self.offset(i, j, k, comp)]
+        return data[unsafe_offset=self.offset(i, j, k, comp)]
 
     def set[
         dtype: DType, origin: Origin[mut=True]
     ](self, data: UnsafePointer[Scalar[dtype], origin], i: Int, j: Int, k: Int, comp: Int, value: Scalar[dtype],):
-        data[self.offset(i, j, k, comp)] = value
+        data[unsafe_offset=self.offset(i, j, k, comp)] = value
 
 
 @fieldwise_init

@@ -114,7 +114,7 @@ struct HeatEquationRunner(Movable, Writable):
             runtime^.close()
             raise e^
 
-    def __del__(deinit self):
+    def __deinit__(deinit self):
         self.runtime^.close()
 
     def slice_array(mut self) raises -> PythonObject:
