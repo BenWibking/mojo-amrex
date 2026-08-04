@@ -6,7 +6,7 @@
 from std.ffi import OwnedDLHandle
 
 
-comptime AmrexRawHandle = UnsafePointer[NoneType, MutUntrackedOrigin]
+comptime AmrexRawHandle = Pointer[NoneType, MutUntrackedOrigin]
 
 
 def require_live_handle(

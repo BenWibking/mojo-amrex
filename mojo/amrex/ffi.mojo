@@ -11,14 +11,14 @@ from amrex.floating_dtype import (
 )
 
 
-comptime RuntimeHandle = UnsafePointer[NoneType, MutUntrackedOrigin]
-comptime BoxArrayHandle = UnsafePointer[NoneType, MutUntrackedOrigin]
-comptime DistributionMappingHandle = UnsafePointer[NoneType, MutUntrackedOrigin]
-comptime GeometryHandle = UnsafePointer[NoneType, MutUntrackedOrigin]
-comptime MultiFabHandle = UnsafePointer[NoneType, MutUntrackedOrigin]
-comptime MFIterHandle = UnsafePointer[NoneType, MutUntrackedOrigin]
-comptime ParmParseHandle = UnsafePointer[NoneType, MutUntrackedOrigin]
-comptime GpuStreamHandle = UnsafePointer[NoneType, MutUntrackedOrigin]
+comptime RuntimeHandle = Pointer[NoneType, MutUntrackedOrigin]
+comptime BoxArrayHandle = Pointer[NoneType, MutUntrackedOrigin]
+comptime DistributionMappingHandle = Pointer[NoneType, MutUntrackedOrigin]
+comptime GeometryHandle = Pointer[NoneType, MutUntrackedOrigin]
+comptime MultiFabHandle = Pointer[NoneType, MutUntrackedOrigin]
+comptime MFIterHandle = Pointer[NoneType, MutUntrackedOrigin]
+comptime ParmParseHandle = Pointer[NoneType, MutUntrackedOrigin]
+comptime GpuStreamHandle = Pointer[NoneType, MutUntrackedOrigin]
 
 comptime OptionalRuntimeHandle = Optional[RuntimeHandle]
 comptime OptionalBoxArrayHandle = Optional[BoxArrayHandle]
@@ -28,9 +28,9 @@ comptime OptionalMultiFabHandle = Optional[MultiFabHandle]
 comptime OptionalMFIterHandle = Optional[MFIterHandle]
 comptime OptionalParmParseHandle = Optional[ParmParseHandle]
 comptime OptionalGpuStreamHandle = Optional[GpuStreamHandle]
-comptime CStringHandle = UnsafePointer[c_char, ImmUntrackedOrigin]
+comptime CStringHandle = Pointer[c_char, ImmUntrackedOrigin]
 comptime OptionalCStringHandle = Optional[CStringHandle]
-comptime CStringArrayHandle = UnsafePointer[CStringHandle, MutUntrackedOrigin]
+comptime CStringArrayHandle = Pointer[CStringHandle, MutUntrackedOrigin]
 comptime OptionalCStringArrayHandle = Optional[CStringArrayHandle]
 
 comptime GPU_BACKEND_NONE = 0
@@ -42,7 +42,7 @@ def init_device_passable_value[
     T: TrivialRegisterPassable,
     mut_origin: MutOrigin,
 ](value: T, target: Pointer[NoneType, mut_origin]):
-    var raw_target: UnsafePointer[NoneType, mut_origin] = target
+    var raw_target: Pointer[NoneType, mut_origin] = target
     raw_target.unsafe_bitcast[T]().unsafe_write(value)
 
 
@@ -189,12 +189,12 @@ struct Array4LayoutMetadata(Copyable, DevicePassable, TrivialRegisterPassable, W
 
     def get[
         dtype: DType, origin: Origin[mut=True]
-    ](self, data: UnsafePointer[Scalar[dtype], origin], i: Int, j: Int, k: Int, comp: Int,) -> Scalar[dtype]:
+    ](self, data: Pointer[Scalar[dtype], origin], i: Int, j: Int, k: Int, comp: Int,) -> Scalar[dtype]:
         return data[unsafe_offset=self.offset(i, j, k, comp)]
 
     def set[
         dtype: DType, origin: Origin[mut=True]
-    ](self, data: UnsafePointer[Scalar[dtype], origin], i: Int, j: Int, k: Int, comp: Int, value: Scalar[dtype],):
+    ](self, data: Pointer[Scalar[dtype], origin], i: Int, j: Int, k: Int, comp: Int, value: Scalar[dtype],):
         data[unsafe_offset=self.offset(i, j, k, comp)] = value
 
 
@@ -204,7 +204,7 @@ struct Array4View[T: AmrexFloatingDtype, origin: Origin[mut=True]](DevicePassabl
     comptime device_type = Array4View[Self.T, MutUnsafeAnyOrigin]
     comptime value_type = Scalar[Self.dtype]
 
-    var data: UnsafePointer[Self.value_type, Self.origin]
+    var data: Pointer[Self.value_type, Self.origin]
     var layout: Array4LayoutMetadata
 
     def device_view(self) -> Self.device_type:
@@ -348,7 +348,7 @@ def for_each_box_cell[
 def last_error_message(ref lib: OwnedDLHandle) raises -> String:
     var message = lib.call[
         "amrex_mojo_last_error_message",
-        Optional[UnsafePointer[c_char, ImmUntrackedOrigin]],
+        Optional[Pointer[c_char, ImmUntrackedOrigin]],
     ]()
     if not message:
         return String("AMReX call failed.")
@@ -709,17 +709,17 @@ def _mfiter_scalar_data_ptr[
     ref lib: OwnedDLHandle,
     multifab: MultiFabHandle,
     mfiter: MFIterHandle,
-) raises -> UnsafePointer[
+) raises -> Pointer[
     Scalar[T.dtype], owner_origin
 ]:
-    var data: Optional[UnsafePointer[T.c_type, owner_origin]]
+    var data: Optional[Pointer[T.c_type, owner_origin]]
     comptime if use_device_ptr:
         data = T.mfiter_device_data_ptr[owner_origin](lib, multifab, mfiter)
     else:
         data = T.mfiter_host_data_ptr[owner_origin](lib, multifab, mfiter)
     if not data:
         raise Error(last_error_message(lib))
-    return rebind[UnsafePointer[Scalar[T.dtype], owner_origin]](data.value())
+    return rebind[Pointer[Scalar[T.dtype], owner_origin]](data.value())
 
 
 def _array4_view_from_mfiter_impl[

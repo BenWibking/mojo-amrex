@@ -24,9 +24,9 @@ trait AmrexFloatingDtype:
         origin: Origin[mut=True]
     ](
         ref lib: OwnedDLHandle,
-        multifab: UnsafePointer[NoneType, MutUntrackedOrigin],
-        mfiter: UnsafePointer[NoneType, MutUntrackedOrigin],
-    ) raises -> Optional[UnsafePointer[Self.c_type, origin]]:
+        multifab: Pointer[NoneType, MutUntrackedOrigin],
+        mfiter: Pointer[NoneType, MutUntrackedOrigin],
+    ) raises -> Optional[Pointer[Self.c_type, origin]]:
         ...
 
     @staticmethod
@@ -34,9 +34,9 @@ trait AmrexFloatingDtype:
         origin: Origin[mut=True]
     ](
         ref lib: OwnedDLHandle,
-        multifab: UnsafePointer[NoneType, MutUntrackedOrigin],
-        mfiter: UnsafePointer[NoneType, MutUntrackedOrigin],
-    ) raises -> Optional[UnsafePointer[Self.c_type, origin]]:
+        multifab: Pointer[NoneType, MutUntrackedOrigin],
+        mfiter: Pointer[NoneType, MutUntrackedOrigin],
+    ) raises -> Optional[Pointer[Self.c_type, origin]]:
         ...
 
 
@@ -52,12 +52,12 @@ struct AmrexFloat32(AmrexFloatingDtype):
         origin: Origin[mut=True]
     ](
         ref lib: OwnedDLHandle,
-        multifab: UnsafePointer[NoneType, MutUntrackedOrigin],
-        mfiter: UnsafePointer[NoneType, MutUntrackedOrigin],
-    ) raises -> Optional[UnsafePointer[Self.c_type, origin]]:
+        multifab: Pointer[NoneType, MutUntrackedOrigin],
+        mfiter: Pointer[NoneType, MutUntrackedOrigin],
+    ) raises -> Optional[Pointer[Self.c_type, origin]]:
         return lib.call[
             "amrex_mojo_multifab_data_ptr_for_mfiter_f32",
-            Optional[UnsafePointer[Self.c_type, origin]],
+            Optional[Pointer[Self.c_type, origin]],
         ](multifab, mfiter)
 
     @staticmethod
@@ -65,12 +65,12 @@ struct AmrexFloat32(AmrexFloatingDtype):
         origin: Origin[mut=True]
     ](
         ref lib: OwnedDLHandle,
-        multifab: UnsafePointer[NoneType, MutUntrackedOrigin],
-        mfiter: UnsafePointer[NoneType, MutUntrackedOrigin],
-    ) raises -> Optional[UnsafePointer[Self.c_type, origin]]:
+        multifab: Pointer[NoneType, MutUntrackedOrigin],
+        mfiter: Pointer[NoneType, MutUntrackedOrigin],
+    ) raises -> Optional[Pointer[Self.c_type, origin]]:
         return lib.call[
             "amrex_mojo_multifab_data_ptr_for_mfiter_device_f32",
-            Optional[UnsafePointer[Self.c_type, origin]],
+            Optional[Pointer[Self.c_type, origin]],
         ](multifab, mfiter)
 
 
@@ -86,12 +86,12 @@ struct AmrexFloat64(AmrexFloatingDtype):
         origin: Origin[mut=True]
     ](
         ref lib: OwnedDLHandle,
-        multifab: UnsafePointer[NoneType, MutUntrackedOrigin],
-        mfiter: UnsafePointer[NoneType, MutUntrackedOrigin],
-    ) raises -> Optional[UnsafePointer[Self.c_type, origin]]:
+        multifab: Pointer[NoneType, MutUntrackedOrigin],
+        mfiter: Pointer[NoneType, MutUntrackedOrigin],
+    ) raises -> Optional[Pointer[Self.c_type, origin]]:
         return lib.call[
             "amrex_mojo_multifab_data_ptr_for_mfiter",
-            Optional[UnsafePointer[Self.c_type, origin]],
+            Optional[Pointer[Self.c_type, origin]],
         ](multifab, mfiter)
 
     @staticmethod
@@ -99,10 +99,10 @@ struct AmrexFloat64(AmrexFloatingDtype):
         origin: Origin[mut=True]
     ](
         ref lib: OwnedDLHandle,
-        multifab: UnsafePointer[NoneType, MutUntrackedOrigin],
-        mfiter: UnsafePointer[NoneType, MutUntrackedOrigin],
-    ) raises -> Optional[UnsafePointer[Self.c_type, origin]]:
+        multifab: Pointer[NoneType, MutUntrackedOrigin],
+        mfiter: Pointer[NoneType, MutUntrackedOrigin],
+    ) raises -> Optional[Pointer[Self.c_type, origin]]:
         return lib.call[
             "amrex_mojo_multifab_data_ptr_for_mfiter_device",
-            Optional[UnsafePointer[Self.c_type, origin]],
+            Optional[Pointer[Self.c_type, origin]],
         ](multifab, mfiter)

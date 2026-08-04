@@ -32,7 +32,7 @@ from amrex.runtime import RuntimeLease, require_matching_gpu_context
 from amrex.space3d.parallelfor import AMREX_MOJO_CAN_COMPILE_GPU_PARALLEL_FOR, ParallelFor, ParallelForCpu
 from std.builtin.device_passable import DevicePassable
 from std.ffi import c_int
-from std.gpu.host import DeviceContext, DeviceStream
+from max.gpu.host import DeviceContext, DeviceStream
 from std.sys import has_accelerator
 
 
@@ -57,7 +57,7 @@ struct MFIterRange(Movable):
 struct MFIterIterator[origin: Origin[mut=True]](Iterator):
     comptime Element = MFIterTile
 
-    var iter: UnsafePointer[MFIter, Self.origin]
+    var iter: Pointer[MFIter, Self.origin]
 
     def __next__(mut self) raises StopIteration -> Self.Element:
         return self.iter[].__next__()
@@ -166,7 +166,7 @@ struct MFIter(AmrexHandle, Iterator, Movable):
         return tile^
 
     def __iter__(mut self) -> MFIterIterator[origin_of(self)]:
-        return MFIterIterator[origin_of(self)](UnsafePointer[MFIter, origin_of(self)](to=self))
+        return MFIterIterator[origin_of(self)](Pointer[MFIter, origin_of(self)](to=self))
 
     def index(ref self) raises -> Int:
         self._require_valid()
@@ -221,7 +221,7 @@ struct MFIter(AmrexHandle, Iterator, Movable):
 
     def stream_handle(
         mut self,
-    ) raises -> UnsafePointer[NoneType, MutUntrackedOrigin]:
+    ) raises -> Pointer[NoneType, MutUntrackedOrigin]:
         self._require_gpu_backend()
         self._require_valid()
         self._activate_current_stream()

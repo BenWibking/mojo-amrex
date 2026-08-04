@@ -65,7 +65,6 @@ bootstrap = { depends-on = ["configure", "build-capi", "install-amrex"] }
 bootstrap-cray-mpich = { depends-on = ["configure-cray-mpich", "build-capi-cray-mpich", "install-amrex-cray-mpich"] }
 build-multifab-smoke = "mojo build examples/multifab_smoke.mojo -o build/multifab_smoke"
 run-multifab-smoke = "./build/multifab_smoke"
-run-multifab-smoke-script = "mojo examples/multifab_smoke.mojo"
 build-multifab-smoke-mojo-gpu = "mojo build examples/multifab_smoke_mojo_gpu.mojo -o build/multifab_smoke_mojo_gpu"
 run-multifab-smoke-mojo-gpu = "./build/multifab_smoke_mojo_gpu"
 run-multifab-smoke-mojo-gpu-script = "mojo examples/multifab_smoke_mojo_gpu.mojo"
@@ -82,7 +81,8 @@ test = { depends-on = ["test-capi", "test-mojo"] }
 format-mojo = "mojo format -l 120 mojo/amrex examples tests/mojo"
 
 [dependencies]
-mojo = ">=1.0.0b3.dev2026080206,<2"
+mojo = ">=1.0.0b3.dev2026080406,<2"
+max-core = ">=26.5.0.dev2026080406,<27"
 openmpi = ">=5.0.10,<6"
 jupyterlab = ">=4.5.6,<5"
 ipykernel = ">=7.1.0,<8"

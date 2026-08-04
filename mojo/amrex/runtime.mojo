@@ -30,7 +30,7 @@ from amrex.loader import default_library_path, load_library
 from amrex.ownership import require_live_handle
 from std.collections import List
 from std.ffi import OwnedDLHandle
-from std.gpu.host import DeviceContext
+from max.gpu.host import DeviceContext
 from std.memory import ArcPointer
 
 
@@ -114,7 +114,7 @@ def require_matching_gpu_context(
 
 
 @explicit_destroy("Must call close() on AmrexRuntime")
-struct AmrexRuntime(ImplicitlyDeletable where False, Movable):
+struct AmrexRuntime(Deinitable where False, Movable):
     var state: RuntimeLease
     var handle: OptionalRuntimeHandle
 
@@ -225,7 +225,7 @@ struct AmrexRuntime(ImplicitlyDeletable where False, Movable):
         var state = self._lease()
         ffi_gpu_reset_stream(state[].lib)
 
-    def gpu_stream_handle(ref self, ref ctx: DeviceContext) raises -> UnsafePointer[NoneType, MutUntrackedOrigin]:
+    def gpu_stream_handle(ref self, ref ctx: DeviceContext) raises -> Pointer[NoneType, MutUntrackedOrigin]:
         var state = self._lease()
         _ = require_matching_gpu_context(state, ctx)
         var handle = ffi_gpu_stream(state[].lib)

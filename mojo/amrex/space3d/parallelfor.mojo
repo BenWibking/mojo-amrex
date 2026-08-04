@@ -24,7 +24,7 @@ from amrex.build_config import AMREX_MOJO_HAS_COMPILED_GPU_BACKEND
 from amrex.loader import load_default_library
 from std.builtin.device_passable import DevicePassable
 from std.gpu import global_idx
-from std.gpu.host import DeviceContext, DeviceStream
+from max.gpu.host import DeviceContext, DeviceStream
 from std.math import ceildiv
 from std.sys import has_accelerator
 
