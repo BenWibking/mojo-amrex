@@ -88,21 +88,21 @@ struct Box3D(DevicePassable, TrivialRegisterPassable, Writable):
 
 @fieldwise_init
 struct RealBox3D(Copyable, RegisterPassable, Writable):
-    var lo_x: Float64
-    var lo_y: Float64
-    var lo_z: Float64
-    var hi_x: Float64
-    var hi_y: Float64
-    var hi_z: Float64
+    var lo_x: c_double
+    var lo_y: c_double
+    var lo_z: c_double
+    var hi_x: c_double
+    var hi_y: c_double
+    var hi_z: c_double
 
 
 @fieldwise_init
 struct RealVect3D(DevicePassable, TrivialRegisterPassable, Writable):
     comptime device_type = Self
 
-    var x: Float64
-    var y: Float64
-    var z: Float64
+    var x: c_double
+    var y: c_double
+    var z: c_double
 
     def _to_device_type(
         self,
@@ -138,6 +138,16 @@ struct MultiFabMemoryInfo(Copyable):
     var is_managed: Bool
     var is_device: Bool
     var is_pinned: Bool
+
+
+@fieldwise_init
+struct _CMultiFabMemoryInfo(RegisterPassable):
+    var requested_kind: c_int
+    var host_accessible: c_int
+    var device_accessible: c_int
+    var is_managed: c_int
+    var is_device: c_int
+    var is_pinned: c_int
 
 
 @fieldwise_init
@@ -620,15 +630,21 @@ def multifab_datatype(ref lib: OwnedDLHandle, multifab: MultiFabHandle) raises -
 
 
 def multifab_memory_info(ref lib: OwnedDLHandle, multifab: MultiFabHandle) raises -> MultiFabMemoryInfo:
-    var raw = List[c_int](length=6, fill=0)
-    _ = lib.call["amrex_mojo_multifab_memory_info", c_int](multifab, raw.unsafe_ptr())
+    var raw = _CMultiFabMemoryInfo(0, 0, 0, 0, 0, 0)
+    var status = Int(
+        lib.call["amrex_mojo_multifab_memory_info", c_int](
+            multifab,
+            Pointer(to=raw),
+        )
+    )
+    raise_on_error(lib, status)
     return MultiFabMemoryInfo(
-        requested_kind=Int(raw[0]),
-        host_accessible=raw[1] != 0,
-        device_accessible=raw[2] != 0,
-        is_managed=raw[3] != 0,
-        is_device=raw[4] != 0,
-        is_pinned=raw[5] != 0,
+        requested_kind=Int(raw.requested_kind),
+        host_accessible=raw.host_accessible != 0,
+        device_accessible=raw.device_accessible != 0,
+        is_managed=raw.is_managed != 0,
+        is_device=raw.is_device != 0,
+        is_pinned=raw.is_pinned != 0,
     )
 
 
@@ -657,12 +673,15 @@ def multifab_valid_box(ref lib: OwnedDLHandle, multifab: MultiFabHandle, tile_in
 
 
 def mfiter_create(ref lib: OwnedDLHandle, multifab: MultiFabHandle) raises -> OptionalMFIterHandle:
-    var out_handle = List[OptionalMFIterHandle](length=1, fill=None)
-    _ = lib.call["amrex_mojo_mfiter_create", c_int](
-        multifab,
-        out_handle.unsafe_ptr(),
+    var out_handle: OptionalMFIterHandle = None
+    var status = Int(
+        lib.call["amrex_mojo_mfiter_create", c_int](
+            multifab,
+            Pointer(to=out_handle),
+        )
     )
-    return out_handle[0]
+    raise_on_error(lib, status)
+    return out_handle
 
 
 def mfiter_destroy(ref lib: OwnedDLHandle, mfiter: MFIterHandle) raises:
@@ -730,16 +749,19 @@ def _array4_view_from_mfiter_impl[
     var data_lo = Array[c_int, 3](fill=0)
     var data_hi = Array[c_int, 3](fill=0)
     var stride = Array[Int64, 4](fill=0)
-    var ncomp_raw = Array[c_int, 1](fill=0)
+    var ncomp_raw: c_int = 0
 
-    _ = lib.call["amrex_mojo_multifab_array4_metadata_for_mfiter", c_int](
-        multifab,
-        mfiter,
-        data_lo.unsafe_ptr(),
-        data_hi.unsafe_ptr(),
-        stride.unsafe_ptr(),
-        ncomp_raw.unsafe_ptr(),
+    var status = Int(
+        lib.call["amrex_mojo_multifab_array4_metadata_for_mfiter", c_int](
+            multifab,
+            mfiter,
+            data_lo.unsafe_ptr(),
+            data_hi.unsafe_ptr(),
+            stride.unsafe_ptr(),
+            Pointer(to=ncomp_raw),
+        )
     )
+    raise_on_error(lib, status)
 
     var data = _mfiter_scalar_data_ptr[T, use_device_ptr, owner_origin](lib, multifab, mfiter)
 
@@ -756,7 +778,7 @@ def _array4_view_from_mfiter_impl[
             stride_j=Int(stride[1]),
             stride_k=Int(stride[2]),
             stride_n=Int(stride[3]),
-            ncomp=Int(ncomp_raw[0]),
+            ncomp=Int(ncomp_raw),
         ),
     )
 
@@ -994,20 +1016,20 @@ def parmparse_query_int(
     ref lib: OwnedDLHandle, parmparse: ParmParseHandle, name: String
 ) raises -> ParmParseIntQueryResult:
     var name_owned = name
-    var out_value = Array[c_int, 1](fill=0)
-    var out_found = Array[c_int, 1](fill=0)
+    var out_value: c_int = 0
+    var out_found: c_int = 0
     var status = Int(
         lib.call["amrex_mojo_parmparse_query_int", c_int](
             parmparse,
             name_owned.as_c_string_slice().unsafe_ptr(),
-            out_value.unsafe_ptr(),
-            out_found.unsafe_ptr(),
+            Pointer(to=out_value),
+            Pointer(to=out_found),
         )
     )
     return ParmParseIntQueryResult(
         status=status,
-        found=out_found[0] != 0,
-        value=Int(out_value[0]),
+        found=out_found != 0,
+        value=Int(out_value),
     )
 
 
@@ -1015,18 +1037,18 @@ def parmparse_query_real(
     ref lib: OwnedDLHandle, parmparse: ParmParseHandle, name: String
 ) raises -> ParmParseRealQueryResult:
     var name_owned = name
-    var out_value = Array[c_double, 1](fill=0.0)
-    var out_found = Array[c_int, 1](fill=0)
+    var out_value: c_double = 0.0
+    var out_found: c_int = 0
     var status = Int(
         lib.call["amrex_mojo_parmparse_query_real", c_int](
             parmparse,
             name_owned.as_c_string_slice().unsafe_ptr(),
-            out_value.unsafe_ptr(),
-            out_found.unsafe_ptr(),
+            Pointer(to=out_value),
+            Pointer(to=out_found),
         )
     )
     return ParmParseRealQueryResult(
         status=status,
-        found=out_found[0] != 0,
-        value=Float64(out_value[0]),
+        found=out_found != 0,
+        value=Float64(out_value),
     )
