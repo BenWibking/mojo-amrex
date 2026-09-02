@@ -1,6 +1,6 @@
 [workspace]
 authors = ["Ben Wibking <ben@wibking.com>"]
-channels = ["https://conda.modular.com/max", "conda-forge"]
+channels = ["https://conda.modular.com/max-nightly", "conda-forge"]
 name = "mojo-amrex"
 platforms = ["osx-arm64", "linux-64", "linux-aarch64"]
 version = "0.1.0"
@@ -81,8 +81,8 @@ test = { depends-on = ["test-capi", "test-mojo"] }
 format-mojo = "mojo format -l 120 mojo/amrex examples tests/mojo"
 
 [dependencies]
-mojo = "==1.0.0"
-max-core = ">=26.5.0,<27"
+mojo = ">=1.1.0.dev2026090205,<2"
+max-core = ">=26.6.0.dev2026082707,<27"
 openmpi = ">=5.0.10,<6"
 jupyterlab = ">=4.5.6,<5"
 ipykernel = ">=7.1.0,<8"
