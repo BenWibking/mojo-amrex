@@ -403,10 +403,10 @@ def runtime_create(
     for i in range(argc):
         argv_storage[i] = argv[i].copy()
 
-    var first_ptr = argv_storage[0].as_c_string_slice().unsafe_ptr()
+    var first_ptr = argv_storage[0].as_c_string_slice().ptr()
     var argv_ptrs = List[type_of(first_ptr)](length=argc, fill=first_ptr)
     for i in range(1, argc):
-        argv_ptrs[i] = argv_storage[i].as_c_string_slice().unsafe_ptr()
+        argv_ptrs[i] = argv_storage[i].as_c_string_slice().ptr()
 
     return lib.call["amrex_mojo_runtime_create", OptionalRuntimeHandle](
         c_int(argc),
@@ -438,10 +438,10 @@ def runtime_create(
     for i in range(argc):
         argv_storage[i] = argv[i].copy()
 
-    var first_ptr = argv_storage[0].as_c_string_slice().unsafe_ptr()
+    var first_ptr = argv_storage[0].as_c_string_slice().ptr()
     var argv_ptrs = List[type_of(first_ptr)](length=argc, fill=first_ptr)
     for i in range(1, argc):
-        argv_ptrs[i] = argv_storage[i].as_c_string_slice().unsafe_ptr()
+        argv_ptrs[i] = argv_storage[i].as_c_string_slice().ptr()
 
     return lib.call[
         "amrex_mojo_runtime_create_on_device",
@@ -975,7 +975,7 @@ def multifab_write_single_level_plotfile(
         lib.call["amrex_mojo_write_single_level_plotfile", c_int](
             multifab,
             geometry,
-            plotfile_owned.as_c_string_slice().unsafe_ptr(),
+            plotfile_owned.as_c_string_slice().ptr(),
             c_double(time),
             c_int(level_step),
         )
@@ -988,7 +988,7 @@ def parmparse_create(ref lib: OwnedDLHandle, runtime: RuntimeHandle, prefix: Str
         var prefix_null: OptionalCStringHandle = None
         return lib.call["amrex_mojo_parmparse_create", OptionalParmParseHandle](runtime, prefix_null)
     return lib.call["amrex_mojo_parmparse_create", OptionalParmParseHandle](
-        runtime, prefix_owned.as_c_string_slice().unsafe_ptr()
+        runtime, prefix_owned.as_c_string_slice().ptr()
     )
 
 
@@ -1006,7 +1006,7 @@ def parmparse_add_int(
     return Int(
         lib.call["amrex_mojo_parmparse_add_int", c_int](
             parmparse,
-            name_owned.as_c_string_slice().unsafe_ptr(),
+            name_owned.as_c_string_slice().ptr(),
             c_int(value),
         )
     )
@@ -1021,7 +1021,7 @@ def parmparse_query_int(
     var status = Int(
         lib.call["amrex_mojo_parmparse_query_int", c_int](
             parmparse,
-            name_owned.as_c_string_slice().unsafe_ptr(),
+            name_owned.as_c_string_slice().ptr(),
             Pointer(to=out_value),
             Pointer(to=out_found),
         )
@@ -1042,7 +1042,7 @@ def parmparse_query_real(
     var status = Int(
         lib.call["amrex_mojo_parmparse_query_real", c_int](
             parmparse,
-            name_owned.as_c_string_slice().unsafe_ptr(),
+            name_owned.as_c_string_slice().ptr(),
             Pointer(to=out_value),
             Pointer(to=out_found),
         )
