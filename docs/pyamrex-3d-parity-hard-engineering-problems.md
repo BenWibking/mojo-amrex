@@ -1,6 +1,6 @@
 # Hard Engineering Problems for pyAMReX 3D Parity
 
-Last updated: 2026-08-11
+Last updated: 2026-09-26
 
 ## Purpose
 
@@ -118,10 +118,15 @@ struct amrex_mojo_amrcore_callbacks_v1 {
 };
 ```
 
-The exact signatures need a prototype against the installed Mojo compiler. The
-design should not assume that an arbitrary capturing Mojo closure can be passed
-directly as a C function pointer. A stable trampoline with an opaque context is
-the safer boundary.
+Current Mojo documents thin `abi("C")` functions and capture-free lambdas as C
+function pointers (including a `qsort` callback example). That establishes the
+function-pointer mechanism for the table, but not the lifetime, reentrancy, or
+error behavior of a delayed AMReX callback. The exact signatures still need a
+prototype against the installed Mojo compiler. A capturing Mojo closure cannot
+be passed directly as a thin C function pointer; use a stable trampoline with
+an opaque context for application state. See the
+[Mojo C FFI manual](https://mojolang.org/docs/manual/c-ffi/) and
+[lambda reference](https://mojolang.org/docs/reference/lambda-expressions/).
 
 Boundary and AMR callbacks should reuse one registration, ownership, error, and
 in-flight-call mechanism rather than creating two independent callback systems.
@@ -141,6 +146,34 @@ Build a standalone callback spike that:
 
 Only after this works should the project implement the full boundary or
 `AmrCore` surfaces.
+
+### Unresolved Major Design Question: Calling Trait Defaults from Overrides
+
+The public Mojo application interface for an `AmrCore`-like hierarchy remains
+undecided. A Mojo trait can provide a default method and a conforming struct
+can override it, but the override cannot call the trait's default body. This
+matters for a Quokka-style simulation: `QuokkaSimulation::initialize()` calls
+`AMRSimulation::initialize()` before its own setup, and
+`QuokkaSimulation::rereadRuntimeParameters()` calls the base implementation
+before reading Quokka-specific and particle parameters. A trait-only translation
+cannot preserve those calls with a `super`-style expression.
+
+The Mojo compiler checkout at `f23fc09d38` explicitly rejects direct access
+to trait members in `Mojo/lib/MojoParser/ExprNodes.cpp`. Its `MOCO-2303` comment
+proposes `Foo.foo(value)` to call a trait default even when the struct overrides
+`foo`. The compiler already emits calls to trait bodies from synthesized
+default-method wrappers, but disables a wrapper when an override supplies the
+conformance witness (`Mojo/lib/MojoParser/Traits.cpp` and
+`Mojo/lib/MojoParser/StructEmitter.cpp`). This is evidence of a missing
+qualified-call path, not evidence that the trait body cannot execute. The
+compiler source does not establish when that path will be implemented.
+
+Decide whether the public binding should expose base lifecycle operations as
+separately named methods on a composed AMR state object, so both trait defaults
+and overrides can call them, or use trait-qualified default calls if Mojo
+supports them. Also decide which operations are mandatory base work and which
+are overridable hooks. Record the choice before fixing the public `AmrCore`
+application contract; the delayed-callback spike can proceed independently.
 
 ## 2. Ownership Is Not Enough: Storage Invalidation
 

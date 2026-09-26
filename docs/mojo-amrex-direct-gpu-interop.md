@@ -1,6 +1,6 @@
 # Direct GPU Interop for `mojo-amrex`
 
-Last updated: 2026-03-25
+Last updated: 2026-09-26
 
 ## Goal
 
@@ -141,7 +141,7 @@ Those methods call C accessors that explicitly require
 
 ```mojo
 from amrex.runtime import AmrexRuntime
-from std.gpu.host import DeviceContext
+from max.gpu.host import DeviceContext
 
 def main() raises:
     var ctx = DeviceContext()

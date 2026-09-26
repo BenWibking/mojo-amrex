@@ -1,6 +1,6 @@
 # pyAMReX 3D Feature-Parity Inventory
 
-Last updated: 2026-08-11
+Last updated: 2026-09-26
 
 ## Purpose
 
@@ -288,6 +288,8 @@ Missing for parity:
 - standard extrapolation and reflection fills
 - external Dirichlet support
 - a C callback table/trampoline for Mojo boundary functions
+- a delayed-callback proof using Mojo's thin `abi("C")` function pointers and
+  an opaque context for captured application state
 - callback error propagation and callback-scoped borrow rules
 
 Acceptance criteria:
@@ -365,6 +367,9 @@ Current `mojo-amrex`:
 Required design work:
 
 - opaque C ABI handles for hierarchy and tag arrays
+- resolve the major design question of Quokka-style calls to base initialization
+  and runtime parameter rereading from application overrides; Mojo traits do not
+  currently allow an override to call its trait's default implementation
 - a callback vtable containing C-compatible function pointers and user context
 - C++ trampolines for each `AmrCore` callback
 - status/error translation that never lets an exception cross the C ABI

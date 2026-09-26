@@ -1,5 +1,13 @@
 # AMReX Runtime Lifetime Options
 
+Last reviewed: 2026-09-26
+
+This is an unresolved ownership design note. The current Mojo toolchain
+supports `@explicit_destroy`, and `AmrexRuntime` uses it with a consuming
+`close()`. That language feature enforces an explicit call but does not by
+itself ensure that dependent `RuntimeLease` wrappers are destroyed first. The
+Option 1 recommendation below is a proposal, not the current implementation.
+
 ## Problem Statement
 
 `AmrexRuntime` currently exposes an explicit `close()` that immediately calls

@@ -1,6 +1,6 @@
 # Roadmap to pyAMReX 3D Feature Parity
 
-Last updated: 2026-08-11
+Last updated: 2026-09-26
 
 ## Goal
 
@@ -200,6 +200,8 @@ APIs.
 - define an invalidation-token or generation pattern for storage that can move
   during resize, regrid, or particle redistribution
 - define the callback error channel before implementing user callbacks
+- prototype a thin `abi("C")` callback and an opaque user-context trampoline;
+  verify delayed invocation, teardown, and error translation separately
 - document supported CPU/GPU/MPI combinations
 
 ### Runtime Capabilities
@@ -461,6 +463,10 @@ application-defined level callbacks.
 ### Mojo Ownership Model
 
 - make hierarchy ownership of level data explicit
+- resolve the major design question of how an application override calls shared
+  AMR lifecycle behavior: Mojo currently cannot call a trait default body from
+  an override; evaluate separately named base operations on composed state
+  against any future trait-qualified call support
 - define whether application level fields are registered, returned, or stored
   behind a Mojo callback context
 - invalidate old level views after remake, clear, or regrid
@@ -480,6 +486,8 @@ application-defined level callbacks.
 ### Exit Gate
 
 - a Mojo application can own and evolve a multilevel AMR hierarchy
+- the public application-hook design preserves base initialization and runtime
+  parameter reread ordering in Quokka-style overrides
 - all required callbacks have safe lifetime and error behavior
 - stale hierarchy and tag views fail deterministically
 - the two-level example passes across the supported execution matrix

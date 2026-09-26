@@ -1,6 +1,6 @@
 # Mojo Bindings Plan for AMReX
 
-Last updated: 2026-03-15
+Last updated: 2026-09-26
 
 ## Goal
 
@@ -62,6 +62,13 @@ CUDA/HIP GPU interop path. Treat
 `docs/mojo-amrex-direct-gpu-interop.md` as the current GPU status document; the
 rest of this file remains useful as background on the original binding
 architecture and scope decisions.
+
+Mojo 1.2.0.dev2026092605 is the current repository toolchain. The original
+runtime-finalization and GPU limitations below are historical design context;
+the [runtime lifetime options](amrex-runtime-lifetime-options.md) and
+[direct GPU interop notes](mojo-amrex-direct-gpu-interop.md) describe the
+current implementation and remaining risks. The broader 3D parity work is
+tracked in the [parity roadmap](pyamrex-3d-parity-roadmap.md).
 
 An initial MPI slice is now implemented:
 
@@ -354,8 +361,10 @@ Instead, expose a root runtime object:
 
 All owning AMReX wrappers are created from an `AmrexRuntime` and retain a
 runtime dependency in their Mojo representation. That makes the runtime a true
-root owner rather than a convention. `AmrexRuntime.__del__()` performs
-finalization only when no wrappers that depend on it remain alive.
+root owner rather than a convention. The current `AmrexRuntime` uses Mojo's
+`@explicit_destroy` and a consuming `close()`; it does not finalize in
+`__del__`. Resolving how `close()` interacts with outstanding wrapper leases
+remains a separate ownership decision in the runtime lifetime options note.
 
 Avoid passing raw AMReX callback hooks in the first version unless there is a
 clear need.
@@ -435,25 +444,13 @@ Current repo status:
 - The binding should not expose a staged host-to-device `Array4` fallback.
 
 The original design intent was to preserve AMReX's native ownership model
-instead of replacing it with Mojo-native buffer ownership. In practice, that
-interop is not complete because AMReX-managed device allocation, borrowed
-`Array4` device views, and stream/runtime composition between AMReX and Mojo
-are not wired up well enough yet.
-
-See `docs/mojo-amrex-direct-gpu-interop.md` for the concrete proposal for that
-deferred direct path. The short version is that AMReX should remain the owner
-of both device memory and stream selection, while Mojo adapts its kernel
-launches to the current AMReX stream.
-
-That leaves two distinct execution models:
-
-- current supported path: host-backed `MultiFab` plus explicit staging into
-  Mojo buffers for user-launched kernels
-- deferred path: direct AMReX GPU-runtime interop with AMReX-owned device
-  allocation and stream coordination
-
-Until the deferred path is properly defined and tested, this repo should not
-present AMReX GPU support as available.
+instead of replacing it with Mojo-native buffer ownership. The repository now
+implements an opt-in direct CUDA/HIP path: Mojo wraps the current AMReX stream
+and launches against borrowed AMReX-owned device storage. See the
+[direct GPU interop notes](mojo-amrex-direct-gpu-interop.md) and
+[GPU synchronization audit](gpu-synchronization-audit.md) for its supported
+surface and remaining ordering risks. This implementation does not establish
+that every backend or GPU/MPI combination has been validated.
 
 ## Build System Plan
 
@@ -664,21 +661,18 @@ just in documentation.
 ### 3. Runtime shutdown ordering
 
 If AMReX finalization happens before all owner wrappers are destroyed, later
-destructors may call into a shut-down runtime. The binding layer must root all
-owners under `AmrexRuntime` and make finalization happen from its destructor.
+destructors may call into a shut-down runtime. The binding layer roots owners
+under `AmrexRuntime`, but its current explicit `close()` can still finalize
+while leases exist. Resolve that ordering before treating runtime teardown as
+safe; see the [runtime lifetime options](amrex-runtime-lifetime-options.md).
 
 ### 4. Premature GPU interop
 
-GPU support is important long-term, but it is not the right first target for a
-new FFI stack. CPU correctness should come first. When GPU support is added,
-prefer AMReX-managed allocation via `The_Async_Arena()` over redesigning
-`MultiFab` ownership around Mojo `DeviceBuffer`, and treat stream coordination
-as the main integration risk. The current public Mojo GPU API appears to manage
-its own streams rather than adopt external AMReX stream handles, so boundary
-synchronization may be required unless lower-level interop becomes available.
-`docs/mojo-amrex-direct-gpu-interop.md` captures the proposed path for closing
-that gap by importing the current AMReX stream into Mojo rather than trying to
-make AMReX adopt Mojo-owned streams.
+The initial CPU-first sequencing remains useful history. The current Mojo GPU
+API can wrap an external CUDA/HIP stream, and this repository uses that path
+with AMReX-owned device storage. Stream lifetime, active-stream changes, and
+cross-stream ordering remain integration risks; see the
+[GPU synchronization audit](gpu-synchronization-audit.md).
 
 ### 5. Depending too heavily on AMReX's Fortran interface build path
 
